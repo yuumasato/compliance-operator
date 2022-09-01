@@ -54,6 +54,7 @@ import (
 
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/common"
+	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/compliancescan"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/utils"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/xccdf"
 )
@@ -542,6 +543,20 @@ func createResults(crClient aggregatorCrClient, scan *compv1alpha1.ComplianceSca
 		return nil
 	}
 
+	// This feels like an appropriate seam to implementing forwarding since
+	// we have a list of consistent results and remediations. Determine if
+	// we're configured to forward results to an external system and
+	// establish that connection here.
+	//
+	f := compliancescan.NewForwarder(scan)
+	//
+	// The NewForwarder() function is a factory that returns the
+	// appropriate forwarding client based on the configuration supplied in
+	// the `ScanSetting`. This should keep forwarding implementation
+	// details (e.g., gRPC) decoupled from the aggregator (e.g., does the
+	// aggregator need to know it's using gRPC under the hood, probably
+	// not).
+
 	for _, pr := range consistentResults {
 		if pr == nil || pr.CheckResult == nil {
 			cmdLog.Info("nil result or result.check, this shouldn't happen")
@@ -571,6 +586,8 @@ func createResults(crClient aggregatorCrClient, scan *compv1alpha1.ComplianceSca
 		if err := createOrUpdateOneResult(crClient, scan, checkResultLabels, checkResultAnnotations, checkResultExists, pr.CheckResult); err != nil {
 			return fmt.Errorf("cannot create or update checkResult %s: %v", pr.CheckResult.Name, err)
 		}
+		// Handle forwarding.
+		f.SendComplianceCheckResult(pr.CheckResult)
 
 		if pr.Remediations == nil ||
 			(pr.CheckResult.Status != compv1alpha1.CheckResultFail &&
@@ -578,6 +595,10 @@ func createResults(crClient aggregatorCrClient, scan *compv1alpha1.ComplianceSca
 				pr.CheckResult.Status != compv1alpha1.CheckResultPass && /* even passing remediations might need to be updated */
 				pr.CheckResult.Status != compv1alpha1.CheckResultInconsistent) {
 			continue
+		}
+		for _, r := range pr.Remediations {
+			// Handle forwarding.
+			f.SendComplianceRemediation(r)
 		}
 
 		for idx := range pr.Remediations {
