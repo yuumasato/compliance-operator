@@ -36,6 +36,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - Modify the `make e2e` target to save test logs to `tests/data/e2e-test.log`.
   This is useful when initiating end-to-end tests locally and debugging the
   output.
+- The upstream catalog image is now built using the
+  [file format](https://olm.operatorframework.io/docs/reference/file-based-catalogs/)
+  replacing the now deprecated SQLite format.
 
 ### Deprecations
 
