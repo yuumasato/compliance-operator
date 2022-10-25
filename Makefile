@@ -213,11 +213,6 @@ CATALOG_SRC_FILE=$(CATALOG_DIR)/catalog-source.yaml
 CATALOG_GROUP_FILE=$(CATALOG_DIR)/operator-group.yaml
 CATALOG_SUB_FILE=$(CATALOG_DIR)/subscription.yaml
 
-# Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
-ifneq ($(origin CATALOG_BASE_IMG), undefined)
-FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
-endif
-
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -387,6 +382,8 @@ endif
 update-skip-range: check-operator-version ## Set olm.skipRange attribute in the operator CSV to $VERSION. This assumes upgrades can skip versions (0.1.47 can be upgraded to 0.1.53).
 	sed -i '/replaces:/d' config/manifests/bases/compliance-operator.clusterserviceversion.yaml
 	sed -i "s/\(olm.skipRange: '>=.*\)<.*'/\1<$(VERSION)'/" config/manifests/bases/compliance-operator.clusterserviceversion.yaml
+	sed -i "s/\(\"name\": \"compliance-operator.v\).*\"/\1$(VERSION)\"/" catalog/preamble.json
+	sed -i "s/\(\"skipRange\": \">=.*\)<.*\"/\1<$(VERSION)\"/" catalog/preamble.json
 
 .PHONY: namespace
 namespace: ## Create the default namespace for the operator (e.g., openshift-compliance).
@@ -447,11 +444,17 @@ openscap-image:
 	$(RUNTIME) $(RUNTIME_BUILD_CMD) $(RUNTIME_BUILD_OPTS) --no-cache -t $(OPENSCAP_IMAGE) $(OPENSCAP_DOCKER_CONTEXT)
 
 # Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
-# This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
-# https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
+# This recipe invokes 'opm render' to build a file-based catalog.
+# For more information, see https://olm.operatorframework.io/docs/reference/file-based-catalogs/
 .PHONY: catalog-image
 catalog-image: opm ## Build a catalog image.
-	$(OPM) index add --container-tool $(RUNTIME) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+	$(eval TMP_DIR := $(shell mktemp -d))
+	$(eval CATALOG_DOCKERFILE := $(TMP_DIR).Dockerfile)
+	cp catalog/preamble.json $(TMP_DIR)/compliance-operator-catalog.json
+	$(OPM) render $(BUNDLE_IMGS) >> $(TMP_DIR)/compliance-operator-catalog.json
+	$(OPM) generate dockerfile $(TMP_DIR)
+	$(RUNTIME) build -f $(CATALOG_DOCKERFILE) -t $(CATALOG_IMG)
+	rm -rf $(TMP_DIR) $(CATALOG_DOCKERFILE)
 
 .PHONY: catalog
 catalog: catalog-image catalog-push ## Build and push a catalog image.
