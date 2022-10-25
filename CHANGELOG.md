@@ -13,6 +13,29 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
+-
+
+### Internal Changes
+
+-
+
+### Deprecations
+
+-
+
+### Removals
+
+-
+
+### Security
+
+-
+
+
+## [0.1.57] - 2022-10-20
+
+### Fixes
+
 - Fix broken-content script to include a new image tag, and add test content datastream xml files.
   We pushed a new test content image to `quay.io/compliance-operator/test-broken-content:kublet_default`
   for our Compliance Operator e2e test. In order to run e2e test on other architectures, we need to store
@@ -39,19 +62,6 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - The upstream catalog image is now built using the
   [file format](https://olm.operatorframework.io/docs/reference/file-based-catalogs/)
   replacing the now deprecated SQLite format.
-
-### Deprecations
-
--
-
-### Removals
-
--
-
-### Security
-
--
-
 
 ## [0.1.56] - 2022-09-27
 
