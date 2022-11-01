@@ -8,10 +8,8 @@ LABEL \
     io.openshift.tags="compliance openscap scan" \
     io.openshift.wants="scap-content"
 
-# Remove the microdnf upgrade libksba line when RH releases UBI image with fix for CVE-2022-3515
 RUN true \
     && microdnf install -y openscap-scanner \
-    && microdnf upgrade libksba \
     && microdnf clean all \
     && true
 
