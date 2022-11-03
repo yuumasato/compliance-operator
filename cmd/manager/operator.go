@@ -124,7 +124,7 @@ func defineOperatorFlags(cmd *cobra.Command) {
 	cmd.Flags().String("platform", "OpenShift",
 		"Specifies the Platform the Compliance Operator is running on. "+
 			"This will affect the defaults created.")
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&metricsAddr, "metrics-bind-address", fmt.Sprintf(":%d", metricsPort), "The address the metric endpoint binds to. This option is hard-coded to the default and is left for compatibility.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
@@ -179,6 +179,9 @@ func RunOperator(cmd *cobra.Command, args []string) {
 	} else {
 		setupLog.Info("Watching all namespaces")
 	}
+
+	// Unused, but kept until we decide what to do with multi-namespace support. See the creation of `mgr` below for
+	// the actual operator options configuration.
 	options := manager.Options{
 		Namespace:          namespace,
 		MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
@@ -192,6 +195,7 @@ func RunOperator(cmd *cobra.Command, args []string) {
 		// Also note that you may face performance issues when using this with a high number of namespaces.
 		// More Info: https://godoc.org/github.com/kubernetes-sigs/controller-runtime/pkg/cache#MultiNamespacedCacheBuilder
 		if strings.Contains(namespace, ",") {
+			// These are not applied because of the non-use of the `options` variable, so multi-namespace is probably non-functional.
 			options.Namespace = ""
 			options.NewCache = cache.MultiNamespacedCacheBuilder(namespaceList)
 		}
@@ -212,8 +216,9 @@ func RunOperator(cmd *cobra.Command, args []string) {
 	monitoringClient := monclientv1.NewForConfigOrDie(cfg)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Namespace:              namespace,
 		Scheme:                 operatorScheme,
-		MetricsBindAddress:     metricsAddr,
+		MetricsBindAddress:     fmt.Sprintf("%s:%d", metricsHost, metricsPort),
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
