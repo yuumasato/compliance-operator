@@ -63,6 +63,7 @@ const (
 // Constants useful for parsing warnings
 const (
 	endPointTag              = "ocp-api-endpoint"
+	hideTag                  = "ocp-hide-rule"
 	endPointTagKubeletconfig = "ocp-api-endpoint-kubeletconfig"
 	dumpLocationClass        = "ocp-dump-location"
 	filterTypeClass          = "ocp-api-filter"
@@ -131,6 +132,18 @@ func warningHasApiObjects(in *xmlquery.Node) bool {
 
 	for _, codeNode := range codeNodes {
 		if codeNode.SelectAttr("class") == endPointTag || codeNode.SelectAttr("class") == endPointTagKubeletconfig {
+			return true
+		}
+	}
+
+	return false
+}
+
+func warningHasHideTag(in *xmlquery.Node) bool {
+	codeNodes := in.SelectElements("//html:code")
+
+	for _, codeNode := range codeNodes {
+		if codeNode.SelectAttr("class") == hideTag {
 			return true
 		}
 	}
@@ -508,10 +521,17 @@ func newComplianceCheckResult(result *xmlquery.Node, rule *xmlquery.Node, ruleId
 		mappedStatus = compv1alpha1.CheckResultManual
 	}
 
+	annotations := make(map[string]string)
+
+	if RuleHasHideTagWarning(rule) {
+		annotations[compv1alpha1.RuleHideTagAnnotationKey] = "true"
+	}
+
 	return &compv1alpha1.ComplianceCheckResult{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:        name,
+			Namespace:   namespace,
+			Annotations: annotations,
 		},
 		ID:           ruleIdRef,
 		Status:       mappedStatus,
@@ -571,6 +591,21 @@ func RuleHasApiObjectWarning(rule *xmlquery.Node) bool {
 			continue
 		}
 		if warningHasApiObjects(warn) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func RuleHasHideTagWarning(rule *xmlquery.Node) bool {
+	warningObjs := rule.SelectElements("//xccdf-1.2:warning")
+
+	for _, warn := range warningObjs {
+		if warn == nil {
+			continue
+		}
+		if warningHasHideTag(warn) {
 			return true
 		}
 	}
