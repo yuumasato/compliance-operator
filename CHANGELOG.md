@@ -13,7 +13,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
--
+- The `rerunner` Service Account was not properly owned by the operator CSV
+  after the recent upgrade of the Operator SDK and as an effect could be removed
+  when Compliance Operator was upgraded from a version built with the older
+  Operator SDK version (from 0.1.53 or older). This issue is also
+  [tracked](https://github.com/ComplianceAsCode/compliance-operator/pull/179) in
+  Red Hat's issue tracker.
 
 ### Internal Changes
 

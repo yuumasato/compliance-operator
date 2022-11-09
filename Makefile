@@ -184,7 +184,7 @@ BUNDLE_IMG ?= $(BUNDLE_TAG_BASE):$(TAG)
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 
 # Includes additional service accounts into the bundle CSV.
-BUNDLE_SA_OPTS ?= --extra-service-accounts remediation-aggregator,api-resource-collector,resultscollector,resultserver,profileparser
+BUNDLE_SA_OPTS ?= --extra-service-accounts remediation-aggregator,api-resource-collector,resultscollector,resultserver,profileparser,rerunner
 
 # USE_IMAGE_DIGESTS defines if images are resolved via tags or digests
 # You can enable this value if you would like to use SHA Based Digests
