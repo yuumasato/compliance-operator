@@ -1506,6 +1506,24 @@ spec:
         serviceAccountName: remediation-aggregator
       - rules:
         - apiGroups:
+          - compliance.openshift.io
+          resources:
+          - compliancescans
+          verbs:
+          - get
+          - list
+          - update
+        - apiGroups:
+          - scheduling.k8s.io
+          resources:
+          - priorityclasses
+          verbs:
+          - get
+          - list
+          - watch
+        serviceAccountName: rerunner
+      - rules:
+        - apiGroups:
           - ""
           resources:
           - configmaps
