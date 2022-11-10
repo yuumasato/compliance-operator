@@ -19,6 +19,14 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   Operator SDK version (from 0.1.53 or older). This issue is also
   [tracked](https://github.com/ComplianceAsCode/compliance-operator/pull/179) in
   Red Hat's issue tracker.
+- Fix metrics port during operator startup.
+  The metrics port configuration was being set to a default of 8080 due to an
+  unused options setup variable, this is corrected to be hard-coded to 8383 as
+  required by OCP monitoring. Fixes [OCP-3097](https://issues.redhat.com/browse/OCPBUGS-3097).
+- Pass namespace to the controller manager on startup, which now allows the
+  WATCH_NAMESPACE adjustments to take place. The operator pod will now only
+  watch in the operator namespace, reducing memory usage when there are many
+  namespaces.
 
 ### Internal Changes
 
