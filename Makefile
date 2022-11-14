@@ -625,6 +625,7 @@ git-release: fetch-git-tags package-version-to-tag changelog ## Update project f
 	sed -i "s/\(.*VERSION?=\).*/\1$(TAG)/" version.Makefile
 	git add version* bundle CHANGELOG.md config/manifests/bases
 	git add "config/helm/Chart.yaml"
+	git add "catalog/preamble.json"
 	git restore config/manager/kustomization.yaml
 
 .PHONY: fetch-git-tags
