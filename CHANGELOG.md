@@ -13,6 +13,33 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
+-
+
+### Internal Changes
+
+-
+
+### Deprecations
+
+-
+
+### Removals
+
+-
+
+### Security
+
+-
+
+
+## [0.1.58] - 2022-11-14
+
+### Enhancements
+
+-
+
+### Fixes
+
 - The `rerunner` Service Account was not properly owned by the operator CSV
   after the recent upgrade of the Operator SDK and as an effect could be removed
   when Compliance Operator was upgraded from a version built with the older
