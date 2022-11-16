@@ -57,7 +57,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Internal Changes
 
--
+- Ensure `preamble.json` is included in the release process so the catalog is
+  up-to-date with the latest version of the operator.
 
 ### Deprecations
 
