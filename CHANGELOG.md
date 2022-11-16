@@ -44,7 +44,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   after the recent upgrade of the Operator SDK and as an effect could be removed
   when Compliance Operator was upgraded from a version built with the older
   Operator SDK version (from 0.1.53 or older). This issue is also
-  [tracked](https://github.com/ComplianceAsCode/compliance-operator/pull/179) in
+  [tracked](https://issues.redhat.com/browse/OCPBUGS-3452) in
   Red Hat's issue tracker.
 - Fix metrics port during operator startup.
   The metrics port configuration was being set to a default of 8080 due to an
