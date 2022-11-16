@@ -1067,6 +1067,13 @@ spec:
           - get
           - list
           - watch
+        - apiGroups:
+          - hypershift.openshift.io
+          resources:
+          - hostedclusters
+          verbs:
+          - get
+          - list
         serviceAccountName: api-resource-collector
       - rules:
         - apiGroups:

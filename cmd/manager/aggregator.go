@@ -547,6 +547,12 @@ func createResults(crClient aggregatorCrClient, scan *compv1alpha1.ComplianceSca
 			cmdLog.Info("nil result or result.check, this shouldn't happen")
 			continue
 		}
+		_, hasHiddenAnnotation := pr.CheckResult.Annotations[compv1alpha1.RuleHideTagAnnotationKey]
+
+		if hasHiddenAnnotation {
+			cmdLog.Info("Skipping result as has hidden annotation", "result", pr.CheckResult)
+			continue
+		}
 
 		checkResultLabels := getCheckResultLabels(&pr.ParseResult, pr.Labels, scan)
 		checkResultAnnotations := getCheckResultAnnotations(pr.CheckResult, pr.Annotations)

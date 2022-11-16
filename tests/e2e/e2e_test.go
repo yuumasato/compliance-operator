@@ -3787,5 +3787,114 @@ func TestE2E(t *testing.T) {
 
 			},
 		},
+		testExecution{
+			Name:       "TestHideRule",
+			IsParallel: true,
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+				var baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "hide_rule")
+				const requiredRule = "version-detect"
+				pbName := getObjNameFromTest(t)
+				prefixName := func(profName, ruleBaseName string) string { return profName + "-" + ruleBaseName }
+
+				ocpPb := &compv1alpha1.ProfileBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      pbName,
+						Namespace: namespace,
+					},
+					Spec: compv1alpha1.ProfileBundleSpec{
+						ContentImage: baselineImage,
+						ContentFile:  ocpContentFile,
+					},
+				}
+				if err := f.Client.Create(goctx.TODO(), ocpPb, getCleanupOpts(ctx)); err != nil {
+					return err
+				}
+				if err := waitForProfileBundleStatus(t, f, namespace, pbName, compv1alpha1.DataStreamValid); err != nil {
+					return err
+				}
+
+				// Check that if the rule we are going to test is there
+				err, found := doesRuleExist(f, ocpPb.Namespace, prefixName(pbName, requiredRule))
+				if err != nil {
+					return err
+				} else if found != true {
+					E2EErrorf(t, "Expected rule %s not found", prefixName(pbName, requiredRule))
+					return err
+				}
+
+				suiteName := "hide-rules-test"
+				scanName := "hide-rules-test"
+
+				tp := &compv1alpha1.TailoredProfile{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      suiteName,
+						Namespace: namespace,
+					},
+					Spec: compv1alpha1.TailoredProfileSpec{
+						Title:       "hide-rules-test",
+						Description: "A test tailored profile to test hide-rules",
+						EnableRules: []compv1alpha1.RuleReferenceSpec{
+							{
+								Name:      prefixName(pbName, requiredRule),
+								Rationale: "To be tested",
+							},
+						},
+					},
+				}
+
+				createTPErr := f.Client.Create(goctx.TODO(), tp, getCleanupOpts(ctx))
+				if createTPErr != nil {
+					return createTPErr
+				}
+
+				ssb := &compv1alpha1.ScanSettingBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      suiteName,
+						Namespace: namespace,
+					},
+					Profiles: []compv1alpha1.NamedObjectReference{
+						{
+							APIGroup: "compliance.openshift.io/v1alpha1",
+							Kind:     "TailoredProfile",
+							Name:     suiteName,
+						},
+					},
+					SettingsRef: &compv1alpha1.NamedObjectReference{
+						APIGroup: "compliance.openshift.io/v1alpha1",
+						Kind:     "ScanSetting",
+						Name:     "default",
+					},
+				}
+
+				err = f.Client.Create(goctx.TODO(), ssb, getCleanupOpts(ctx))
+				if err != nil {
+					return err
+				}
+
+				// Ensure that all the scans in the suite have finished and are marked as Done
+				err = waitForSuiteScansStatus(t, f, namespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultNotApplicable)
+				if err != nil {
+					return err
+				}
+
+				// the check should be shown as manual
+				checkResult := compv1alpha1.ComplianceCheckResult{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fmt.Sprintf("%s-version-detect", scanName),
+						Namespace: namespace,
+					},
+					ID:       "xccdf_org.ssgproject.content_rule_version_detect",
+					Status:   compv1alpha1.CheckResultNoResult,
+					Severity: compv1alpha1.CheckResultSeverityMedium,
+				}
+				err = assertHasCheck(f, suiteName, scanName, checkResult)
+				if err == nil {
+					return fmt.Errorf("The check should not be found in the scan %s", scanName)
+				}
+				E2ELogf(t, "The test succeeded!")
+				return nil
+
+			},
+		},
 	)
 }

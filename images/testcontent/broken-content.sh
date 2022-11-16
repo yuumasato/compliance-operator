@@ -8,6 +8,7 @@ declare -a tags=(
     'proff_diff_baseline'
     'proff_diff_mod'
     'rem_mod_base'
+    'hide_rule'
     'rem_mod_change'
     'broken_os_detection'
     'from'

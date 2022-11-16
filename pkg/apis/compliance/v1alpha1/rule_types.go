@@ -11,6 +11,10 @@ import (
 // here or in the compliance-operator?
 const RuleIDAnnotationKey = "compliance.openshift.io/rule"
 
+// RuleHideTagAnnotationKey is the annotation used to mark a rule to be hidden from the
+// ComplianceCheckResult
+const RuleHideTagAnnotationKey = "compliance.openshift.io/hide-tag"
+
 // RuleVariableAnnotationKey store list of xccdf variables used to render the rule
 const RuleVariableAnnotationKey = "compliance.openshift.io/rule-variable"
 

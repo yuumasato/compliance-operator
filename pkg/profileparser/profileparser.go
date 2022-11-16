@@ -623,6 +623,10 @@ func ParseRulesAndDo(contentDom *xmlquery.Node, stdParser *referenceParser, pb *
 				log.Error(err, "couldn't annotate a rule")
 				// We continue even if there's an error.
 			}
+			if utils.RuleHasHideTagWarning(ruleObj) {
+				log.Info("Rule has hide tag warning")
+				annotations[cmpv1alpha1.RuleHideTagAnnotationKey] = "true"
+			}
 
 			p := cmpv1alpha1.Rule{
 				TypeMeta: metav1.TypeMeta{

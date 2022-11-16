@@ -17,7 +17,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Internal Changes
 
--
+- Added the ability to hide compliance check result for helper rule, we will
+  scan for "ocp-hide-rule" in the warning, and if it exist we will not show
+  the rule in the compliance check result.
+
+- Added permission to fetch HyperShift version resources, please refer to
+  [HyperShift Version Detection](https://github.com/ComplianceAsCode/content/pull/9726)
+  on how to use tailoredProfile for HyperShift version detection.
 
 ### Deprecations
 
