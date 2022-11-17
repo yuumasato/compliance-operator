@@ -13,7 +13,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
--
+- Fixes an [issue](https://issues.redhat.com/browse/OCPBUGS-3420) where
+  `ScanSettingBindings` created without a `settingRef` did not use a proper
+  default value. `ScanSettingBindings` without a `settingRef` will now use the
+  `default` `ScanSetting`.
 
 ### Internal Changes
 
