@@ -38,6 +38,15 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 -
 
 
+## [0.1.59] - 2022-11-16
+
+### Internal Changes
+
+- OpenShift platforms were added as an annotation. This helps organize
+  operators across the OpenShift ecosystem.
+- The `preamble.json` file was included in release targets, making it easier to
+  include changes when releasing new versions of the operator.
+
 ## [0.1.58] - 2022-11-14
 
 ### Enhancements
