@@ -2331,10 +2331,10 @@ func TestE2E(t *testing.T) {
 				return nil
 			},
 		},
-                testExecution{
-                        Name: "TestScanSettingBindingUsesDefaultScanSetting",
-                        IsParallel: true,
-                        TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+		testExecution{
+			Name:       "TestScanSettingBindingUsesDefaultScanSetting",
+			IsParallel: true,
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
 				objName := getObjNameFromTest(t)
 				scanSettingBindingName := objName + "-binding"
 				scanSettingBinding := compv1alpha1.ScanSettingBinding{
@@ -2365,13 +2365,13 @@ func TestE2E(t *testing.T) {
 					return err
 				}
 
-                                // Make sure the binding used the `default` ScanSetting.
-                                if binding.SettingsRef.Name != "default" {
+				// Make sure the binding used the `default` ScanSetting.
+				if binding.SettingsRef.Name != "default" {
 					E2EErrorf(t, "Expected the settings reference to use the default ScanSetting")
-                                }
-                                return nil
-                        },
-                },
+				}
+				return nil
+			},
+		},
 		testExecution{
 			Name:       "TestScanSettingBindingWatchesTailoredProfile",
 			IsParallel: true,
