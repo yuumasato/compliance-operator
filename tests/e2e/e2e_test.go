@@ -2331,6 +2331,47 @@ func TestE2E(t *testing.T) {
 				return nil
 			},
 		},
+                testExecution{
+                        Name: "TestScanSettingBindingUsesDefaultScanSetting",
+                        IsParallel: true,
+                        TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+				objName := getObjNameFromTest(t)
+				scanSettingBindingName := objName + "-binding"
+				scanSettingBinding := compv1alpha1.ScanSettingBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      scanSettingBindingName,
+						Namespace: namespace,
+					},
+					Profiles: []compv1alpha1.NamedObjectReference{
+						{
+							Name:     "ocp4-cis",
+							Kind:     "Profile",
+							APIGroup: "compliance.openshift.io/v1alpha1",
+						},
+					},
+				}
+				if err := f.Client.Create(goctx.TODO(), &scanSettingBinding, getCleanupOpts(ctx)); err != nil {
+					return err
+				}
+
+				// Wait until the suite finishes
+				if err := waitForSuiteScansStatus(t, f, namespace, scanSettingBindingName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant); err != nil {
+					return err
+				}
+
+				bindingKey := types.NamespacedName{Namespace: namespace, Name: scanSettingBindingName}
+				binding := &compv1alpha1.ScanSettingBinding{}
+				if err := f.Client.Get(goctx.TODO(), bindingKey, binding); err != nil {
+					return err
+				}
+
+                                // Make sure the binding used the `default` ScanSetting.
+                                if binding.SettingsRef.Name != "default" {
+					E2EErrorf(t, "Expected the settings reference to use the default ScanSetting")
+                                }
+                                return nil
+                        },
+                },
 		testExecution{
 			Name:       "TestScanSettingBindingWatchesTailoredProfile",
 			IsParallel: true,

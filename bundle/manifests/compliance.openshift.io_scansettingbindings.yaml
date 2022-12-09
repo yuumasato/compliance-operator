@@ -46,6 +46,10 @@ spec:
               type: object
             type: array
           settingsRef:
+            default:
+              apiGroup: compliance.openshift.io/v1alpha1
+              kind: ScanSetting
+              name: default
             properties:
               apiGroup:
                 type: string
