@@ -213,7 +213,12 @@ var _ = Describe("Nodeutils", func() {
 		defaultKCPayload := `
 		{
 			"streamingConnectionIdleTimeout": "0s",
-			"something": "0s"
+			"something": "0s",
+			"systemReserved": {
+				"cpu": "0s",
+				"memory": "0s"
+			},
+			"autoSizingReserved": true
 		}
 		`
 		testKubeletConfig := func(kcPayload string) *mcfgv1.KubeletConfig {
