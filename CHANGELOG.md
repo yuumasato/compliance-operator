@@ -23,6 +23,16 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   corrected the descriptions, and also added a new `rationale` field to
   `ComplianceCheckResult` objects.
 
+- Make Compliance Operator to apply all the related remediations for 
+  one ComplianceCheckResult at once, this helps users who use manual
+  remediation, this feature will look for all the related remediations
+  for a ComplianceCheckResult when one remediation is applied. For ex.
+  we have `cp4-cis-kubelet-evictio...-inodesfree`, `cp4-cis-kubelet-evictio...-inodesfree-1`,
+  remediations, when a user applies either one of them, we will apply
+  all the other remediations associate with the rule.
+  [OCPBUGS-4338]https://issues.redhat.com/browse/OCPBUGS-4338
+
+
 ### Internal Changes
 
 - The Compliance Operator now marks a `ScanSettingBinding` that uses a
