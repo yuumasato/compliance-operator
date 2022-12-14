@@ -2,8 +2,9 @@ package v1alpha1
 
 import (
 	"errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,6 +15,12 @@ import (
 // ComplianceScanRescanAnnotation indicates that a ComplianceScan
 // should be re-run
 const ComplianceScanRescanAnnotation = "compliance.openshift.io/rescan"
+
+// ComplianceScanTimeoutAnnotation indicates that a ComplianceScan
+// got a timeout, we will put the timeout node name in the annotation
+// if the scan is a node scan. If it's a platform scan, we will put
+// "api-checks" in the annotation.
+const ComplianceScanTimeoutAnnotation = "compliance.openshift.io/timeout"
 
 // ComplianceScanLabel serves as an indicator for which ComplianceScan
 // owns the referenced object
@@ -204,6 +211,15 @@ type ComplianceScanSettings struct {
 	// for the scanner container and 200Mi memory with 100m CPU for the api-resource-collector
 	// container).
 	ScanLimits map[corev1.ResourceName]resource.Quantity `json:"scanLimits,omitempty"`
+
+	// Timeout is the maximum amount of time the scan can run. If the scan
+	// hasn't finished by then, it will be aborted.
+	// +kubebuilder:default="30m"
+	Timeout string `json:"timeout,omitempty"`
+
+	// MaxRetryOnTimeout is the maximum number of times the scan will be retried if it times out.
+	// +kubebuilder:default=3
+	MaxRetryOnTimeout int `json:"maxRetryOnTimeout,omitempty"`
 }
 
 // ComplianceScanSpec defines the desired state of ComplianceScan
@@ -261,6 +277,8 @@ type ComplianceScanStatus struct {
 	Warnings string `json:"warnings,omitempty"`
 	// +optional
 	Conditions Conditions `json:"conditions,omitempty"`
+	//Is the number of retries left for the scan on timeout
+	RemainingRetries int `json:"remainingRetries,omitempty"`
 }
 
 // StorageReference stores a reference to where certain objects are being stored
@@ -311,6 +329,17 @@ func (cs *ComplianceScan) NeedsRescan() bool {
 		return false
 	}
 	_, needsRescan := annotations[ComplianceScanRescanAnnotation]
+	return needsRescan
+}
+
+// NeedsTimeoutRescan indicates whether a ComplianceScan needs to
+// rescan due to timeout
+func (cs *ComplianceScan) NeedsTimeoutRescan() bool {
+	annotations := cs.GetAnnotations()
+	if annotations == nil {
+		return false
+	}
+	_, needsRescan := annotations[ComplianceScanTimeoutAnnotation]
 	return needsRescan
 }
 
@@ -385,4 +414,8 @@ func (s *ComplianceScanStatus) SetConditionsProcessing() {
 
 func (s *ComplianceScanStatus) SetConditionReady() {
 	s.Conditions.SetConditionReady("scan")
+}
+
+func (s *ComplianceScanStatus) SetConditionTimeout() {
+	s.Conditions.SetConditionTimeout("scan")
 }

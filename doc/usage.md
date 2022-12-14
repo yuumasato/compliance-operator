@@ -531,3 +531,42 @@ $ oc patch sub compliance-operator -nopenshift-compliance --patch-file co-memlim
 
 Please note that this only sets the limit for the compliance-operator
 deployment, not the pods actually performing the scan.
+
+## To use timeout option for scan
+
+The scan has a timeout option that can be specified in the `ComplianceScanSetting`
+object as a duration string (e.g. 1h30m). If the scan does not finish within the
+specified timeout, it will either be reattempted (up to a maximum of `MaxRetryOnTimeout`
+times) or considered a failure, depending on the value of `MaxRetryOnTimeout`.
+The timeout can be disabled by setting it to 0s, and the default value is 30m.
+The default value for `MaxRetryOnTimeout` is 3, so the timeout scan will be retried
+up to three times if it fails.
+
+To set a `Timeout` and `MaxRetryOnTimeout` in `ScanSetting`:
+
+```yaml
+apiVersion: compliance.openshift.io/v1alpha1
+kind: ScanSetting
+metadata:
+  name: default
+  namespace: openshift-compliance
+rawResultStorage:
+  rotation: 3
+  size: 1Gi
+roles:
+- worker
+- master
+scanTolerations:
+- effect: NoSchedule
+  key: node-role.kubernetes.io/master
+  operator: Exists
+schedule: '0 1 * * *'
+timeout: '10m0s'
+maxRetryOnTimeout: 3
+```
+
+Compliance Operator will check the creation timestamp of the Scanner pod age,
+if it is longer than timeout, we will terminate the scan or retry.
+
+A timeout scan will send a warning on retries, and the scan will have an
+error result.

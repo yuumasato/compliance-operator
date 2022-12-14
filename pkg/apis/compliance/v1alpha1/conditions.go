@@ -221,3 +221,13 @@ func (conditions *Conditions) SetConditionReady(what string) {
 		Message: fmt.Sprintf("Compliance %s run is done running the scans", what),
 	})
 }
+
+func (conditions *Conditions) SetConditionTimeout(what string) {
+	conditions.SetCondition(Condition{
+		Type:    "Ready",
+		Status:  corev1.ConditionFalse,
+		Reason:  "Timeout",
+		Message: fmt.Sprintf("%s timeout", what),
+	})
+	conditions.RemoveCondition("Processing")
+}
