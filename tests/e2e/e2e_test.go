@@ -2331,10 +2331,10 @@ func TestE2E(t *testing.T) {
 				return nil
 			},
 		},
-                testExecution{
-                        Name: "TestScanSettingBindingUsesDefaultScanSetting",
-                        IsParallel: true,
-                        TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+		testExecution{
+			Name:       "TestScanSettingBindingUsesDefaultScanSetting",
+			IsParallel: true,
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
 				objName := getObjNameFromTest(t)
 				scanSettingBindingName := objName + "-binding"
 				scanSettingBinding := compv1alpha1.ScanSettingBinding{
@@ -2365,13 +2365,13 @@ func TestE2E(t *testing.T) {
 					return err
 				}
 
-                                // Make sure the binding used the `default` ScanSetting.
-                                if binding.SettingsRef.Name != "default" {
+				// Make sure the binding used the `default` ScanSetting.
+				if binding.SettingsRef.Name != "default" {
 					E2EErrorf(t, "Expected the settings reference to use the default ScanSetting")
-                                }
-                                return nil
-                        },
-                },
+				}
+				return nil
+			},
+		},
 		testExecution{
 			Name:       "TestScanSettingBindingWatchesTailoredProfile",
 			IsParallel: true,
@@ -3449,8 +3449,8 @@ func TestE2E(t *testing.T) {
 			IsParallel: false,
 			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
 
-				var baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "kubeletconfig")
-				const requiredRule = "kubelet-eviction-thresholds-set-hard-imagefs-available"
+				var baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "kubelet_default")
+				const requiredRule = "kubelet-test-cipher"
 				pbName := getObjNameFromTest(t)
 				prefixName := func(profName, ruleBaseName string) string { return profName + "-" + ruleBaseName }
 
@@ -3480,8 +3480,7 @@ func TestE2E(t *testing.T) {
 					return err
 				}
 
-				suiteName := "kubeletconfig-test-node"
-				scanName := "kubeletconfig-test-node-e2e"
+				suiteName := "kubelet-remediation-test-suite"
 
 				tp := &compv1alpha1.TailoredProfile{
 					ObjectMeta: metav1.ObjectMeta{
@@ -3489,8 +3488,8 @@ func TestE2E(t *testing.T) {
 						Namespace: namespace,
 					},
 					Spec: compv1alpha1.TailoredProfileSpec{
-						Title:       "kubeletconfig-Test",
-						Description: "A test tailored profile to kubeletconfig remediation",
+						Title:       "kubelet-remediation-test",
+						Description: "A test tailored profile to test kubelet remediation",
 						EnableRules: []compv1alpha1.RuleReferenceSpec{
 							{
 								Name:      prefixName(pbName, requiredRule),
@@ -3499,9 +3498,19 @@ func TestE2E(t *testing.T) {
 						},
 						SetValues: []compv1alpha1.VariableValueSpec{
 							{
-								Name:      prefixName(pbName, "var-kubelet-evictionhard-imagefs-available"),
+								Name:      prefixName(pbName, "var-kubelet-tls-cipher-suites-regex"),
 								Rationale: "Value to be set",
-								Value:     "20%",
+								Value:     "^(TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384|TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384|TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256|TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)$",
+							},
+							{
+								Name:      prefixName(pbName, "var-kubelet-tls-cipher-suites"),
+								Rationale: "Value to be set",
+								Value:     "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+							},
+							{
+								Name:      prefixName(pbName, "var-role-master"),
+								Rationale: "needed to validate the SS",
+								Value:     testPoolName,
 							},
 						},
 					},
@@ -3544,6 +3553,8 @@ func TestE2E(t *testing.T) {
 					return err
 				}
 
+				scanName := suiteName
+
 				// We need to check that the remediation is auto-applied and save
 				// the object so we can delete it later
 				remName := prefixName(scanName, requiredRule)
@@ -3572,10 +3583,10 @@ func TestE2E(t *testing.T) {
 				// Now the check should be passing
 				checkResult := compv1alpha1.ComplianceCheckResult{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fmt.Sprintf("%s-kubelet-eviction-thresholds-set-hard-imagefs-available", scanName),
+						Name:      fmt.Sprintf("%s-kubelet-test-cipher", suiteName),
 						Namespace: namespace,
 					},
-					ID:       "xccdf_org.ssgproject.content_rule_kubelet_eviction_thresholds_set_hard_imagefs_available",
+					ID:       "xccdf_org.ssgproject.content_rule_kubelet_test_cipher",
 					Status:   compv1alpha1.CheckResultPass,
 					Severity: compv1alpha1.CheckResultSeverityMedium,
 				}
@@ -3586,7 +3597,6 @@ func TestE2E(t *testing.T) {
 
 				E2ELogf(t, "The test succeeded!")
 				return nil
-
 			},
 		},
 
