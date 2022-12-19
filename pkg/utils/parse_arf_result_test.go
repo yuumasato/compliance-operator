@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/antchfx/xmlquery"
 	igntypes "github.com/coreos/ignition/v2/config/v3_2/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -799,5 +800,38 @@ Server 3.fedora.pool.ntp.org`
 			})
 		})
 
+		Describe("Testing desciption and rationale rendering", func() {
+			Context("Valid XCCDF", func() {
+				resultsFilename = "../../tests/data/xccdf-result-remdiation-templating.xml"
+				dsFilename = "../../tests/data/ds-input-for-remediation-value.xml"
+				resultsReader, err := os.Open(resultsFilename)
+				Expect(err).NotTo(HaveOccurred())
+				resultsDom, err := xmlquery.Parse(resultsReader)
+				Expect(err).NotTo(HaveOccurred())
+
+				ds, err = os.Open(dsFilename)
+				Expect(err).NotTo(HaveOccurred())
+				dsDom, err := ParseContent(ds)
+				Expect(err).NotTo(HaveOccurred())
+				It("Should parse the XCCDF without errors", func() {
+					Expect(err).NotTo(HaveOccurred())
+				})
+				allValues := xmlquery.Find(resultsDom, "//set-value")
+				valuesList := make(map[string]string)
+
+				for _, codeNode := range allValues {
+					valuesList[strings.TrimPrefix(codeNode.SelectAttr("idref"), valuePrefix)] = codeNode.InnerText()
+				}
+
+				It("Should render correct description", func() {
+					rule := dsDom.SelectElement("//xccdf-1.2:Rule[@id='xccdf_org.ssgproject.content_rule_sshd_set_keepalive']")
+					description, err := complianceCheckResultDescription(rule, valuesList)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(description).To(ContainSubstring("-----0-----"))
+
+				})
+			})
+
+		})
 	})
 })
