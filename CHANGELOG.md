@@ -19,6 +19,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   a buggy comparison that did not take into account trivial differences
   in remediation metadata (tracked with [OCPBUGS-6710](https://issues.redhat.com/browse/OCPBUGS-6710))
 
+- Fixed a [regression](https://issues.redhat.com/browse/OCPBUGS-6827) where
+  attempting to create a `ScanSettingBinding` that was using a `TailoredProfile`
+  that was in turn using a non-default `MachineConfigPool` would mark
+  the `ScanSettingBinding` as failed. Note that this bug was only affecting
+  setups where the TailoredProfile wasn't annotated with
+  `compliance.openshift.io/product-type`.
+
 ### Internal Changes
 
 -
