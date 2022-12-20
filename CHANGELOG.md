@@ -21,7 +21,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixes an [issue](https://issues.redhat.com/browse/OCPBUGS-4615) where
   `ComplianceCheckResult` objects do not have correct descriptions, we
   corrected the descriptions, and also added a new `rationale` field to
-  `ComplianceCheckResult` objects.
+  `ComplianceCheckResult` objects. And we fixed variable rendering in 
+  in the `instructions` field.
 
 ### Internal Changes
 

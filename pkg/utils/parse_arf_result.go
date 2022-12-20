@@ -404,7 +404,7 @@ func getRuleOcilQuestionID(rule *xmlquery.Node) string {
 	return strings.TrimSuffix(questionnareName, questionnaireSuffix) + questionSuffix
 }
 
-func GetInstructionsForRule(rule *xmlquery.Node, ocilTable NodeByIdHashTable) string {
+func GetInstructionsForRule(rule *xmlquery.Node, ocilTable NodeByIdHashTable, valuesList map[string]string) string {
 	// convert rule's questionnaire ID to question ID
 	ruleQuestionId := getRuleOcilQuestionID(rule)
 
@@ -420,8 +420,17 @@ func GetInstructionsForRule(rule *xmlquery.Node, ocilTable NodeByIdHashTable) st
 		return ""
 	}
 
+	if textNode.InnerText() == "" {
+		return ""
+	}
+
+	textNodeStr, _, err := RenderValues(textNode.InnerText(), valuesList)
+	if err != nil {
+		return ""
+	}
+
 	// if found, strip the last line
-	textSlice := strings.Split(strings.TrimSpace(textNode.InnerText()), "\n")
+	textSlice := strings.Split(strings.TrimSpace(textNodeStr), "\n")
 	if len(textSlice) > 1 {
 		textSlice = textSlice[:len(textSlice)-1]
 	}
@@ -474,7 +483,7 @@ func ParseResultsFromContentAndXccdf(scheme *runtime.Scheme, scanName string, na
 			continue
 		}
 
-		instructions := GetInstructionsForRule(resultRule, questionsTable)
+		instructions := GetInstructionsForRule(resultRule, questionsTable, valuesList)
 		ruleValues := getValueListUsedForRule(resultRule, ovalTestVarTable, defTable, valuesList)
 		resCheck, err := newComplianceCheckResult(result, resultRule, ruleIDRef, instructions, scanName, namespace, ruleValues, manualRules, valuesList)
 		if err != nil {
@@ -585,11 +594,11 @@ func complianceCheckResultRationale(rule *xmlquery.Node, valuesList map[string]s
 func getElementText(nptr *xmlquery.Node, elem string, valuesList map[string]string) (string, error) {
 	elemSelected := nptr.SelectElement(elem)
 	if elemSelected != nil {
-		rationaleRendered, _, err := RenderValues(XmlNodeAsMarkdownPreRender(elemSelected, true), valuesList)
+		elemRendered, _, err := RenderValues(XmlNodeAsMarkdownPreRender(elemSelected, true), valuesList)
 		if err != nil {
 			return "", fmt.Errorf("error rendering element: %v", err)
 		}
-		return rationaleRendered, nil
+		return elemRendered, nil
 	}
 	return "", nil
 }
