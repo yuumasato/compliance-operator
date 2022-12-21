@@ -159,7 +159,7 @@ func AreKubeletConfigsRendered(pool *mcfgv1.MachineConfigPool, client runtimecli
 
 	kc, err := GetKCFromMC(kcmcfg, client)
 	if err != nil {
-		return false, fmt.Errorf("failed to get kubelet config from machine config %s: %w", currentKCMCName, err), ""
+		return false, fmt.Errorf("failed to get kubelet config using machine config name %s: %w", currentKCMCName, err), ""
 	}
 
 	return IsKCSubsetOfMC(kc, kcmcfg)
@@ -172,6 +172,9 @@ func IsKCSubsetOfMC(kc *mcfgv1.KubeletConfig, mc *mcfgv1.MachineConfig) (bool, e
 	}
 	if mc == nil {
 		return false, fmt.Errorf("machine config is nil"), ""
+	}
+	if kc.Spec.KubeletConfig == nil {
+		return false, fmt.Errorf("kubelet config spec is nil, please check if KubeletConfig object has been used correctly"), ""
 	}
 
 	var obj interface{}

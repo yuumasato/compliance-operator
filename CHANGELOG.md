@@ -23,6 +23,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   corrected the descriptions, and also added a new `rationale` field to
   `ComplianceCheckResult` objects.
 
+- Added check for nil pointer before comparing if KubeletConfig is fully rendered。
+  This is necessary because setting the KubeletConfig object incorrectly can result
+  in an empty KubeletConfig Spec, which can cause a panic error. This check will prevent
+  this issue and ensure the comparison is performed safely.
+  [OCPBUGS-4621](https://issues.redhat.com/browse/OCPBUGS-4621)
+
 ### Internal Changes
 
 - The Compliance Operator now marks a `ScanSettingBinding` that uses a
