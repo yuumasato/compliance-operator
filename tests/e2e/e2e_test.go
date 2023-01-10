@@ -3448,38 +3448,6 @@ func TestE2E(t *testing.T) {
 			Name:       "TestKubeletConfigRemediation",
 			IsParallel: false,
 			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
-
-				var baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "kubelet_default")
-				const requiredRule = "kubelet-test-cipher"
-				pbName := getObjNameFromTest(t)
-				prefixName := func(profName, ruleBaseName string) string { return profName + "-" + ruleBaseName }
-
-				ocpPb := &compv1alpha1.ProfileBundle{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      pbName,
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ProfileBundleSpec{
-						ContentImage: baselineImage,
-						ContentFile:  ocpContentFile,
-					},
-				}
-				if err := f.Client.Create(goctx.TODO(), ocpPb, getCleanupOpts(ctx)); err != nil {
-					return err
-				}
-				if err := waitForProfileBundleStatus(t, f, namespace, pbName, compv1alpha1.DataStreamValid); err != nil {
-					return err
-				}
-
-				// Check that if the rule we are going to test is there
-				err, found := doesRuleExist(f, ocpPb.Namespace, prefixName(pbName, requiredRule))
-				if err != nil {
-					return err
-				} else if found != true {
-					E2EErrorf(t, "Expected rule %s not found", prefixName(pbName, requiredRule))
-					return err
-				}
-
 				suiteName := "kubelet-remediation-test-suite"
 
 				tp := &compv1alpha1.TailoredProfile{
@@ -3492,24 +3460,28 @@ func TestE2E(t *testing.T) {
 						Description: "A test tailored profile to test kubelet remediation",
 						EnableRules: []compv1alpha1.RuleReferenceSpec{
 							{
-								Name:      prefixName(pbName, requiredRule),
+								Name:      "ocp4-kubelet-enable-streaming-connections",
+								Rationale: "To be tested",
+							},
+							{
+								Name:      "ocp4-version-detect-in-ocp",
 								Rationale: "To be tested",
 							},
 						},
 						SetValues: []compv1alpha1.VariableValueSpec{
 							{
-								Name:      prefixName(pbName, "var-kubelet-tls-cipher-suites-regex"),
+								Name:      "ocp4-var-streaming-connection-timeouts",
 								Rationale: "Value to be set",
-								Value:     "^(TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384|TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384|TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256|TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)$",
+								Value:     "8h0m0s",
 							},
 							{
-								Name:      prefixName(pbName, "var-kubelet-tls-cipher-suites"),
+								Name:      "ocp4-var-role-master",
 								Rationale: "Value to be set",
-								Value:     "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+								Value:     testPoolName,
 							},
 							{
-								Name:      prefixName(pbName, "var-role-master"),
-								Rationale: "needed to validate the SS",
+								Name:      "ocp4-var-role-worker",
+								Rationale: "Value to be set",
 								Value:     testPoolName,
 							},
 						},
@@ -3542,7 +3514,7 @@ func TestE2E(t *testing.T) {
 					},
 				}
 
-				err = f.Client.Create(goctx.TODO(), ssb, getCleanupOpts(ctx))
+				err := f.Client.Create(goctx.TODO(), ssb, getCleanupOpts(ctx))
 				if err != nil {
 					return err
 				}
@@ -3557,7 +3529,7 @@ func TestE2E(t *testing.T) {
 
 				// We need to check that the remediation is auto-applied and save
 				// the object so we can delete it later
-				remName := prefixName(scanName, requiredRule)
+				remName := scanName + "-kubelet-enable-streaming-connections"
 				waitForGenericRemediationToBeAutoApplied(t, f, remName, namespace)
 
 				err = reRunScan(t, f, scanName, namespace)
@@ -3583,10 +3555,10 @@ func TestE2E(t *testing.T) {
 				// Now the check should be passing
 				checkResult := compv1alpha1.ComplianceCheckResult{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fmt.Sprintf("%s-kubelet-test-cipher", suiteName),
+						Name:      fmt.Sprintf("%s-kubelet-enable-streaming-connections", suiteName),
 						Namespace: namespace,
 					},
-					ID:       "xccdf_org.ssgproject.content_rule_kubelet_test_cipher",
+					ID:       "xccdf_org.ssgproject.content_rule_kubelet_enable_streaming_connections",
 					Status:   compv1alpha1.CheckResultPass,
 					Severity: compv1alpha1.CheckResultSeverityMedium,
 				}
