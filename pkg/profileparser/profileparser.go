@@ -614,7 +614,7 @@ func ParseRulesAndDo(contentDom *xmlquery.Node, stdParser *referenceParser, pb *
 				foundPlatformMap[platform] = true
 			}
 
-			instructions := utils.GetInstructionsForRule(ruleObj, questionsTable)
+			instructions := utils.GetInstructionsForRule(ruleObj, questionsTable, valuesList)
 			defs := utils.GetRuleOvalTest(ruleObj, defTable)
 
 			// note: stdParser is a global variable initialized in init()

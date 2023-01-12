@@ -800,7 +800,7 @@ Server 3.fedora.pool.ntp.org`
 			})
 		})
 
-		Describe("Testing desciption and rationale rendering", func() {
+		Describe("Testing desciption rationale and instruction rendering", func() {
 			Context("Valid XCCDF", func() {
 				resultsFilename = "../../tests/data/xccdf-result-remdiation-templating.xml"
 				dsFilename = "../../tests/data/ds-input-for-remediation-value.xml"
@@ -828,6 +828,22 @@ Server 3.fedora.pool.ntp.org`
 					description, err := complianceCheckResultDescription(rule, valuesList)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(description).To(ContainSubstring("-----0-----"))
+
+				})
+
+				It("Should render correct rationale", func() {
+					rule := dsDom.SelectElement("//xccdf-1.2:Rule[@id='xccdf_org.ssgproject.content_rule_sshd_set_keepalive']")
+					rationale, err := complianceCheckResultRationale(rule, valuesList)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(rationale).To(ContainSubstring("-----0-----"))
+
+				})
+
+				It("Should render correct instruction", func() {
+					rule := dsDom.SelectElement("//xccdf-1.2:Rule[@id='xccdf_org.ssgproject.content_rule_sshd_set_keepalive']")
+					questionsTable := NewOcilQuestionTable(dsDom)
+					instruction := GetInstructionsForRule(rule, questionsTable, valuesList)
+					Expect(instruction).To(ContainSubstring("-----0-----"))
 
 				})
 			})
