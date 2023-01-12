@@ -20,6 +20,9 @@ type JSONDiffRow struct {
 
 // JSONIsSubset checks if a is a subset json of b
 func JSONIsSubset(a, b []byte) (bool, *JSONDiff, error) {
+	if a == nil || b == nil {
+		return false, nil, fmt.Errorf("nil json")
+	}
 	return jsonIsSubsetR(a, b, nil, nil)
 }
 
