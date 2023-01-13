@@ -41,6 +41,8 @@ const (
 	mcBase64PayloadPrefix  = `data:text/plain;charset=utf-8;base64,`
 )
 
+var nodeSizingEnvList = [2]string{"autoSizingReserved", "systemReserved"}
+
 func GetFirstNodeRoleLabel(nodeSelector map[string]string) string {
 	if nodeSelector == nil {
 		return ""
@@ -216,11 +218,18 @@ func IsKCSubsetOfMC(kc *mcfgv1.KubeletConfig, mc *mcfgv1.MachineConfig) (bool, e
 		return false, fmt.Errorf("encoded kubeletconfig %s does not contain encoding prefix", mc.Name), ""
 	}
 
+	// remove node sizing related fields from kubelet config
+	filteredKC, err := removeNodeSizingEnvParams(kc.Spec.KubeletConfig.Raw)
+	if err != nil {
+		return false, fmt.Errorf("failed to remove node sizing related fields from decoded kubelet config: %w", err), ""
+	}
+
 	// Check if KubeletConfig is a subset of the MachineConfig
-	isSubset, diff, err := JSONIsSubset(kc.Spec.KubeletConfig.Raw, decodedKC)
+	isSubset, diff, err := JSONIsSubset(filteredKC, decodedKC)
 	if err != nil {
 		return false, fmt.Errorf("failed to check if kubeletconfig %s is subset of rendered MC %s: %w", kc.Name, mc.Name, err), ""
 	}
+
 	if isSubset {
 		return true, nil, ""
 	}
@@ -247,6 +256,21 @@ func GetKCFromMC(mc *mcfgv1.MachineConfig, client runtimeclient.Client) (*mcfgv1
 		}
 	}
 	return nil, fmt.Errorf("machine config %s doesn't have a KubeletConfig owner reference", mc.GetName())
+}
+
+// removeNodeSizingEnvParams remove KubeletConfig Parameter related to /etc/node-sizing-enabled.env,
+// as it is not rendered in the MachineConfig to file /etc/kubernetes/kubelet.conf
+func removeNodeSizingEnvParams(mc []byte) ([]byte, error) {
+	var data map[string]json.RawMessage
+
+	if err := json.Unmarshal(mc, &data); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal kubelet config: %w", err)
+	}
+
+	for _, key := range nodeSizingEnvList {
+		delete(data, key)
+	}
+	return json.Marshal(data)
 }
 
 // McfgPoolLabelMatches verifies if the given nodeSelector matches the given MachineConfigPool's nodeSelector

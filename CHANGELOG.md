@@ -17,6 +17,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   `ScanSettingBindings` created without a `settingRef` did not use a proper
   default value. `ScanSettingBindings` without a `settingRef` will now use the
   `default` `ScanSetting`.
+  
+- System reserved parameters do not get generated into `/etc/kubernetes/kubelet.conf`,
+  and it is causing Compliance Operator to fail to unpause the machine config pool,
+  this PR excludes node sizing, and system reserved parameters from checking if 
+  KubeletConfig is not part of the generated Machine Config since it does not get
+  generated into `/etc/kubernetes/kubelet.conf` file.
+  [OCPBUGS-4445] https://issues.redhat.com/browse/OCPBUGS-4445
 
 - Fixes an [issue](https://issues.redhat.com/browse/OCPBUGS-4615) where
   `ComplianceCheckResult` objects do not have correct descriptions, we
