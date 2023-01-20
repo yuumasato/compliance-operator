@@ -3919,5 +3919,69 @@ func TestE2E(t *testing.T) {
 
 			},
 		},
+		testExecution{
+			Name:       "TestScheduledSuiteTimeoutFail",
+			IsParallel: true,
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+				suiteName := "test-scheduled-suite-timeout-fail"
+
+				workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
+				selectWorkers := map[string]string{
+					"node-role.kubernetes.io/worker": "",
+				}
+
+				testSuite := &compv1alpha1.ComplianceSuite{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      suiteName,
+						Namespace: namespace,
+					},
+					Spec: compv1alpha1.ComplianceSuiteSpec{
+						ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
+							AutoApplyRemediations: false,
+						},
+						Scans: []compv1alpha1.ComplianceScanSpecWrapper{
+							{
+								Name: workerScanName,
+								ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+									ContentImage: contentImagePath,
+									Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+									Content:      rhcosContentFile,
+									Rule:         "xccdf_org.ssgproject.content_rule_no_netrc_files",
+									NodeSelector: selectWorkers,
+									ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+										MaxRetryOnTimeout: 0,
+										RawResultStorage: compv1alpha1.RawResultStorageSettings{
+											Rotation: 1,
+										},
+										Timeout: "1s",
+										Debug:   true,
+									},
+								},
+							},
+						},
+					},
+				}
+
+				err := f.Client.Create(goctx.TODO(), testSuite, getCleanupOpts(ctx))
+				if err != nil {
+					return err
+				}
+
+				// Ensure that all the scans in the suite have finished and are marked as Done
+				err = waitForSuiteScansStatus(t, f, namespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultError)
+				if err != nil {
+					return err
+				}
+				scan := &compv1alpha1.ComplianceScan{}
+				err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: workerScanName, Namespace: namespace}, scan)
+				if err != nil {
+					return err
+				}
+				if _, ok := scan.Annotations[compv1alpha1.ComplianceScanTimeoutAnnotation]; !ok {
+					return fmt.Errorf("The scan should have the timeout annotation")
+				}
+				return nil
+			},
+		},
 	)
 }

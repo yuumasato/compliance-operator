@@ -5,7 +5,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"math"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -42,7 +43,8 @@ const (
 	// flag that indicates that deletion should be done
 	doDelete = true
 	// flag that indicates that no deletion should take place
-	dontDelete = false
+	dontDelete        = false
+	podTimeoutDisable = time.Duration(0)
 )
 
 const (
@@ -209,6 +211,9 @@ func (r *ReconcileComplianceScan) validate(instance *compv1alpha1.ComplianceScan
 	// If no phase set, default to pending (the initial phase):
 	if instance.Status.Phase == "" {
 		instanceCopy := instance.DeepCopy()
+		if instance.Status.RemainingRetries != instance.Spec.MaxRetryOnTimeout {
+			instanceCopy.Status.RemainingRetries = instance.Spec.MaxRetryOnTimeout
+		}
 		instanceCopy.Status.Phase = compv1alpha1.PhasePending
 		instanceCopy.Status.SetConditionPending()
 		updateErr := r.Client.Status().Update(context.TODO(), instanceCopy)
@@ -284,6 +289,13 @@ func (r *ReconcileComplianceScan) phasePendingHandler(instance *compv1alpha1.Com
 	if instance.NeedsRescan() {
 		instanceCopy := instance.DeepCopy()
 		delete(instanceCopy.Annotations, compv1alpha1.ComplianceScanRescanAnnotation)
+		err := r.Client.Update(context.TODO(), instanceCopy)
+		return reconcile.Result{}, err
+	}
+
+	if instance.NeedsTimeoutRescan() {
+		instanceCopy := instance.DeepCopy()
+		delete(instanceCopy.Annotations, compv1alpha1.ComplianceScanTimeoutAnnotation)
 		err := r.Client.Update(context.TODO(), instanceCopy)
 		return reconcile.Result{}, err
 	}
@@ -375,11 +387,23 @@ func (r *ReconcileComplianceScan) phaseLaunchingHandler(h scanTypeHandler, logge
 func (r *ReconcileComplianceScan) phaseRunningHandler(h scanTypeHandler, logger logr.Logger) (reconcile.Result, error) {
 	logger.Info("Phase: Running")
 
-	running, err := h.handleRunningScan()
+	running, timeoutNodes, err := h.handleRunningScan()
 
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+
+	if len(timeoutNodes) > 0 {
+		scan := h.getScan()
+		scan = scan.DeepCopy()
+
+		if scan.NeedsTimeoutRescan() {
+			return r.updateScanStatusOnTimeout(scan, timeoutNodes, logger)
+		} else {
+			return r.setAnnotationOnTimeout(scan, timeoutNodes, logger)
+		}
+	}
+
 	if running {
 		// The platform scan pod is still running, go back to queue.
 		return reconcile.Result{Requeue: true, RequeueAfter: requeueAfterDefault}, nil
@@ -394,6 +418,50 @@ func (r *ReconcileComplianceScan) phaseRunningHandler(h scanTypeHandler, logger 
 		return reconcile.Result{}, err
 	}
 	r.Metrics.IncComplianceScanStatus(scan.Name, scan.Status)
+	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileComplianceScan) updateScanStatusOnTimeout(scan *compv1alpha1.ComplianceScan, timeoutNodes []string, logger logr.Logger) (reconcile.Result, error) {
+	remRetries := scan.Status.RemainingRetries
+	var err error
+	// If we have retries left, let's retry the scan
+	scan.Status.Phase = compv1alpha1.PhaseDone
+	scan.Status.Result = compv1alpha1.ResultError
+	scan.Status.ErrorMessage = "Timeout while waiting for the scan pod to be finished."
+	scan.Status.SetConditionTimeout()
+
+	if remRetries > 0 {
+		logger.Info("Retrying scan", "compliancescan", scan.ObjectMeta.Name, "node", strings.Join(timeoutNodes, ","))
+		r.Recorder.Eventf(scan, corev1.EventTypeWarning, "Retrying", "Retrying scan %s due to timeout on %s", scan.ObjectMeta.Name, strings.Join(timeoutNodes, ","))
+		scan.Status.RemainingRetries = remRetries - 1
+		err = r.Client.Status().Update(context.TODO(), scan)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	} else {
+		logger.Info("No retries left, marking scan as failed", "compliancescan", scan.ObjectMeta.Name, "node", strings.Join(timeoutNodes, ","))
+		scan.Status.RemainingRetries = scan.Spec.MaxRetryOnTimeout
+		r.generateResultEventForScan(scan, logger)
+		err = r.Client.Status().Update(context.TODO(), scan)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileComplianceScan) setAnnotationOnTimeout(scan *compv1alpha1.ComplianceScan, timeoutNodes []string, logger logr.Logger) (reconcile.Result, error) {
+	if scan.Annotations == nil {
+		scan.Annotations = make(map[string]string)
+	}
+	scan.Annotations[compv1alpha1.ComplianceScanTimeoutAnnotation] = strings.Join(timeoutNodes, ",")
+	if scan.Status.RemainingRetries > 0 {
+		scan.Annotations[compv1alpha1.ComplianceScanRescanAnnotation] = ""
+	}
+	err := r.Client.Update(context.TODO(), scan)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 	return reconcile.Result{}, nil
 }
 
@@ -683,20 +751,20 @@ func (r *ReconcileComplianceScan) deleteResultConfigMaps(instance *compv1alpha1.
 }
 
 // returns true if the pod is still running, false otherwise
-func isPodRunningInNode(r *ReconcileComplianceScan, scanInstance *compv1alpha1.ComplianceScan, node *corev1.Node, logger logr.Logger) (bool, error) {
+func isPodRunningInNode(r *ReconcileComplianceScan, scanInstance *compv1alpha1.ComplianceScan, node *corev1.Node, timeout time.Duration, logger logr.Logger) (bool, error) {
 	podName := getPodForNodeName(scanInstance.Name, node.Name)
-	return isPodRunning(r, podName, common.GetComplianceOperatorNamespace(), logger)
+	return isPodRunning(r, podName, common.GetComplianceOperatorNamespace(), timeout, logger)
 }
 
 // returns true if the pod is still running, false otherwise
-func isPlatformScanPodRunning(r *ReconcileComplianceScan, scanInstance *compv1alpha1.ComplianceScan, logger logr.Logger) (bool, error) {
+func isPlatformScanPodRunning(r *ReconcileComplianceScan, scanInstance *compv1alpha1.ComplianceScan, timeout time.Duration, logger logr.Logger) (bool, error) {
 	logger.Info("Retrieving platform scan pod.", "Name", scanInstance.Name+"-"+PlatformScanName)
 
 	podName := getPodForNodeName(scanInstance.Name, PlatformScanName)
-	return isPodRunning(r, podName, common.GetComplianceOperatorNamespace(), logger)
+	return isPodRunning(r, podName, common.GetComplianceOperatorNamespace(), timeout, logger)
 }
 
-func isPodRunning(r *ReconcileComplianceScan, podName, namespace string, logger logr.Logger) (bool, error) {
+func isPodRunning(r *ReconcileComplianceScan, podName, namespace string, timeout time.Duration, logger logr.Logger) (bool, error) {
 	podlogger := logger.WithValues("Pod.Name", podName)
 	foundPod := &corev1.Pod{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: podName, Namespace: namespace}, foundPod)
@@ -730,6 +798,19 @@ func isPodRunning(r *ReconcileComplianceScan, podName, namespace string, logger 
 
 	// the pod is still running or being created etc
 	podlogger.Info("Pod still running")
+
+	// if timeout is not set, we don't check for timeout
+	if timeout == podTimeoutDisable {
+		return true, nil
+	}
+
+	podCreatiopnTime := foundPod.CreationTimestamp.Time
+	if time.Since(podCreatiopnTime) > timeout {
+		podlogger.Info("Pod timed out")
+		timeoutErr := common.NewTimeoutError("Timeout reached while waiting for the scan to finish in the pod: %s", podName)
+		return true, timeoutErr
+	}
+
 	return true, nil
 }
 

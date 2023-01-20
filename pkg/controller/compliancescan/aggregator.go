@@ -139,7 +139,6 @@ func (r *ReconcileComplianceScan) deleteAggregator(instance *compv1alpha1.Compli
 
 func isAggregatorRunning(r *ReconcileComplianceScan, scanInstance *compv1alpha1.ComplianceScan, logger logr.Logger) (bool, error) {
 	logger.Info("Checking aggregator pod for scan", "ComplianceScan.Name", scanInstance.Name)
-
 	podName := getAggregatorPodName(scanInstance.Name)
-	return isPodRunning(r, podName, common.GetComplianceOperatorNamespace(), logger)
+	return isPodRunning(r, podName, common.GetComplianceOperatorNamespace(), podTimeoutDisable, logger)
 }

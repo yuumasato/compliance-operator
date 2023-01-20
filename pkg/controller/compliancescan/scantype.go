@@ -5,6 +5,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"strings"
+	"time"
 
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/common"
@@ -21,7 +22,7 @@ type scanTypeHandler interface {
 	validate() (bool, error)
 	getScan() *compv1alpha1.ComplianceScan
 	createScanWorkload() error
-	handleRunningScan() (bool, error)
+	handleRunningScan() (bool, []string, error)
 	// shouldLaunchAggregator is a check that tests whether the scanner already failed
 	// hard in which case there might not be a reason to launch the aggregator pod, e.g.
 	// in cases the content cannot be loaded at all
@@ -122,6 +123,16 @@ func (nh *nodeScanTypeHandler) validate() (bool, error) {
 		}
 	}
 
+	if nh.scan.Spec.ComplianceScanSettings.Timeout != "" {
+		_, err := time.ParseDuration(nh.scan.Spec.ComplianceScanSettings.Timeout)
+		if err != nil {
+			timeoutWarning := "Cannot parse timeout value" + err.Error()
+			nh.l.Info(timeoutWarning, "Scan.Name", nh.scan.Name)
+			nh.r.Recorder.Event(nh.scan, corev1.EventTypeWarning, "InvalidTimeout", timeoutWarning)
+			return false, nil
+		}
+	}
+
 	return true, nil
 }
 
@@ -145,11 +156,23 @@ func (nh *nodeScanTypeHandler) createScanWorkload() error {
 	return nil
 }
 
-func (nh *nodeScanTypeHandler) handleRunningScan() (bool, error) {
+func (nh *nodeScanTypeHandler) handleRunningScan() (bool, []string, error) {
+	// scan.Spec.ComplianceScanSettings.Timeout is in string format, e.g. "1h30m"
+	// so we need to parse it
+	timeoutVal := podTimeoutDisable
+	timeoutNodes := []string{}
+	var err error
+	if nh.scan.Spec.ComplianceScanSettings.Timeout != "" {
+		timeoutVal, err = time.ParseDuration(nh.scan.Spec.ComplianceScanSettings.Timeout)
+		if err != nil {
+			return true, timeoutNodes, fmt.Errorf("couldn't parse timeout: %w", err)
+		}
+	}
 	for idx := range nh.nodes {
 		node := &nh.nodes[idx]
 		var unschedulableErr *podUnschedulableError
-		running, err := isPodRunningInNode(nh.r, nh.scan, node, nh.l)
+		var timeoutErr *common.TimeoutError
+		running, err := isPodRunningInNode(nh.r, nh.scan, node, timeoutVal, nh.l)
 		if errors.IsNotFound(err) {
 			// Let's go back to the previous state and make sure all the nodes are covered.
 			nh.l.Info("Phase: Running: A pod is missing. Going to state LAUNCHING to make sure we launch it",
@@ -157,9 +180,9 @@ func (nh *nodeScanTypeHandler) handleRunningScan() (bool, error) {
 			nh.scan.Status.Phase = compv1alpha1.PhaseLaunching
 			err = nh.r.Client.Status().Update(context.TODO(), nh.scan)
 			if err != nil {
-				return true, err
+				return true, timeoutNodes, err
 			}
-			return true, nil
+			return true, timeoutNodes, nil
 		} else if goerrors.As(err, &unschedulableErr) {
 			// Create custom error message for this pod that couldn't be scheduled
 			cmName := getConfigMapForNodeName(nh.scan.Name, node.Name)
@@ -173,23 +196,27 @@ func (nh *nodeScanTypeHandler) handleRunningScan() (bool, error) {
 			if errors.IsNotFound(cmGetErr) {
 				if cmCreateErr := nh.r.Client.Create(context.TODO(), cm); cmCreateErr != nil {
 					if !errors.IsAlreadyExists(cmCreateErr) {
-						return true, cmCreateErr
+						return true, timeoutNodes, cmCreateErr
 					}
 				}
 			} else if cmGetErr != nil {
-				return true, cmGetErr
+				return true, timeoutNodes, cmGetErr
 			}
 
 			// We're good, the CM that tells us about this error is already there
 			// let's continue to check the next pod
+		} else if goerrors.As(err, &timeoutErr) {
+			nh.l.Info("Timeout while waiting for the Node scan pod to be finished.")
+			timeoutNodes = append(timeoutNodes, node.Name)
+			return true, timeoutNodes, nil
 		} else if err != nil {
-			return true, err
+			return true, timeoutNodes, err
 		}
 		if running {
-			return true, nil
+			return true, timeoutNodes, nil
 		}
 	}
-	return false, nil
+	return false, timeoutNodes, nil
 }
 
 func (nh *nodeScanTypeHandler) shouldLaunchAggregator() (bool, string, error) {
@@ -308,6 +335,15 @@ func (ph *platformScanTypeHandler) getScan() *compv1alpha1.ComplianceScan {
 }
 
 func (ph *platformScanTypeHandler) validate() (bool, error) {
+	if ph.scan.Spec.ComplianceScanSettings.Timeout != "" {
+		_, err := time.ParseDuration(ph.scan.Spec.ComplianceScanSettings.Timeout)
+		if err != nil {
+			timeoutWarning := "Cannot parse timeout value" + err.Error()
+			ph.l.Info(timeoutWarning, "Scan.Name", ph.scan.Name)
+			ph.r.Recorder.Event(ph.scan, corev1.EventTypeWarning, "InvalidTimeout", timeoutWarning)
+			return false, nil
+		}
+	}
 	return true, nil
 }
 
@@ -321,22 +357,35 @@ func (ph *platformScanTypeHandler) createScanWorkload() error {
 	return ph.r.launchScanPod(ph.scan, pod, ph.l)
 }
 
-func (ph *platformScanTypeHandler) handleRunningScan() (bool, error) {
-	running, err := isPlatformScanPodRunning(ph.r, ph.scan, ph.l)
+func (ph *platformScanTypeHandler) handleRunningScan() (bool, []string, error) {
+	timeoutVal := podTimeoutDisable
+	var err error
+	timeoutNodes := []string{}
+	var timeoutErr *common.TimeoutError
+	if ph.scan.Spec.ComplianceScanSettings.Timeout != "" {
+		timeoutVal, err = time.ParseDuration(ph.scan.Spec.ComplianceScanSettings.Timeout)
+		if err != nil {
+			return true, timeoutNodes, fmt.Errorf("couldn't parse timeout: %w", err)
+		}
+	}
+	running, err := isPlatformScanPodRunning(ph.r, ph.scan, timeoutVal, ph.l)
 	if errors.IsNotFound(err) {
 		// Let's go back to the previous state and make sure all the nodes are covered.
-		ph.l.Info("Phase: Running: The platform scan pod is missing. Going to state LAUNCHING to make sure we launch it",
-			"compliancescan")
+		ph.l.Info("Phase: Running: The platform scan pod is missing. Going to state LAUNCHING to make sure we launch it, compliancescan")
 		ph.scan.Status.Phase = compv1alpha1.PhaseLaunching
 		err = ph.r.Client.Status().Update(context.TODO(), ph.scan)
 		if err != nil {
-			return true, err
+			return true, timeoutNodes, err
 		}
-		return true, nil
+		return true, timeoutNodes, nil
+	} else if goerrors.As(err, &timeoutErr) {
+		ph.l.Info("Timeout while waiting for the platform scan pod to be finished.")
+		timeoutNodes = append(timeoutNodes, PlatformScanName)
+		return true, timeoutNodes, nil
 	} else if err != nil {
-		return true, err
+		return true, timeoutNodes, err
 	}
-	return running, nil
+	return running, timeoutNodes, nil
 }
 
 func (ph *platformScanTypeHandler) shouldLaunchAggregator() (bool, string, error) {
