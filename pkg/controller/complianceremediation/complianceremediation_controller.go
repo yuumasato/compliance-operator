@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -39,6 +40,7 @@ var log = logf.Log.WithName(ctrlName)
 const (
 	remediationNameAnnotationKey = "remediation/"
 	defaultDependencyRequeueTime = time.Second * 20
+	remediationSuffixRegex       = "-[0-9]+" // matches -<number>
 )
 
 func (r *ReconcileComplianceRemediation) SetupWithManager(mgr ctrl.Manager) error {
@@ -172,6 +174,7 @@ func (r *ReconcileComplianceRemediation) Reconcile(ctx context.Context, request 
 			return reconcile.Result{}, valueReqErr
 		}
 	}
+
 	//if no UnmetDependencies, UnsetValue, ValueRequired
 	if !(remediationInstance.HasUnmetDependencies() || remediationInstance.HasAnnotation(compv1alpha1.RemediationUnsetValueAnnotation) || remediationInstance.HasAnnotation(compv1alpha1.RemediationValueRequiredAnnotation)) {
 		reconcileErr = r.reconcileRemediation(remediationInstance, reqLogger)
@@ -237,9 +240,18 @@ func (r *ReconcileComplianceRemediation) reconcileRemediation(instance *compv1al
 	} else if kerrors.IsNotFound(err) {
 		if instance.Spec.Apply {
 			instance.AddOwnershipLabels(obj)
-			return r.createRemediation(obj, objectLogger)
+			// Going through remediation list, to make sure all the related
+			// remediations objects are set to apply
+			err := r.setRemediations(instance, objectLogger, true)
+			if err != nil {
+				return fmt.Errorf("failed to set related remediations to apply: %w", err)
+			}
+			err = r.createRemediation(obj, objectLogger)
+			if err != nil {
+				return fmt.Errorf("failed to create remediation: %w", err)
+			}
+			return nil
 		}
-
 		objectLogger.Info("The object wasn't found, so no action is needed to unapply it")
 		return nil
 	} else if err != nil {
@@ -247,10 +259,50 @@ func (r *ReconcileComplianceRemediation) reconcileRemediation(instance *compv1al
 	}
 
 	if instance.Spec.Apply {
+		err = r.setRemediations(instance, objectLogger, true)
+		if err != nil {
+			return fmt.Errorf("failed to set related remediations to apply: %w", err)
+		}
 		return r.patchRemediation(obj, objectLogger)
 	}
-
+	err = r.setRemediations(instance, objectLogger, false)
+	if err != nil {
+		return fmt.Errorf("failed to set related remediations to unapply: %w", err)
+	}
 	return r.deleteRemediation(obj, found, objectLogger)
+}
+
+// find all the other releated remediation and set the apply to true or false
+func (r *ReconcileComplianceRemediation) setRemediations(instance *compv1alpha1.ComplianceRemediation, logger logr.Logger, apply bool) error {
+	remediations := &compv1alpha1.ComplianceRemediationList{}
+	err := r.Client.List(context.TODO(), remediations, client.InNamespace(instance.GetNamespace()))
+	if err != nil {
+		return fmt.Errorf("couldn't list remediations: %w", err)
+	}
+
+	for _, remediation := range remediations.Items {
+		remName := remediation.Name
+		if remName == instance.Name {
+			continue
+		}
+
+		// filter the name of the remediation, to take out the "-number" suffix
+		reg := regexp.MustCompile(remediationSuffixRegex)
+		filteredName := reg.ReplaceAllString(remName, "${1}")
+		filterdInstanceName := reg.ReplaceAllString(instance.Name, "${1}")
+
+		if filteredName == filterdInstanceName {
+			if remediation.Spec.Apply != apply {
+				remediation.Spec.Apply = apply
+				err = r.Client.Update(context.TODO(), &remediation)
+				if err != nil {
+					return fmt.Errorf("couldn't update remediation: %w", err)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func (r *ReconcileComplianceRemediation) createRemediation(remObj *unstructured.Unstructured, logger logr.Logger) error {

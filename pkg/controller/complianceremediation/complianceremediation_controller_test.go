@@ -99,7 +99,9 @@ var _ = Describe("Testing complianceremediation controller", func() {
 				},
 			},
 		}
+
 		remediationinstance.Spec.Type = compv1alpha1.ConfigurationRemediation
+
 		scanInstance = &compv1alpha1.ComplianceScan{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "myScan",
@@ -162,12 +164,105 @@ var _ = Describe("Testing complianceremediation controller", func() {
 
 				err := reconciler.reconcileRemediation(remediationinstance, logger)
 				Expect(err).To(BeNil())
+
 				By("the remediation should be applied")
 				foundCM := &corev1.ConfigMap{}
 				err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: "my-cm", Namespace: "test-ns"}, foundCM)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(foundCM.GetName()).To(Equal("my-cm"))
 				Expect(foundCM.Data["key"]).To(Equal("val"))
+			})
+		})
+
+		Context("Apply all the related remediation", func() {
+			BeforeEach(func() {
+
+				cm2 := &corev1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "ConfigMap",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-cm-2",
+						Namespace: "test-ns",
+					},
+					Data: map[string]string{
+						"key": "val",
+					},
+				}
+
+				unstructuredCM2, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cm2)
+				Expect(err).ToNot(HaveOccurred())
+
+				remediationinstance2 := &compv1alpha1.ComplianceRemediation{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "testRem-2",
+						Labels:      testRemLabels,
+						Annotations: testRemAnnotations,
+					},
+					Spec: compv1alpha1.ComplianceRemediationSpec{
+						Current: compv1alpha1.ComplianceRemediationPayload{
+							Object: nil,
+						},
+					},
+				}
+				remediationinstance2.Spec.Type = compv1alpha1.ConfigurationRemediation
+				remediationinstance2.Spec.Current.Object = &unstructured.Unstructured{
+					Object: unstructuredCM2,
+				}
+
+				err = reconciler.Client.Create(context.TODO(), remediationinstance2)
+				Expect(err).NotTo(HaveOccurred())
+
+				cm := &corev1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "ConfigMap",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-cm",
+						Namespace: "test-ns",
+					},
+					Data: map[string]string{
+						"key": "val",
+					},
+				}
+
+				unstructuredCM, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cm)
+				Expect(err).ToNot(HaveOccurred())
+				remediationinstance.Spec.Current.Object = &unstructured.Unstructured{
+					Object: unstructuredCM,
+				}
+				err = reconciler.Client.Update(context.TODO(), remediationinstance)
+				Expect(err).NotTo(HaveOccurred())
+
+			})
+
+			It("should reconcile the current remediation", func() {
+				By("running a reconcile loop")
+				err := reconciler.reconcileRemediation(remediationinstance, logger)
+				Expect(err).To(BeNil())
+				By("the remediation should be applied")
+				foundCM := &corev1.ConfigMap{}
+				err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: "my-cm", Namespace: "test-ns"}, foundCM)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(foundCM.GetName()).To(Equal("my-cm"))
+				Expect(foundCM.Data["key"]).To(Equal("val"))
+
+				By("the second remediation should have applied")
+				rem2 := &compv1alpha1.ComplianceRemediation{}
+				err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: "testRem-2", Namespace: remediationinstance.Namespace}, rem2)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(rem2.Spec.Apply).To(BeTrue())
+
+				err = reconciler.reconcileRemediation(rem2, logger)
+				Expect(err).To(BeNil())
+
+				foundCM2 := &corev1.ConfigMap{}
+				err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: "my-cm-2", Namespace: "test-ns"}, foundCM2)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(foundCM2.GetName()).To(Equal("my-cm-2"))
+				Expect(foundCM2.Data["key"]).To(Equal("val"))
 			})
 		})
 
