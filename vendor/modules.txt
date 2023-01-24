@@ -41,7 +41,7 @@ github.com/coreos/go-semver/semver
 # github.com/coreos/go-systemd v0.0.0-20190719114852-fd7a80b32e1f
 ## explicit
 github.com/coreos/go-systemd/unit
-# github.com/coreos/go-systemd/v22 v22.3.2
+# github.com/coreos/go-systemd/v22 v22.4.0
 ## explicit; go 1.12
 github.com/coreos/go-systemd/v22/unit
 # github.com/coreos/ign-converter v0.0.0-20201123214124-8dac862888aa
@@ -205,13 +205,15 @@ github.com/josharian/intern
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
+# github.com/kr/pretty v0.3.0
+## explicit; go 1.12
 # github.com/mailru/easyjson v0.7.7
 ## explicit; go 1.12
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/mattn/go-colorable v0.1.9
-## explicit; go 1.13
+# github.com/mattn/go-colorable v0.1.13
+## explicit; go 1.15
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.16
 ## explicit; go 1.15
@@ -252,7 +254,7 @@ github.com/nxadm/tail/ratelimiter
 github.com/nxadm/tail/util
 github.com/nxadm/tail/watch
 github.com/nxadm/tail/winfile
-# github.com/olekukonko/tablewriter v0.0.4
+# github.com/olekukonko/tablewriter v0.0.5
 ## explicit; go 1.12
 github.com/olekukonko/tablewriter
 # github.com/onsi/ginkgo v1.16.5
@@ -290,7 +292,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20220826140015-b21e86c742e7 => github.com/openshift/api v0.0.0-20220826140015-b21e86c742e7
+# github.com/openshift/api v0.0.0-20221220162201-efeef9d83325 => github.com/openshift/api v0.0.0-20220826140015-b21e86c742e7
 ## explicit; go 1.18
 github.com/openshift/api
 github.com/openshift/api/apiserver
@@ -356,7 +358,7 @@ github.com/openshift/api/template
 github.com/openshift/api/template/v1
 github.com/openshift/api/user
 github.com/openshift/api/user/v1
-# github.com/openshift/client-go v0.0.0-20220525160904-9e1acff93e4a => github.com/openshift/client-go v0.0.0-20220504114320-6aec01bb0754
+# github.com/openshift/client-go v0.0.0-20220831193253-4950ae70c8ea => github.com/openshift/client-go v0.0.0-20220504114320-6aec01bb0754
 ## explicit; go 1.16
 github.com/openshift/client-go/config/clientset/versioned
 github.com/openshift/client-go/config/clientset/versioned/scheme
@@ -377,16 +379,16 @@ github.com/openshift/client-go/operator/informers/externalversions/operator/v1
 github.com/openshift/client-go/operator/informers/externalversions/operator/v1alpha1
 github.com/openshift/client-go/operator/listers/operator/v1
 github.com/openshift/client-go/operator/listers/operator/v1alpha1
-# github.com/openshift/library-go v0.0.0-20220826132527-2b7a682a2de4
-## explicit; go 1.17
+# github.com/openshift/library-go v0.0.0-20220915130036-73d5a4a82865
+## explicit; go 1.18
 github.com/openshift/library-go/pkg/crypto
 github.com/openshift/library-go/pkg/image/internal/digest
 github.com/openshift/library-go/pkg/image/internal/reference
 github.com/openshift/library-go/pkg/image/reference
 github.com/openshift/library-go/pkg/image/referencemutator
 github.com/openshift/library-go/pkg/image/trigger
-# github.com/openshift/machine-config-operator v0.0.1-0.20201123223240-d4188ac400eb
-## explicit; go 1.13
+# github.com/openshift/machine-config-operator v0.0.1-0.20230124070108-2d92b8d47e80
+## explicit; go 1.18
 github.com/openshift/machine-config-operator/internal/clients
 github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io
 github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1
@@ -443,6 +445,8 @@ github.com/rivo/uniseg
 # github.com/robfig/cron/v3 v3.0.1
 ## explicit; go 1.12
 github.com/robfig/cron/v3
+# github.com/rogpeppe/go-internal v1.8.1
+## explicit; go 1.16
 # github.com/securego/gosec/v2 v2.13.1
 ## explicit; go 1.19
 github.com/securego/gosec/v2
@@ -494,7 +498,7 @@ github.com/wI2L/jsondiff
 # github.com/xo/terminfo v0.0.0-20210125001918-ca9a967f8778
 ## explicit; go 1.15
 github.com/xo/terminfo
-# go.uber.org/atomic v1.7.0
+# go.uber.org/atomic v1.9.0
 ## explicit; go 1.13
 go.uber.org/atomic
 # go.uber.org/multierr v1.6.0
