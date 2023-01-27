@@ -3567,6 +3567,25 @@ func TestE2E(t *testing.T) {
 					return err
 				}
 
+				err = assertHasCheck(f, suiteName, scanName, checkResult)
+				if err != nil {
+					return err
+				}
+
+				// The remediation must not be Outdated
+				remediation := &compv1alpha1.ComplianceRemediation{}
+				remNsName := types.NamespacedName{
+					Name:      remName,
+					Namespace: namespace,
+				}
+				err = f.Client.Get(goctx.TODO(), remNsName, remediation)
+				if err != nil {
+					return fmt.Errorf("couldn't get remediation %s: %w", remName, err)
+				}
+				if remediation.Status.ApplicationState != compv1alpha1.RemediationApplied {
+					return fmt.Errorf("remediation %s is not applied, but %s", remName, remediation.Status.ApplicationState)
+				}
+
 				E2ELogf(t, "The test succeeded!")
 				return nil
 			},

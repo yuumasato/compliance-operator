@@ -3,10 +3,52 @@ package v1alpha1
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var _ = Describe("Testing ComplianceRemediation API", func() {
+	When("handling ComplianceRemediationPayload sub-API", func() {
+		var payload *ComplianceRemediationPayload
+
+		BeforeEach(func() {
+			payload = &ComplianceRemediationPayload{}
+		})
+
+		It("handles normalizing payload with no object", func() {
+			n := payload.normalized()
+			Expect(n).ToNot(BeNil())
+			Expect(n.Object).To(BeNil())
+		})
+
+		It("normalizes missing annotations", func() {
+			cm := &corev1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ConfigMap",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-cm",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"key": "val",
+				},
+			}
+
+			unstructuredCM, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cm)
+			Expect(err).ToNot(HaveOccurred())
+			payload.Object = &unstructured.Unstructured{
+				Object: unstructuredCM,
+			}
+			Expect(payload.Object.GetAnnotations()).To(BeNil())
+			n := payload.normalized()
+			Expect(n.Object.GetAnnotations()).ToNot(BeNil())
+		})
+	})
+
 	var rem *ComplianceRemediation
 	When("parsing dependency references", func() {
 		BeforeEach(func() {

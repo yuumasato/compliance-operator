@@ -13,7 +13,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
--
+- On re-running scans, remediations that were previously Applied might
+  have been marked as Outdated after a re-run finished
+  despite no changes in the actual remediation content because of
+  a buggy comparison that did not take into account trivial differences
+  in remediation metadata (tracked with [OCPBUGS-6710](https://issues.redhat.com/browse/OCPBUGS-6710))
 
 ### Internal Changes
 
