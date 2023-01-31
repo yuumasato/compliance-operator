@@ -51,6 +51,7 @@ rules:
     resources:
       - apiservers
       - oauths
+      - projects
     resourceNames:
       - cluster
     verbs:
