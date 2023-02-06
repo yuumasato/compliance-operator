@@ -1208,6 +1208,8 @@ k8s.io/kube-openapi v0.0.0-20230123231816-1cb3ae25d79a h1:s6zvHjyDQX1NtVT88pvw2t
 k8s.io/kube-openapi v0.0.0-20230123231816-1cb3ae25d79a/go.mod h1:/BYxry62FuDzmI+i9B+X2pqfySRmSOW2ARmj5Zbqhj0=
 k8s.io/pod-security-admission v0.24.4 h1:ZYYIsBFtP8+PJwVgOldLvnC/otR+6x7SoL4HnbuMXbg=
 k8s.io/pod-security-admission v0.24.4/go.mod h1:yIppVzUIT3WCbvI+z1lku+WGo6PgMLRlk5W9DluSewo=
+k8s.io/pod-security-admission v0.26.1 h1:EDIxsYFeKMzNvN/JB0PgQcuwBP6fIkIG2O8ZWJhzOp4=
+k8s.io/pod-security-admission v0.26.1/go.mod h1:hCbYTG5UtLlivmukkMPjAWf23PUBUHzEvR60xNVWN4c=
 k8s.io/utils v0.0.0-20210802155522-efc7438f0176/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=

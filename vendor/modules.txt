@@ -1048,8 +1048,8 @@ k8s.io/kube-openapi/pkg/schemamutation
 k8s.io/kube-openapi/pkg/spec3
 k8s.io/kube-openapi/pkg/util/proto
 k8s.io/kube-openapi/pkg/validation/spec
-# k8s.io/pod-security-admission v0.24.4
-## explicit; go 1.16
+# k8s.io/pod-security-admission v0.26.1
+## explicit; go 1.19
 k8s.io/pod-security-admission/api
 # k8s.io/utils v0.0.0-20230115233650-391b47cb4029
 ## explicit; go 1.18
