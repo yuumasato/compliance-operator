@@ -178,15 +178,6 @@ func (r *ComplianceRemediation) RemediationPayloadDiffers(other *ComplianceRemed
 	return !reflect.DeepEqual(r.Spec.Current.normalized(), other.Spec.Current.normalized())
 }
 
-func (r *ComplianceRemediation) normalize() {
-	if r.Annotations == nil {
-		r.Annotations = make(map[string]string)
-	}
-	if r.Labels == nil {
-		r.Annotations = make(map[string]string)
-	}
-}
-
 func (r *ComplianceRemediation) GetSuite() string {
 	return r.Labels[SuiteLabel]
 }

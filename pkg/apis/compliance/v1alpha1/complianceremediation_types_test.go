@@ -7,6 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"reflect"
 )
 
 var _ = Describe("Testing ComplianceRemediation API", func() {
@@ -46,6 +47,15 @@ var _ = Describe("Testing ComplianceRemediation API", func() {
 			Expect(payload.Object.GetAnnotations()).To(BeNil())
 			n := payload.normalized()
 			Expect(n.Object.GetAnnotations()).ToNot(BeNil())
+
+			// ensure that normalized doesn't change more than it needs to
+			normalizedCm := corev1.ConfigMap{}
+			err = runtime.DefaultUnstructuredConverter.FromUnstructured(n.Object.Object, &normalizedCm)
+			Expect(err).ToNot(HaveOccurred())
+			// explicitly not comparing the TypeMeta because 1) if it got modified, FromUnstructured would
+			// have failed and 2) this is the only nested struct that gets modified by normalize()
+			reflect.DeepEqual(cm.ObjectMeta, &normalizedCm.ObjectMeta)
+			reflect.DeepEqual(cm.Data, &normalizedCm.Data)
 		})
 	})
 
