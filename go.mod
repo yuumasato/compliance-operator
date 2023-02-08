@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/ginkgo/v2 v2.8.0
 	github.com/onsi/gomega v1.26.0
 	github.com/wI2L/jsondiff v0.3.0
 	k8s.io/apimachinery v0.26.1
