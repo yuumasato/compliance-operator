@@ -15,7 +15,7 @@ require (
 require (
 	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/ajeddeloh/go-json v0.0.0-20200220154158-5ae607161559 // indirect
-	github.com/antchfx/xmlquery v1.3.12
+	github.com/antchfx/xmlquery v1.3.15
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0
 	github.com/cenkalti/backoff/v4 v4.2.0
@@ -93,7 +93,7 @@ require (
 
 require (
 	github.com/PaesslerAG/gval v1.0.0 // indirect
-	github.com/antchfx/xpath v1.2.1 // indirect
+	github.com/antchfx/xpath v1.2.3 // indirect
 	github.com/coreos/fcct v0.5.0 // indirect
 	github.com/coreos/go-json v0.0.0-20211020211907-c63f628265de // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
