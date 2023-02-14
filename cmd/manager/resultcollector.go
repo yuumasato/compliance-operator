@@ -239,7 +239,7 @@ func readResultsFile(filename string, timeout int64) (*resultFileContents, error
 	cleanFileName := filepath.Clean(filename)
 	handle, err := waitForResultsFile(cleanFileName, timeout)
 	if err != nil {
-		os.Exit(1)
+		return nil, fmt.Errorf("error waiting for results file: %w", err)
 	}
 	// #nosec
 	defer handle.Close()
