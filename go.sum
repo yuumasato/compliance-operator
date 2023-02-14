@@ -187,6 +187,8 @@ github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7
 github.com/evanphx/json-patch v0.5.2/go.mod h1:ZWS5hhDbVDyob71nXKNL0+PWn6ToqBHMikGIFbs31qQ=
 github.com/evanphx/json-patch v4.12.0+incompatible h1:4onqiflcdA9EOZ4RxV643DvftH5pOlLGNtQ5lPWQu84=
 github.com/evanphx/json-patch v4.12.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
+github.com/evanphx/json-patch v5.6.0+incompatible h1:jBYDEEiFBPxA0v50tFdvOzQQTCvpL6mnFh5mB2/l16U=
+github.com/evanphx/json-patch v5.6.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch/v5 v5.6.0 h1:b91NhWfaz02IuVxO9faSllyAtNXHMPkC5J8sJCLunww=
 github.com/evanphx/json-patch/v5 v5.6.0/go.mod h1:G79N1coSVB93tBe7j6PhzjmR3/2VvlbKOFpnXhI9Bw4=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
@@ -526,6 +528,8 @@ github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.63.0 h
 github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.63.0/go.mod h1:/UtstAaWVaS3Z9GK9jo8+4SN9T+RMSq7VlOcQMmiEsc=
 github.com/prometheus-operator/prometheus-operator/pkg/client v0.56.2 h1:psZHmkyInelOfiHumxbc2D+2Lt8P7mO3tzPTJbC1V6U=
 github.com/prometheus-operator/prometheus-operator/pkg/client v0.56.2/go.mod h1:jtoOEXTxjUksvTgxv+nIeg/+tFp7o3Y9y4TMon/y6ZQ=
+github.com/prometheus-operator/prometheus-operator/pkg/client v0.63.0 h1:8Au9x/807lcDRCmypzfWvr9haO5eF/eX7hiMQCy1k4A=
+github.com/prometheus-operator/prometheus-operator/pkg/client v0.63.0/go.mod h1:sjCnCbwVFVTO90iChFOK0eUat70C4Q11EVik0Rk3EeU=
 github.com/prometheus/client_golang v0.9.1/go.mod h1:7SWBe2y4D6OKWSNQJUaRYU/AaXPKyh/dDVn+NZz0KFw=
 github.com/prometheus/client_golang v0.9.3/go.mod h1:/TN21ttK/J9q6uSwhBd54HahCDft0ttaMvbicHlPoso=
 github.com/prometheus/client_golang v1.0.0/go.mod h1:db9x61etRT2tGnBNRi70OPL5FsnadC4Ky3P0J6CfImo=
@@ -1233,6 +1237,8 @@ k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65/go.mod h1:sX9MT8g7NVZM5lV
 k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42/go.mod h1:Z/45zLw8lUo4wdiUkI+v/ImEGAvu3WatcZl3lPMR4Rk=
 k8s.io/kube-openapi v0.0.0-20230123231816-1cb3ae25d79a h1:s6zvHjyDQX1NtVT88pvw2tddqhqY0Bz0Gbnn+yctsFU=
 k8s.io/kube-openapi v0.0.0-20230123231816-1cb3ae25d79a/go.mod h1:/BYxry62FuDzmI+i9B+X2pqfySRmSOW2ARmj5Zbqhj0=
+k8s.io/kube-openapi v0.0.0-20230202010329-39b3636cbaa3 h1:vV3ZKAUX0nMjTflyfVea98dTfROpIxDaEsQws0FT2Ts=
+k8s.io/kube-openapi v0.0.0-20230202010329-39b3636cbaa3/go.mod h1:/BYxry62FuDzmI+i9B+X2pqfySRmSOW2ARmj5Zbqhj0=
 k8s.io/pod-security-admission v0.24.4 h1:ZYYIsBFtP8+PJwVgOldLvnC/otR+6x7SoL4HnbuMXbg=
 k8s.io/pod-security-admission v0.24.4/go.mod h1:yIppVzUIT3WCbvI+z1lku+WGo6PgMLRlk5W9DluSewo=
 k8s.io/pod-security-admission v0.26.1 h1:EDIxsYFeKMzNvN/JB0PgQcuwBP6fIkIG2O8ZWJhzOp4=
