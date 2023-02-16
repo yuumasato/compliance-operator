@@ -97,6 +97,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The operator now parses links from the compliance content and renders it in
   custom resources accordingly.
+- `ComplianceCheckResult` objects are automatically cleaned up on each scan.
+  This prevents the [illusion](https://issues.redhat.com/browse/OCPBUGS-3009)
+  that changes to profiles, like excluding rules, aren't taking effect because
+  stale `ComplianceCheckResult` objects are leftover from previous runs.
 
 - The operator have the ability to hide warnings for certain failed to fetched
   resources, this is useful when the user does not want to see the warnings

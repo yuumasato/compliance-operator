@@ -401,6 +401,15 @@ func TestAutoRemediate(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Fetch remediation here so we can clean up the machine config later.
+	// We do this before the rescan takes place because the rescan will
+	// prune the remediation after the check passes.
+	rem := &compv1alpha1.ComplianceRemediation{}
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: remName, Namespace: f.OperatorNamespace}, rem)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// We can re-run the scan at this moment and check that it's now compliant
 	// and it's reflected in a CheckResult
 	err = f.ReRunScan(scanName, f.OperatorNamespace)
@@ -436,15 +445,9 @@ func TestAutoRemediate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The test should not leave junk around, let's remove the MC and wait for the nodes to stabilize
-	// again
-	log.Printf("Removing applied remediation\n")
-	// Fetch remediation here so it can be deleted
-	rem := &compv1alpha1.ComplianceRemediation{}
-	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: remName, Namespace: f.OperatorNamespace}, rem)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// The test should not leave junk around, let's remove the MC and wait
+	// for the nodes to stabilize again
+	log.Printf("Removing applied machine config\n")
 	mcfgToBeDeleted := rem.Spec.Current.Object.DeepCopy()
 	mcfgToBeDeleted.SetName(rem.GetMcName())
 	err = f.Client.Delete(context.TODO(), mcfgToBeDeleted)

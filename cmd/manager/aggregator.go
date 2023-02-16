@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/version"
@@ -557,6 +558,33 @@ func createResults(crClient aggregatorCrClient, scan *compv1alpha1.ComplianceSca
 	// aggregator need to know it's using gRPC under the hood, probably
 	// not).
 
+	// Find all the existing scan results. As we iterate through the list
+	// of the most recent results below, we should remove entries from the
+	// list of existing results. By the end of the loop, we should have a
+	// list of results that are effectively stale. For example, checks that
+	// have been disabled through a tailored profile. If we don't clean
+	// these up during the aggregation phase, it will look like they're
+	// still valid, even though they're from an old scan.
+	staleComplianceCheckResults := make(map[string]compv1alpha1.ComplianceCheckResult)
+	complianceCheckResults := compv1alpha1.ComplianceCheckResultList{}
+	withLabel := map[string]string{
+		compv1alpha1.ComplianceScanLabel: scan.Name,
+	}
+	lo := runtimeclient.ListOptions{
+		Namespace:     scan.Namespace,
+		LabelSelector: labels.SelectorFromSet(withLabel),
+	}
+	err := crClient.getClient().List(context.TODO(), &complianceCheckResults, &lo)
+	if err != nil {
+		return fmt.Errorf("Unable to fetch existing ComplianceCheckResultList: %w", err)
+	}
+	for _, r := range complianceCheckResults.Items {
+		// Use a map so that we can find specific
+		// ComplianceCheckResults without iterating over the list for
+		// every new result from the latest scan.
+		staleComplianceCheckResults[r.Name] = r
+	}
+
 	for _, pr := range consistentResults {
 		if pr == nil || pr.CheckResult == nil {
 			cmdLog.Info("nil result or result.check, this shouldn't happen")
@@ -592,6 +620,14 @@ func createResults(crClient aggregatorCrClient, scan *compv1alpha1.ComplianceSca
 		if err := createOrUpdateOneResult(crClient, scan, checkResultLabels, checkResultAnnotations, checkResultExists, pr.CheckResult); err != nil {
 			return fmt.Errorf("cannot create or update checkResult %s: %v", pr.CheckResult.Name, err)
 		}
+
+		// Remove the ComplianceCheckResult from the list of stale
+		// results so we don't delete it later.
+		_, ok := staleComplianceCheckResults[foundCheckResult.Name]
+		if ok {
+			delete(staleComplianceCheckResults, foundCheckResult.Name)
+		}
+
 		// Handle forwarding.
 		f.SendComplianceCheckResult(pr.CheckResult)
 
@@ -612,6 +648,18 @@ func createResults(crClient aggregatorCrClient, scan *compv1alpha1.ComplianceSca
 			if remErr := handleRemediation(crClient, rem, pr.CheckResult, scan); remErr != nil {
 				return remErr
 			}
+		}
+	}
+
+	// If there are any ComplianceCheckResults left in
+	// staleComplianceCheckResults, they were from previous scans and we
+	// should delete them. Otherwise, we give users the impression changes
+	// they've made to their scans, profiles, or settings haven't taken
+	// effect.
+	for _, result := range staleComplianceCheckResults {
+		err := crClient.getClient().Delete(context.TODO(), &result)
+		if err != nil {
+			return fmt.Errorf("Unable to delete stale ComplianceCheckResult %s: %w", result.Name, err)
 		}
 	}
 

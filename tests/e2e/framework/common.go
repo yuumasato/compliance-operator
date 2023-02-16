@@ -1647,6 +1647,26 @@ func (f *Framework) AssertCheckRemediation(name, namespace string, shouldHaveRem
 	return nil
 }
 
+func (f *Framework) AssertRemediationExists(name, namespace string) error {
+	var r compv1alpha1.ComplianceRemediation
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, &r)
+	if err != nil {
+		return fmt.Errorf("Failed to assert ComplianceRemediation %s exists: %w", name, err)
+	}
+	return nil
+}
+
+func (f *Framework) AssertRemediationDoesNotExists(name, namespace string) error {
+	var r compv1alpha1.ComplianceRemediation
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, &r)
+	if apierrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("Failed to assert ComplianceRemediation %s does not exist: %w", name, err)
+	}
+	return fmt.Errorf("Failed to assert ComplianceRemediation %s does not exist.", name)
+}
+
 func (f *Framework) TaintNode(node *core.Node, taint core.Taint) error {
 	taintedNode := node.DeepCopy()
 	if taintedNode.Spec.Taints == nil {
@@ -2332,5 +2352,23 @@ func (f *Framework) AssertCronJobIsNotSuspended(name string) error {
 		return errors.New(msg)
 	}
 	log.Printf("CronJob %s is active", name)
+	return nil
+}
+
+func (f *Framework) AssertScanDoesNotContainCheck(scanName, checkName, namespace string) error {
+	var getCheck compv1alpha1.ComplianceCheckResult
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: checkName, Namespace: namespace}, &getCheck)
+	if apierrors.IsNotFound(err) {
+		// The check doesn't exist at all, which means it also doesn't exist in *any* scans
+		log.Printf("didn't find ComplianceCheckResult %s", checkName)
+		return nil
+	} else if err != nil {
+		return err
+	}
+	// Make sure the check we found actually belongs to the scan we're given. This is extra
+	// validation in case the same check is used across other scans.
+	if getCheck.Labels[compv1alpha1.ComplianceScanLabel] == scanName {
+		return fmt.Errorf("found ComplianceCheckResult %s in ComplianceScan %s", checkName, scanName)
+	}
 	return nil
 }
