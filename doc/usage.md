@@ -425,7 +425,7 @@ The compliance-operator exposes the following metrics to Prometheus when cluster
     compliance_operator_compliance_scan_status_total{name="scan-name",phase="AGGREGATING",result="NOT-AVAILABLE"} 1
 
     # HELP compliance_operator_compliance_scan_error_total A counter for the
-    # total number of encounters of error
+    # total number errors
     # TYPE compliance_operator_compliance_scan_error_total counter
     compliance_operator_compliance_scan_error_total{name="scan-name",error="some_error"} 1
 
