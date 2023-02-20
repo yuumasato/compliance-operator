@@ -553,6 +553,11 @@ else
 	@set -o pipefail; $(GO) test $(TEST_OPTIONS) -json $(PKGS) --ginkgo.noColor | gotest2junit -v > $(JUNITFILE)
 endif
 
+.PHONY: test-coverage
+test-coverage: fmt ## Run the unit tests and generate a coverage report
+	@$(GO) test -cover -coverprofile=coverage.out $(PKGS)
+	@$(GO) tool cover -func coverage.out
+
 .PHONY: test-benchmark
 test-benchmark: ## Run the benchmark tests -- Note that this can only be ran for one package. You can set $BENCHMARK_PKG for this. cpu.prof and mem.prof will be generated
 	@$(GO) test -cpuprofile cpu.prof -memprofile mem.prof -bench . $(TEST_OPTIONS) $(BENCHMARK_PKG)

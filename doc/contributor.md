@@ -37,6 +37,15 @@ can run them using:
 $ make test-unit
 ```
 
+### Coverage Tests
+
+There is a seperate target specifically for unit test coverage that outputs a
+coverage report in `coverage.out`. It also provides a coverage summary.
+
+```console
+$ make test-coverage
+```
+
 ### Functional Tests
 
 The end-to-end tests for the compliance-operator require a Kubernetes
