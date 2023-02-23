@@ -168,7 +168,7 @@ metadata:
       Container Platform", "OpenShift Platform Plus"]'
     operators.operatorframework.io/builder: operator-sdk-v1.19.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-    repository: https://github.com/openshift/compliance-operator
+    repository: https://github.com/ComplianceAsCode/compliance-operator
     support: Red Hat Inc.
   labels:
     operatorframework.io/arch.amd64: supported
@@ -1600,8 +1600,8 @@ spec:
   - openscap
   - audit
   links:
-  - name: Compliance Operator upstream repo
-    url: https://github.com/openshift/compliance-operator
+  - name: Compliance Operator upstream repository
+    url: https://github.com/ComplianceAsCode/compliance-operator
   - name: Compliance Operator documentation
     url: https://docs.openshift.com/container-platform/latest/security/compliance_operator/compliance-operator-understanding.html
   maintainers:
