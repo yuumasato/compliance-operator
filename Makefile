@@ -564,7 +564,7 @@ test-benchmark: ## Run the benchmark tests -- Note that this can only be ran for
 	@echo "The pprof files generated are: cpu.prof and mem.prof"
 
 .PHONY: e2e
-e2e: e2e-set-image prep-e2e
+e2e: e2e-set-image prep-e2e ## Run full end-to-end tests that exercise content on an operational cluster.
 	@CONTENT_IMAGE=$(E2E_CONTENT_IMAGE_PATH) BROKEN_CONTENT_IMAGE=$(E2E_BROKEN_CONTENT_IMAGE_PATH) $(GO) test ./tests/e2e $(E2E_GO_TEST_FLAGS) -args $(E2E_ARGS) | tee tests/e2e-test.log
 
 .PHONY: prep-e2e
