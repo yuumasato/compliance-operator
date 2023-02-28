@@ -21,7 +21,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/clarketm/json v1.17.1
-	github.com/coreos/ignition/v2 v2.14.0
+	github.com/coreos/ignition/v2 v2.15.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dsnet/compress v0.0.1
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
@@ -65,7 +65,7 @@ require (
 	go.uber.org/zap v1.24.0
 	golang.org/x/mod v0.8.0
 	golang.org/x/net v0.7.0
-	golang.org/x/oauth2 v0.4.0 // indirect
+	golang.org/x/oauth2 v0.5.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/term v0.5.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
@@ -95,13 +95,13 @@ require (
 	github.com/PaesslerAG/gval v1.0.0 // indirect
 	github.com/antchfx/xpath v1.2.1 // indirect
 	github.com/coreos/fcct v0.5.0 // indirect
-	github.com/coreos/go-json v0.0.0-20211020211907-c63f628265de // indirect
-	github.com/coreos/go-semver v0.3.0 // indirect
+	github.com/coreos/go-json v0.0.0-20230131223807-18775e0fb4fb // indirect
+	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd v0.0.0-20190719114852-fd7a80b32e1f // indirect
-	github.com/coreos/go-systemd/v22 v22.4.0 // indirect
+	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/coreos/ign-converter v0.0.0-20201123214124-8dac862888aa // indirect
 	github.com/coreos/ignition v0.35.0 // indirect
-	github.com/coreos/vcontext v0.0.0-20211021162308-f1dbbca7bef4 // indirect
+	github.com/coreos/vcontext v0.0.0-20230201181013-d72178a18687 // indirect
 	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fatih/color v1.13.0 // indirect
