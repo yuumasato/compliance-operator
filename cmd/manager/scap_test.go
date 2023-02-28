@@ -230,6 +230,42 @@ var _ = Describe("Testing filtering", func() {
 		})
 	})
 
+	Context("Filtering configmaps yaml data", func() {
+		var rawcm []byte
+		expectedYAML := `{"admission":{},"aggregatorConfig":{"allowedNames":null,"clientCA":"","extraHeaderPrefixes":null,"groupHeaders":null,"usernameHeaders":null},"apiServerArguments":{"audit-log-format":["json"],"audit-log-maxsize":["100"],"audit-log-path":["/var/log/openshift-apiserver/audit.log"],"audit-policy-file":["/etc/kubernetes/audit-config/policy.yaml"],"shutdown-delay-duration":["3s"]},"apiVersion":"openshiftcontrolplane.config.openshift.io/v1","auditConfig":{"auditFilePath":"","enabled":false,"logFormat":"","maximumFileRetentionDays":0,"maximumFileSizeMegabytes":0,"maximumRetainedFiles":0,"policyConfiguration":null,"policyFile":"","webHookKubeConfig":"","webHookMode":""},"cloudProviderFile":"","corsAllowedOrigins":null,"imagePolicyConfig":{"additionalTrustedCA":"","allowedRegistriesForImport":null,"externalRegistryHostnames":null,"internalRegistryHostname":"image-registry.openshift-image-registry.svc:5000","maxImagesBulkImportedPerRepository":0},"jenkinsPipelineConfig":{"autoProvisionEnabled":null,"parameters":null,"serviceName":"","templateName":"","templateNamespace":""},"kind":"OpenShiftAPIServerConfig","kubeClientConfig":{"connectionOverrides":{"acceptContentTypes":"","burst":0,"contentType":"","qps":0},"kubeConfig":"/etc/kubernetes/secrets/svc-kubeconfig/kubeconfig"},"projectConfig":{"defaultNodeSelector":"","projectRequestMessage":"","projectRequestTemplate":""},"routingConfig":{"subdomain":"apps.wenshen-hypershift.devcluster.openshift.com"},"serviceAccountOAuthGrantMethod":"","servingInfo":{"bindAddress":"","bindNetwork":"","certFile":"/etc/kubernetes/certs/serving/tls.crt","cipherSuites":["TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256","TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256","TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384","TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384","TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256","TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"],"clientCA":"/etc/kubernetes/certs/client-ca/ca.crt","keyFile":"/etc/kubernetes/certs/serving/tls.key","maxRequestsInFlight":0,"minTLSVersion":"VersionTLS12","requestTimeoutSeconds":0},"storageConfig":{"ca":"/etc/kubernetes/certs/etcd-client-ca/ca.crt","certFile":"/etc/kubernetes/certs/etcd-client/etcd-client.crt","keyFile":"/etc/kubernetes/certs/etcd-client/etcd-client.key","storagePrefix":"","urls":["https://etcd-client:2379"]}}`
+		BeforeEach(func() {
+			cmFile, err := os.Open("../../tests/data/configmap_yaml.json")
+			Expect(err).To(BeNil())
+			var readErr error
+			rawcm, readErr = io.ReadAll(cmFile)
+			Expect(readErr).To(BeNil())
+		})
+		It("filters configmaps YAML data appropriately", func() {
+			filteredOut, filterErr := filter(context.TODO(), rawcm,
+				`.data["config.yaml"]`)
+			Expect(filterErr).To(BeNil())
+			Expect(string(filteredOut)).To(Equal(expectedYAML))
+		})
+	})
+
+	Context("Filtering configmaps json data", func() {
+		var rawcm []byte
+		expectedJSON := `{"apiServerArguments":{"audit-log-format":["json"],"audit-log-maxbackup":["10"],"audit-log-maxsize":["100"],"audit-log-path":["/var/log/openshift-apiserver/audit.log"],"audit-policy-file":["/var/run/configmaps/audit/policy.yaml"],"shutdown-delay-duration":["15s"],"shutdown-send-retry-after":["true"]},"apiVersion":"openshiftcontrolplane.config.openshift.io/v1","imagePolicyConfig":{"internalRegistryHostname":"image-registry.openshift-image-registry.svc:5000"},"kind":"OpenShiftAPIServerConfig","projectConfig":{"projectRequestMessage":""},"routingConfig":{"subdomain":"apps.ci-ln-xllhdgb-76ef8.origin-ci-int-aws.dev.rhcloud.com"},"servingInfo":{"bindNetwork":"tcp","cipherSuites":["TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256","TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256","TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384","TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384","TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256","TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"],"minTLSVersion":"VersionTLS12"},"storageConfig":{"urls":["https://10.0.137.27:2379","https://10.0.158.132:2379","https://10.0.204.8:2379"]}}`
+		BeforeEach(func() {
+			cmFile, err := os.Open("../../tests/data/configmap_json.json")
+			Expect(err).To(BeNil())
+			var readErr error
+			rawcm, readErr = io.ReadAll(cmFile)
+			Expect(readErr).To(BeNil())
+		})
+		It("filters configmaps JSON data appropriately", func() {
+			filteredOut, filterErr := filter(context.TODO(), rawcm,
+				`.data["config.yaml"] | fromjson`)
+			Expect(filterErr).To(BeNil())
+			Expect(string(filteredOut)).To(Equal(expectedJSON))
+		})
+	})
+
 	Context("Testing errors", func() {
 		It("outputs error if it can't create filter", func() {
 			_, filterErr := filter(context.TODO(), []byte{},
