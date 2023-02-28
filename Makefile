@@ -115,7 +115,7 @@ TEST_DEPLOY=$(TEST_SETUP_DIR)/deploy_rbac.yaml
 
 # Pass extra flags to the e2e test run.
 # e.g. to run a specific test in the e2e test suite, do:
-# 	make e2e E2E_GO_TEST_FLAGS="-v -run TestE2E/TestScanWithNodeSelectorFiltersCorrectly"
+# 	make e2e E2E_GO_TEST_FLAGS="-v -run TestE2E/Parallel_tests/TestScanWithNodeSelectorFiltersCorrectly"
 E2E_GO_TEST_FLAGS?=-v -test.timeout 120m
 
 # By default we run all tests; available options: all, parallel, serial
