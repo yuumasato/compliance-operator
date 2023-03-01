@@ -69,6 +69,20 @@ images.
 $ make e2e
 ```
 
+You can run a single functional tests using the `E2E_GO_TEST_FLAGS`, but it
+must contain the fully rendered test name, which you may have to build manually.
+
+```console
+$ E2E_GO_TEST_FLAGS="-v -run TestE2E/Parallel_tests/TestScanWithNodeSelectorFiltersCorrectly" make e2e
+```
+
+The first part of the test name is actually the test suite (`TestE2E`), which
+is responsible for setting up and tearing down resources for all tests. The
+second portion of the test name is either `Parallel_tests` or `Serial_tests`,
+depending on the `IsParallel` attribute of the test. The final part of the test
+name is the actual test name. Note that using `-run
+TestScanWithNodeSelectorFiltersCorrectly` will not match when go invokes the tests.
+
 ## Writing Release Notes
 
 Release notes are maintained in the [changelog](CHANGELOG.md) and follow
