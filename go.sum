@@ -520,6 +520,8 @@ github.com/openshift/client-go v0.0.0-20220504114320-6aec01bb0754 h1:E/SORtM8rYR
 github.com/openshift/client-go v0.0.0-20220504114320-6aec01bb0754/go.mod h1:0KyRH70L+vAGs8wkOkqbsE9qR4lgjW2ugJsCzl1nj5w=
 github.com/openshift/library-go v0.0.0-20220915130036-73d5a4a82865 h1:x7KWaYzkD2KQ3rha9u7OVAfjZpSFTmJRSHb4CHc+CwM=
 github.com/openshift/library-go v0.0.0-20220915130036-73d5a4a82865/go.mod h1:KPBAXGaq7pPmA+1wUVtKr5Axg3R68IomWDkzaOxIhxM=
+github.com/openshift/library-go v0.0.0-20230302150105-38724ca8e236 h1:THzJ0wPyXuGPfkKCaeJ1zzRym/Zwsh9gBUav5VMbFjk=
+github.com/openshift/library-go v0.0.0-20230302150105-38724ca8e236/go.mod h1:xO4nAf0qa56dgvEJWVD1WuwSJ8JWPU1TYLBQrlutWnE=
 github.com/openshift/machine-config-operator v0.0.1-0.20230124070108-2d92b8d47e80 h1:Y7RvdU4KtJgxPesl2Fc/0loxAFcHu51v5PsHoYgvxnw=
 github.com/openshift/machine-config-operator v0.0.1-0.20230124070108-2d92b8d47e80/go.mod h1:NgX5kcFdHIzpzH6bA4ofpzLool4Tc+fgO3Gyqp6Mv00=
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
