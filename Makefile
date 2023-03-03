@@ -567,6 +567,14 @@ test-benchmark: ## Run the benchmark tests -- Note that this can only be ran for
 e2e: e2e-set-image prep-e2e ## Run full end-to-end tests that exercise content on an operational cluster.
 	@CONTENT_IMAGE=$(E2E_CONTENT_IMAGE_PATH) BROKEN_CONTENT_IMAGE=$(E2E_BROKEN_CONTENT_IMAGE_PATH) $(GO) test ./tests/e2e $(E2E_GO_TEST_FLAGS) -args $(E2E_ARGS) | tee tests/e2e-test.log
 
+.PHONY: e2e-parallel
+e2e-parallel: ## Run non-destructive end-to-end tests concurrently.
+	E2E_GO_TEST_FLAGS=parallel $(MAKE) e2e
+
+.PHONY: e2e-serial
+e2e-serial: ## Run destructive end-to-end tests serially.
+	E2E_GO_TEST_FLAGS=serial $(MAKE) e2e
+
 .PHONY: prep-e2e
 prep-e2e: kustomize
 	rm -rf $(TEST_SETUP_DIR)
