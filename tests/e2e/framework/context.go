@@ -1,6 +1,8 @@
 package framework
 
 import (
+	goctx "context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -9,6 +11,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 )
 
 type Context struct {
@@ -108,6 +113,12 @@ func (ctx *Context) Cleanup() {
 	if ctx.t == nil && failed {
 		log.Fatal("A cleanup function failed")
 	}
+
+	var scans compv1alpha1.ComplianceScanList
+	listOpts := client.ListOptions{}
+	ctx.client.List(goctx.TODO(), &scans, &listOpts)
+	log.Warning(fmt.Sprintf("%d scans not cleaned up", len(scans.Items)))
+
 }
 
 func (ctx *Context) GetTestType() string {
