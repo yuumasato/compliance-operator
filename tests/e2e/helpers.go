@@ -2542,7 +2542,7 @@ func getMetricResults(t *testing.T, namespace string) string {
 
 func assertMetric(t *testing.T, content, metric string, expected int) error {
 	if val := parseMetric(t, content, metric); val != expected {
-		return errors.New(fmt.Sprintf("expected %v for counter %s, got %v", expected, metric, val))
+		return fmt.Errorf("expected %v for counter %s, got %v", expected, metric, val)
 	}
 	return nil
 }
