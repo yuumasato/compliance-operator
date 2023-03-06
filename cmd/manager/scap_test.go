@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/common"
@@ -217,7 +216,7 @@ var _ = Describe("Testing filtering", func() {
 			nsFile, err := os.Open("../../tests/data/namespaces.json")
 			Expect(err).To(BeNil())
 			var readErr error
-			rawns, readErr = ioutil.ReadAll(nsFile)
+			rawns, readErr = io.ReadAll(nsFile)
 			Expect(readErr).To(BeNil())
 		})
 		It("filters namespaces appropriately", func() {
@@ -243,7 +242,7 @@ var _ = Describe("Testing filtering", func() {
 				nsFile, err := os.Open("../../tests/data/namespaces.json")
 				Expect(err).To(BeNil())
 				var readErr error
-				rawns, readErr = ioutil.ReadAll(nsFile)
+				rawns, readErr = io.ReadAll(nsFile)
 				Expect(readErr).To(BeNil())
 			})
 

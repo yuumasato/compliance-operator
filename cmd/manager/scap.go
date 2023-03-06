@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"html"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -563,7 +562,7 @@ func fetch(ctx context.Context, streamDispatcher streamerDispatcherFn, rfClients
 				return fmt.Errorf("streaming URIs failed: %w", err)
 			}
 			defer stream.Close()
-			body, err := ioutil.ReadAll(stream)
+			body, err := io.ReadAll(stream)
 			if err != nil {
 				return err
 			}
@@ -672,7 +671,7 @@ func (c *scapContentDataStream) SaveWarningsIfAny(warnings []string, outputFile 
 	}
 	DBG("Persisting warnings to output file")
 	warningsStr := strings.Join(warnings, "\n")
-	err := ioutil.WriteFile(outputFile, []byte(warningsStr), 0600)
+	err := os.WriteFile(outputFile, []byte(warningsStr), 0600)
 	return err
 }
 
@@ -692,7 +691,7 @@ func saveResources(rootDir string, data map[string][]byte) error {
 		if err != nil {
 			return err
 		}
-		err = ioutil.WriteFile(savePath, fileContents, 0600)
+		err = os.WriteFile(savePath, fileContents, 0600)
 		if err != nil {
 			return err
 		}
