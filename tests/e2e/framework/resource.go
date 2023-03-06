@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -102,33 +103,34 @@ func (ctx *Context) GetOperatorNamespace() (string, error) {
 }
 
 func (ctx *Context) getNamespace(ns string) (string, error) {
-	if ns != "" {
+	// create namespace only if it doesn't already exist
+	_, err := ctx.kubeclient.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		namespaceObj := &core.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: ns,
+				Labels: map[string]string{
+					psapi.EnforceLevelLabel:                          string(psapi.LevelPrivileged),
+					"security.openshift.io/scc.podSecurityLabelSync": "false",
+				},
+			},
+		}
+
+		log.Printf("creating namespace %s", ns)
+		_, err = ctx.kubeclient.CoreV1().Namespaces().Create(context.TODO(), namespaceObj, metav1.CreateOptions{})
+		if apierrors.IsAlreadyExists(err) {
+			return "", fmt.Errorf("namespace %s already exists: %w", ns, err)
+		} else if err != nil {
+			return "", err
+		}
+		return ns, nil
+	} else if apierrors.IsAlreadyExists(err) {
+		log.Printf("using existing namespace %s", ns)
+		return ns, nil
+	} else {
 		return ns, nil
 	}
-	// create namespace
-	ns = ctx.GetID()
-	namespaceObj := &core.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: ns,
-			Labels: map[string]string{
-				psapi.EnforceLevelLabel:                          string(psapi.LevelPrivileged),
-				"security.openshift.io/scc.podSecurityLabelSync": "false",
-			},
-		},
-	}
-	fmt.Println(namespaceObj)
-	_, err := ctx.kubeclient.CoreV1().Namespaces().Create(context.TODO(), namespaceObj, metav1.CreateOptions{})
-	if apierrors.IsAlreadyExists(err) {
-		return "", fmt.Errorf("namespace %s already exists: %w", ns, err)
-	} else if err != nil {
-		return "", err
-	}
-	ctx.AddCleanupFn(func() error {
-		gracePeriodSeconds := int64(0)
-		opts := metav1.DeleteOptions{GracePeriodSeconds: &gracePeriodSeconds}
-		return ctx.kubeclient.CoreV1().Namespaces().Delete(context.TODO(), ns, opts)
-	})
-	return ns, nil
+
 }
 
 // GetWatchNamespace will return the  namespaces to operator
@@ -155,7 +157,7 @@ func (ctx *Context) GetWatchNamespace() (string, error) {
 	return ctx.watchNamespace, nil
 }
 
-func (ctx *Context) createFromYAML(yamlFile []byte, skipIfExists bool, cleanupOptions *CleanupOptions) error {
+func (ctx *Context) createFromYAML(yamlFile []byte, skipIfExists bool) error {
 	operatorNamespace, err := ctx.GetOperatorNamespace()
 	if err != nil {
 		return err
@@ -173,7 +175,7 @@ func (ctx *Context) createFromYAML(yamlFile []byte, skipIfExists bool, cleanupOp
 			return fmt.Errorf("failed to unmarshal object spec: %w", err)
 		}
 		obj.SetNamespace(operatorNamespace)
-		err = ctx.client.Create(goctx.TODO(), obj, cleanupOptions)
+		err = ctx.client.CreateWithoutCleanup(goctx.TODO(), obj)
 		if skipIfExists && apierrors.IsAlreadyExists(err) {
 			continue
 		}
@@ -192,7 +194,7 @@ func (ctx *Context) createFromYAML(yamlFile []byte, skipIfExists bool, cleanupOp
 				}
 				return true, nil
 			})
-			err = ctx.client.Create(goctx.TODO(), obj, cleanupOptions)
+			err = ctx.client.CreateWithoutCleanup(goctx.TODO(), obj)
 			if skipIfExists && apierrors.IsAlreadyExists(err) {
 				continue
 			}
@@ -214,5 +216,5 @@ func (ctx *Context) InitializeClusterResources(cleanupOptions *CleanupOptions) e
 	if err != nil {
 		return fmt.Errorf("failed to read namespaced manifest: %w", err)
 	}
-	return ctx.createFromYAML(namespacedYAML, false, cleanupOptions)
+	return ctx.createFromYAML(namespacedYAML, false)
 }
