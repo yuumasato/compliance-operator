@@ -382,7 +382,7 @@ github.com/openshift/client-go/operator/informers/externalversions/operator/v1
 github.com/openshift/client-go/operator/informers/externalversions/operator/v1alpha1
 github.com/openshift/client-go/operator/listers/operator/v1
 github.com/openshift/client-go/operator/listers/operator/v1alpha1
-# github.com/openshift/library-go v0.0.0-20230302150105-38724ca8e236
+# github.com/openshift/library-go v0.0.0-20230306101417-d7e4a8ca0588
 ## explicit; go 1.19
 github.com/openshift/library-go/pkg/crypto
 github.com/openshift/library-go/pkg/image/internal/digest
