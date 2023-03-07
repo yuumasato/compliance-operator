@@ -29,6 +29,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   are not available in json format, and we need to convert it to json format so that
   it can be read by OpenSCAP.
 
+- Added documentation on how to run platform scan on HyperShift Management
+  Cluster in `doc/usage.md`.
+
 ### Deprecations
 
 -
