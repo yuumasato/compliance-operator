@@ -569,11 +569,11 @@ e2e: e2e-set-image prep-e2e ## Run full end-to-end tests that exercise content o
 
 .PHONY: e2e-parallel
 e2e-parallel: ## Run non-destructive end-to-end tests concurrently.
-	E2E_GO_TEST_FLAGS=parallel $(MAKE) e2e
+	E2E_TEST_TYPE=parallel $(MAKE) e2e
 
 .PHONY: e2e-serial
 e2e-serial: ## Run destructive end-to-end tests serially.
-	E2E_GO_TEST_FLAGS=serial $(MAKE) e2e
+	E2E_TEST_TYPE=serial $(MAKE) e2e
 
 .PHONY: prep-e2e
 prep-e2e: kustomize
