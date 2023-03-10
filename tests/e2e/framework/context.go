@@ -94,7 +94,7 @@ func (ctx *Context) Cleanup() {
 		// The cleanup function will be skipped
 		if ctx.t.Failed() && ctx.skipCleanupOnError {
 			// Also, could we log the error here?
-			log.Info("Skipping cleanup function since --skip-cleanup-error is true")
+			log.Info("Skipping cleanup function since -skipCleanupOnError is true")
 			return
 		}
 	}
