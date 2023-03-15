@@ -17,7 +17,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Internal Changes
 
--
+- Fix openscap image substitution in Makefile so that the correct image is used.
 
 ### Deprecations
 
