@@ -1,19 +1,13 @@
 package framework
 
 import (
-	goctx "context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/pborman/uuid"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 )
 
 type Context struct {
@@ -50,14 +44,13 @@ type CleanupOptions struct {
 type cleanupFn func() error
 
 func (f *Framework) newContext(t *testing.T) *Context {
-
 	// Context is used among others for namespace names where '/' is forbidden and must be 63 characters or less
-	id := "osdk-e2e-" + uuid.New()
+	id := f.OperatorNamespace
 
-	var operatorNamespace string
-	_, ok := os.LookupEnv(TestOperatorNamespaceEnv)
+	operatorNamespace := f.OperatorNamespace
+	val, ok := os.LookupEnv(TestOperatorNamespaceEnv)
 	if ok {
-		operatorNamespace = f.OperatorNamespace
+		operatorNamespace = val
 	}
 
 	watchNamespace := operatorNamespace
@@ -113,11 +106,6 @@ func (ctx *Context) Cleanup() {
 	if ctx.t == nil && failed {
 		log.Fatal("A cleanup function failed")
 	}
-
-	var scans compv1alpha1.ComplianceScanList
-	listOpts := client.ListOptions{}
-	ctx.client.List(goctx.TODO(), &scans, &listOpts)
-	log.Warning(fmt.Sprintf("%d scans not cleaned up", len(scans.Items)))
 
 }
 

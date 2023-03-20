@@ -16,6 +16,7 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"github.com/pborman/uuid"
 	log "github.com/sirupsen/logrus"
 	extscheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -125,15 +126,17 @@ func (opts *frameworkOpts) addToFlagSet(flagset *flag.FlagSet) {
 }
 
 func newFramework(opts *frameworkOpts) (*Framework, error) {
-	kubeconfig, kcNamespace, err := GetKubeconfigAndNamespace(opts.kubeconfigPath)
+	kubeconfig, _, err := GetKubeconfigAndNamespace(opts.kubeconfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build the kubeconfig: %w", err)
 	}
 
-	operatorNamespace := kcNamespace
+	var operatorNamespace string
 	ns, ok := os.LookupEnv(TestOperatorNamespaceEnv)
 	if ok && ns != "" {
 		operatorNamespace = ns
+	} else {
+		operatorNamespace = "osdk-e2e-" + uuid.New()
 	}
 
 	kubeclient, err := kubernetes.NewForConfig(kubeconfig)
@@ -241,7 +244,7 @@ func (f *Framework) runM(m *testing.M) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to read global resource manifest: %w", err)
 	}
-	err = ctx.createFromYAML(globalYAML, true, &CleanupOptions{TestContext: ctx})
+	err = ctx.createFromYAML(globalYAML, true)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create resource(s) in global resource manifest: %w", err)
 	}
