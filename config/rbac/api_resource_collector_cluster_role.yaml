@@ -769,6 +769,16 @@ rules:
       - list
       - watch
   - apiGroups:
+      - imageregistry.operator.openshift.io
+    resources:
+      - imagepruners
+    resourceNames:
+      - cluster
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
       - operator.openshift.io
     resources:
       - kubeapiservers
