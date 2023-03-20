@@ -32,7 +32,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestProfileModification",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				const (
 					removedRule         = "chronyd-no-chronyc-network"
 					unlinkedRule        = "chronyd-client-only"
@@ -135,7 +135,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestProfileISTagUpdate",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				const (
 					removedRule         = "chronyd-no-chronyc-network"
 					unlinkedRule        = "chronyd-client-only"
@@ -244,7 +244,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestProfileISTagOtherNs",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				const (
 					removedRule         = "chronyd-no-chronyc-network"
 					unlinkedRule        = "chronyd-client-only"
@@ -354,7 +354,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestInvalidBundleWithUnexistentRef",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				const (
 					unexistentImage = "bad-namespace/bad-image:latest"
 				)
@@ -385,7 +385,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestInvalidBundleWithNoTag",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				const (
 					noTagImage = "bad-namespace/bad-image"
 				)
@@ -416,7 +416,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestParsingErrorRestartsParserInitContainer",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				var (
 					badImage  = fmt.Sprintf("%s:%s", brokenContentImagePath, "from")
 					goodImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "to")
@@ -510,7 +510,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestRulesAreClassifiedAppropriately",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				for _, expected := range []struct {
 					RuleName  string
 					CheckType string
@@ -553,7 +553,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestSingleScanSucceeds",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				scanName := getObjNameFromTest(t)
 				testScan := &compv1alpha1.ComplianceScan{
 					ObjectMeta: metav1.ObjectMeta{
@@ -612,7 +612,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanProducesRemediations",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				bindingName := getObjNameFromTest(t)
 				tpName := getObjNameFromTest(t)
 
@@ -688,7 +688,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestSingleScanWithStorageSucceeds",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				scanName := getObjNameFromTest(t)
 				testScan := &compv1alpha1.ComplianceScan{
 					ObjectMeta: metav1.ObjectMeta{
@@ -724,7 +724,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanWithUnexistentResourceFails",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				var unexistentImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "unexistent_resource")
 				scanName := getObjNameFromTest(t)
 				testScan := &compv1alpha1.ComplianceScan{
@@ -762,7 +762,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanStorageOutOfLimitRangeFails",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				// Create LimitRange
 				lr := &corev1.LimitRange{
 					ObjectMeta: metav1.ObjectMeta{
@@ -825,7 +825,7 @@ func TestE2E(t *testing.T) {
 			Name: "TestScanStorageOutOfQuotaRangeFails",
 			// This can't be parallel since it's a global quota for the namespace
 			IsParallel: false,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				// Create ResourceQuota
 				rq := &corev1.ResourceQuota{
 					ObjectMeta: metav1.ObjectMeta{
@@ -881,7 +881,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestSingleTailoredScanSucceeds",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				tailoringCM := &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-single-tailored-scan-succeeds-cm",
@@ -936,7 +936,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestSingleTailoredPlatformScanSucceeds",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				tailoringCM := &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-tailored-platform-scan-succeeds-cm",
@@ -993,7 +993,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanWithNodeSelectorFiltersCorrectly",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				selectWorkers := map[string]string{
 					"node-role.kubernetes.io/worker": "",
 				}
@@ -1032,7 +1032,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanWithNodeSelectorNoMatches",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				scanName := getObjNameFromTest(t)
 				selectNone := map[string]string{
 					"node-role.kubernetes.io/no-matches": "",
@@ -1065,7 +1065,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanWithInvalidScanTypeFails",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				scanName := getObjNameFromTest(t)
 				testScan := &compv1alpha1.ComplianceScan{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1093,7 +1093,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanWithInvalidContentFails",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				exampleComplianceScan := &compv1alpha1.ComplianceScan{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-scan-w-invalid-content",
@@ -1119,7 +1119,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanWithInvalidProfileFails",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				exampleComplianceScan := &compv1alpha1.ComplianceScan{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-scan-w-invalid-profile",
@@ -1145,7 +1145,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestMalformedTailoredScanFails",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				tailoringCM := &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-malformed-tailored-scan-fails-cm",
@@ -1201,7 +1201,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanWithEmptyTailoringCMNameFails",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				exampleComplianceScan := &compv1alpha1.ComplianceScan{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-scan-w-empty-tailoring-cm",
@@ -1228,7 +1228,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanWithMissingTailoringCMFailsAndRecovers",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				scanName := "test-scan-w-missing-tailoring-cm"
 				exampleComplianceScan := &compv1alpha1.ComplianceScan{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1298,7 +1298,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestMissingPodInRunningState",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				exampleComplianceScan := &compv1alpha1.ComplianceScan{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-missing-pod-scan",
@@ -1341,7 +1341,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestApplyGenericRemediation",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				remName := "test-apply-generic-remediation"
 				unstruct := &unstructured.Unstructured{}
 				unstruct.SetUnstructuredContent(map[string]interface{}{
@@ -1401,7 +1401,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestPatchGenericRemediation",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				remName := getObjNameFromTest(t)
 				cmName := remName
 				cmKey := types.NamespacedName{
@@ -1486,7 +1486,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestGenericRemediationFailsWithUnkownType",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				remName := "test-generic-remediation-fails-unkown"
 				genericRem := &compv1alpha1.ComplianceRemediation{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1529,7 +1529,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestSuiteWithInvalidScheduleShowsError",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				suiteName := "test-suite-with-invalid-schedule"
 				testSuite := &compv1alpha1.ComplianceSuite{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1577,7 +1577,7 @@ func TestE2E(t *testing.T) {
 			// NOTE(jaosorior): This was made a serial test because it runs the long-running, resource-taking and
 			// big AF moderate profile
 			IsParallel: false,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				suiteName := "test-suite-two-scans"
 
 				workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
@@ -1714,7 +1714,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScheduledSuite",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				suiteName := "test-scheduled-suite"
 
 				workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
@@ -1808,7 +1808,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScheduledSuitePriorityClass",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				suiteName := "test-scheduled-suite-priority-class"
 
 				workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
@@ -1892,7 +1892,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScheduledSuiteInvalidPriorityClass",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				suiteName := "test-scheduled-suite-invalid-priority-class"
 
 				workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
@@ -1962,7 +1962,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScheduledSuiteUpdate",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				suiteName := getObjNameFromTest(t)
 				workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
 				selectWorkers := map[string]string{
@@ -2053,7 +2053,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestSuiteWithContentThatDoesNotMatch",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				suiteName := "test-suite-with-non-matching-content"
 				testSuite := &compv1alpha1.ComplianceSuite{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2099,7 +2099,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestTolerations",
 			IsParallel: false,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				workerNodes := getNodesWithSelectorOrFail(t, f, map[string]string{
 					"node-role.kubernetes.io/worker": "",
 				})
@@ -2175,7 +2175,7 @@ func TestE2E(t *testing.T) {
 		//testExecution{
 		//	Name:       "TestNodeSchedulingErrorFailsTheScan",
 		//	IsParallel: false,
-		//	TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+		//	TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 		//		workerNodesLabel := map[string]string{
 		//			"node-role.kubernetes.io/worker": "",
 		//		}
@@ -2230,10 +2230,16 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanSettingBinding",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				objName := getObjNameFromTest(t)
 				const defaultCpuLimit = "100m"
 				const testMemoryLimit = "432Mi"
+
+				rhcosPb := &compv1alpha1.ProfileBundle{}
+				err := f.Client.Get(goctx.TODO(), types.NamespacedName{Name: "rhcos4", Namespace: f.OperatorNamespace}, rhcosPb)
+				if err != nil {
+					t.Fatalf("unable to get rhcos4 profile bundle required for test: %s", err)
+				}
 
 				rhcos4e8profile := &compv1alpha1.Profile{}
 				key := types.NamespacedName{Namespace: namespace, Name: rhcosPb.Name + "-e8"}
@@ -2334,9 +2340,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanSettingBindingTailoringAndNonDefaultRole",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
-				mcTctx.ensureE2EPool()
-
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				tpName := "non-default-role-tp"
 				scanSettingBindingName := "non-default-role-ssb"
 
@@ -2404,7 +2408,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanSettingBindingUsesDefaultScanSetting",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				objName := getObjNameFromTest(t)
 				scanSettingBindingName := objName + "-binding"
 				scanSettingBinding := compv1alpha1.ScanSettingBinding{
@@ -2445,7 +2449,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScanSettingBindingWatchesTailoredProfile",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				tpName := getObjNameFromTest(t)
 				bindingName := getObjNameFromTest(t)
 
@@ -2588,7 +2592,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestAutoRemediate",
 			IsParallel: false,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				// FIXME, maybe have a func that returns a struct with suite name and scan names?
 				suiteName := "test-remediate"
 				scanName := fmt.Sprintf("%s-e2e", suiteName)
@@ -2617,8 +2621,6 @@ func TestE2E(t *testing.T) {
 				if createTPErr != nil {
 					return createTPErr
 				}
-
-				mcTctx.ensureE2EPool()
 
 				ssb := &compv1alpha1.ScanSettingBinding{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2747,7 +2749,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestUnapplyRemediation",
 			IsParallel: false,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				// FIXME, maybe have a func that returns a struct with suite name and scan names?
 				suiteName := "test-unapply-remediation"
 
@@ -2778,8 +2780,6 @@ func TestE2E(t *testing.T) {
 						},
 					},
 				}
-
-				mcTctx.ensureE2EPool()
 
 				err := f.Client.Create(goctx.TODO(), exampleComplianceSuite, getCleanupOpts(ctx))
 				if err != nil {
@@ -2850,7 +2850,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestInconsistentResult",
 			IsParallel: false,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				suiteName := "test-inconsistent"
 				workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
 				selectWorkers := map[string]string{
@@ -2972,7 +2972,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestPlatformAndNodeSuiteScan",
 			IsParallel: false,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.TestCtx, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.TestCtx, namespace string) error {
 				suiteName := "test-suite-two-scans-with-platform"
 
 				workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
@@ -3186,7 +3186,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestUpdateRemediation",
 			IsParallel: false,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				origSuiteName := "test-update-remediation"
 				workerScanName := fmt.Sprintf("%s-e2e-scan", origSuiteName)
 
@@ -3221,8 +3221,6 @@ func TestE2E(t *testing.T) {
 						},
 					},
 				}
-
-				mcTctx.ensureE2EPool()
 
 				err := f.Client.Create(goctx.TODO(), origSuite, getCleanupOpts(ctx))
 				if err != nil {
@@ -3289,7 +3287,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestProfileBundleDefaultIsKept",
 			IsParallel: false,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				var (
 					otherImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "proff_diff_baseline")
 					bctx       = goctx.Background()
@@ -3358,7 +3356,7 @@ func TestE2E(t *testing.T) {
 					return err
 				}
 
-				ocpPb, err = getReadyProfileBundle(t, f, "ocp4", namespace)
+				_, err = getReadyProfileBundle(t, f, "ocp4", namespace)
 				if err != nil {
 					E2EFatalf(t, "error getting valid and up-to-date PB: %s", err)
 				}
@@ -3368,7 +3366,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestVariableTemplate",
 			IsParallel: false,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 
 				var baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "variabletemplate")
 				const requiredRule = "audit-profile-set"
@@ -3517,7 +3515,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestKubeletConfigRemediation",
 			IsParallel: false,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				suiteName := "kubelet-remediation-test-suite"
 
 				tp := &compv1alpha1.TailoredProfile{
@@ -3557,9 +3555,6 @@ func TestE2E(t *testing.T) {
 						},
 					},
 				}
-				mcTctx.ensureE2EPool()
-				// To prevent pod from crashing when there is an invalid machine config pool in the cluster
-				mcTctx.ensureInvalidE2EPool()
 				createTPErr := f.Client.Create(goctx.TODO(), tp, getCleanupOpts(ctx))
 				if createTPErr != nil {
 					return createTPErr
@@ -3664,7 +3659,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestManualRulesTailoredProfile",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				var baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "kubeletconfig")
 				const requiredRule = "kubelet-eviction-thresholds-set-soft-imagefs-available"
 				pbName := getObjNameFromTest(t)
@@ -3787,7 +3782,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestCheckDefaultKubeletConfig",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				var baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "kubelet_default")
 				const requiredRule = "kubelet-test-cipher"
 				pbName := getObjNameFromTest(t)
@@ -3902,7 +3897,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestHideRule",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				var baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "hide_rule")
 				const requiredRule = "version-detect"
 				pbName := getObjNameFromTest(t)
@@ -4011,7 +4006,7 @@ func TestE2E(t *testing.T) {
 		testExecution{
 			Name:       "TestScheduledSuiteTimeoutFail",
 			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, mcTctx *mcTestCtx, namespace string) error {
+			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
 				suiteName := "test-scheduled-suite-timeout-fail"
 
 				workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)

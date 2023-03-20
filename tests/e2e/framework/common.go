@@ -6,14 +6,34 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
-	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
+	"github.com/cenkalti/backoff/v4"
+	ocpapi "github.com/openshift/api"
+	configv1 "github.com/openshift/api/config/v1"
+	imagev1 "github.com/openshift/api/image/v1"
+	mcfgapi "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	core "k8s.io/api/core/v1"
+	v1 "k8s.io/api/rbac/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	psapi "k8s.io/pod-security-admission/api"
+	dynclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
+
+	"github.com/ComplianceAsCode/compliance-operator/pkg/apis"
+	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
+	"github.com/ComplianceAsCode/compliance-operator/pkg/utils"
 )
+
+var defaultBackoff = backoff.WithMaxRetries(backoff.NewExponentialBackOff(), maxRetries)
 
 // readFile accepts a file path and returns the file contents.
 func (f *Framework) readFile(p *string) ([]byte, error) {
@@ -51,6 +71,14 @@ func (f *Framework) readYAML(y []byte) ([][]byte, error) {
 	return o, nil
 }
 
+func unmarshalJSON(j []byte) (dynclient.Object, error) {
+	obj := &unstructured.Unstructured{}
+	if err := obj.UnmarshalJSON(j); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal object spec: %w", err)
+	}
+	return obj, nil
+}
+
 func (f *Framework) cleanUpFromYAMLFile(p *string) error {
 	c, err := f.readFile(p)
 	if err != nil {
@@ -62,14 +90,54 @@ func (f *Framework) cleanUpFromYAMLFile(p *string) error {
 	}
 
 	for _, d := range documents {
-		obj := &unstructured.Unstructured{}
-		if err := obj.UnmarshalJSON(d); err != nil {
-			return fmt.Errorf("failed to unmarshal object spec: %w", err)
+		obj, err := unmarshalJSON(d)
+		if err != nil {
+			return err
 		}
 		obj.SetNamespace(f.OperatorNamespace)
-		log.Printf("deleting %s %s", obj.GetKind(), obj.GetName())
+		log.Printf("deleting %s %s", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetName())
 		if err := f.Client.Delete(context.TODO(), obj); err != nil {
-			return fmt.Errorf("failed to delete %s: %w", obj, err)
+			return fmt.Errorf("failed to delete %s: %w", obj.GetObjectKind().GroupVersionKind().Kind, err)
+		}
+	}
+	return nil
+}
+
+func (f *Framework) cleanUpProfileBundle(p string) error {
+	pb := &compv1alpha1.ProfileBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      p,
+			Namespace: f.OperatorNamespace,
+		},
+	}
+	err := f.Client.Delete(context.TODO(), pb)
+	if err != nil {
+		return fmt.Errorf("failed to delete ProfileBundle%s: %w", p, err)
+	}
+	return nil
+}
+
+func (f *Framework) createFromYAMLFile(p *string) error {
+	c, err := f.readFile(p)
+	if err != nil {
+		return err
+	}
+	documents, err := f.readYAML(c)
+	if err != nil {
+		return err
+	}
+
+	for _, d := range documents {
+		obj, err := unmarshalJSON(d)
+		if err != nil {
+			return err
+		}
+
+		obj.SetNamespace(f.OperatorNamespace)
+		log.Printf("creating %s %s", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetName())
+		err = f.Client.CreateWithoutCleanup(context.TODO(), obj)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -78,7 +146,7 @@ func (f *Framework) cleanUpFromYAMLFile(p *string) error {
 func (f *Framework) waitForScanCleanup() error {
 	timeouterr := wait.Poll(time.Second*5, time.Minute*2, func() (bool, error) {
 		var scans compv1alpha1.ComplianceScanList
-		f.Client.List(context.TODO(), &scans, &client.ListOptions{})
+		f.Client.List(context.TODO(), &scans, &dynclient.ListOptions{})
 		if len(scans.Items) == 0 {
 			return true, nil
 		}
@@ -94,4 +162,566 @@ func (f *Framework) waitForScanCleanup() error {
 
 	}
 	return nil
+}
+
+func (f *Framework) addFrameworks() error {
+	// compliance-operator objects
+	coObjs := [3]dynclient.ObjectList{&compv1alpha1.ComplianceScanList{},
+		&compv1alpha1.ComplianceRemediationList{},
+		&compv1alpha1.ComplianceSuiteList{},
+	}
+
+	for _, obj := range coObjs {
+		err := AddToFrameworkScheme(apis.AddToScheme, obj)
+		if err != nil {
+			return fmt.Errorf("failed to add custom resource scheme to framework: %v", err)
+		}
+	}
+
+	// Additional testing objects
+	testObjs := [1]dynclient.ObjectList{
+		&configv1.OAuthList{},
+	}
+	for _, obj := range testObjs {
+		err := AddToFrameworkScheme(configv1.Install, obj)
+		if err != nil {
+			return fmt.Errorf("failed to add configv1 resource scheme to framework: %v", err)
+		}
+	}
+
+	// MCO objects
+	mcoObjs := [2]dynclient.ObjectList{
+		&mcfgv1.MachineConfigPoolList{},
+		&mcfgv1.MachineConfigList{},
+	}
+	for _, obj := range mcoObjs {
+		err := AddToFrameworkScheme(mcfgapi.Install, obj)
+		if err != nil {
+			return fmt.Errorf("failed to add custom resource scheme to framework: %v", err)
+		}
+	}
+
+	// OpenShift objects
+	ocpObjs := [2]dynclient.ObjectList{
+		&imagev1.ImageStreamList{},
+		&imagev1.ImageStreamTagList{},
+	}
+	for _, obj := range ocpObjs {
+		if err := AddToFrameworkScheme(ocpapi.Install, obj); err != nil {
+			return fmt.Errorf("failed to add custom resource scheme to framework: %v", err)
+		}
+	}
+
+	//Schedule objects
+	scObjs := [1]dynclient.ObjectList{
+		&schedulingv1.PriorityClassList{},
+	}
+	for _, obj := range scObjs {
+		if err := AddToFrameworkScheme(schedulingv1.AddToScheme, obj); err != nil {
+			return fmt.Errorf("TEST SETUP: failed to add custom resource scheme to framework: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (f *Framework) initializeMetricsTestResources() error {
+	if _, err := f.KubeClient.RbacV1().ClusterRoles().Create(context.TODO(), &v1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "co-metrics-client",
+		},
+		Rules: []v1.PolicyRule{
+			{
+				NonResourceURLs: []string{
+					"/metrics-co",
+				},
+				Verbs: []string{
+					"get",
+				},
+			},
+		},
+	}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	if _, err := f.KubeClient.RbacV1().ClusterRoleBindings().Create(context.TODO(), &v1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "co-metrics-client",
+		},
+		Subjects: []v1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "default",
+				Namespace: f.OperatorNamespace,
+			},
+		},
+		RoleRef: v1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "co-metrics-client",
+		},
+	}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	if _, err := f.KubeClient.CoreV1().Secrets(f.OperatorNamespace).Create(context.TODO(), &core.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "metrics-token",
+			Namespace: f.OperatorNamespace,
+			Annotations: map[string]string{
+				"kubernetes.io/service-account.name": "default",
+			},
+		},
+		Type: "kubernetes.io/service-account-token",
+	}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+func (f *Framework) replaceNamespaceFromManifest() error {
+	log.Printf("updating manifest %s with namespace %s\n", *f.NamespacedManPath, f.OperatorNamespace)
+	if f.NamespacedManPath == nil {
+		return fmt.Errorf("no namespaced manifest given as test argument (operator-sdk might have changed)")
+	}
+	c, err := f.readFile(f.NamespacedManPath)
+	if err != nil {
+		return err
+	}
+
+	newContents := strings.Replace(string(c), "openshift-compliance", f.OperatorNamespace, -1)
+
+	// #nosec
+	err = os.WriteFile(*f.NamespacedManPath, []byte(newContents), 0644)
+	if err != nil {
+		return fmt.Errorf("error writing namespaced manifest file: %s", err)
+	}
+	return nil
+}
+
+func (f *Framework) waitForDeployment(name string, replicas int, retryInterval, timeout time.Duration) error {
+	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
+		deployment, err := f.KubeClient.AppsV1().Deployments(f.OperatorNamespace).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				log.Printf("Waiting for availability of Deployment: %s in Namespace: %s \n", name, f.OperatorNamespace)
+				return false, nil
+			}
+			return false, err
+		}
+
+		if int(deployment.Status.AvailableReplicas) >= replicas {
+			return true, nil
+		}
+		log.Printf("Waiting for full availability of %s deployment (%d/%d)\n", name,
+			deployment.Status.AvailableReplicas, replicas)
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("Deployment available (%d/%d)\n", replicas, replicas)
+	return nil
+}
+
+func (f *Framework) ensureTestNamespaceExists() error {
+	// create namespace only if it doesn't already exist
+	_, err := f.KubeClient.CoreV1().Namespaces().Get(context.TODO(), f.OperatorNamespace, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		ns := &core.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: f.OperatorNamespace,
+				Labels: map[string]string{
+					psapi.EnforceLevelLabel:                          string(psapi.LevelPrivileged),
+					"security.openshift.io/scc.podSecurityLabelSync": "false",
+				},
+			},
+		}
+
+		log.Printf("creating namespace %s", f.OperatorNamespace)
+		_, err = f.KubeClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+		if apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("namespace %s already exists: %w", f.OperatorNamespace, err)
+		} else if err != nil {
+			return err
+		}
+		return nil
+	} else if apierrors.IsAlreadyExists(err) {
+		log.Printf("using existing namespace %s", f.OperatorNamespace)
+		return nil
+	} else {
+		return nil
+	}
+
+}
+
+// waitForProfileBundleStatus will poll until the compliancescan that we're
+// lookingfor reaches a certain status, or until a timeout is reached.
+func (f *Framework) waitForProfileBundleStatus(name string) error {
+	pb := &compv1alpha1.ProfileBundle{}
+	var lastErr error
+	// retry and ignore errors until timeout
+	timeouterr := wait.Poll(retryInterval, timeout, func() (bool, error) {
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: f.OperatorNamespace}, pb)
+		if lastErr != nil {
+			if apierrors.IsNotFound(lastErr) {
+				log.Printf("waiting for availability of %s ProfileBundle\n", name)
+				return false, nil
+			}
+			log.Printf("retrying due to error: %s\n", lastErr)
+			return false, nil
+		}
+
+		if pb.Status.DataStreamStatus == compv1alpha1.DataStreamValid {
+			return true, nil
+		}
+		log.Printf("waiting ProfileBundle %s to become %s (%s)\n", name, compv1alpha1.DataStreamValid, pb.Status.DataStreamStatus)
+		return false, nil
+	})
+	if timeouterr != nil {
+		return fmt.Errorf("ProfileBundle %s failed to reach state %s", name, compv1alpha1.DataStreamValid)
+	}
+	log.Printf("ProfileBundle ready (%s)\n", pb.Status.DataStreamStatus)
+	return nil
+}
+
+func (f *Framework) updateScanSettingsForDebug() error {
+	for _, ssName := range []string{"default", "default-auto-apply"} {
+		ss := &compv1alpha1.ScanSetting{}
+		sskey := types.NamespacedName{Name: ssName, Namespace: f.OperatorNamespace}
+		if err := f.Client.Get(context.TODO(), sskey, ss); err != nil {
+			return err
+		}
+
+		ssCopy := ss.DeepCopy()
+		ssCopy.Debug = true
+
+		if err := f.Client.Update(context.TODO(), ssCopy); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (f *Framework) ensureE2EScanSettings() error {
+	for _, ssName := range []string{"default", "default-auto-apply"} {
+		ss := &compv1alpha1.ScanSetting{}
+		sskey := types.NamespacedName{Name: ssName, Namespace: f.OperatorNamespace}
+		if err := f.Client.Get(context.TODO(), sskey, ss); err != nil {
+			return err
+		}
+
+		ssCopy := ss.DeepCopy()
+		ssCopy.ObjectMeta = metav1.ObjectMeta{
+			Name:      "e2e-" + ssName,
+			Namespace: f.OperatorNamespace,
+		}
+		ssCopy.Roles = []string{
+			testPoolName,
+		}
+		ssCopy.Debug = true
+
+		if err := f.Client.Create(context.TODO(), ssCopy, nil); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (f *Framework) deleteScanSettings(name string) error {
+	ss := &compv1alpha1.ScanSetting{}
+	sskey := types.NamespacedName{Name: name, Namespace: f.OperatorNamespace}
+	if err := f.Client.Get(context.TODO(), sskey, ss); err != nil {
+		return err
+	}
+
+	err := f.Client.Delete(context.TODO(), ss)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup scan setting %s: %w", name, err)
+	}
+	return nil
+}
+
+func (f *Framework) createMachineConfigPool(n string) error {
+	// get the worker pool
+	w := "worker"
+	p := &mcfgv1.MachineConfigPool{}
+	getErr := backoff.RetryNotify(
+		func() error {
+			err := f.Client.Get(context.TODO(), types.NamespacedName{Name: w}, p)
+			if apierrors.IsNotFound(err) {
+				// Can't recover from this
+				log.Printf("Could not find the %s Machine Config Pool to modify: %s", w, err)
+			}
+			// might be a transcient error
+			return err
+		},
+		defaultBackoff,
+		func(err error, interval time.Duration) {
+			log.Printf("error while getting MachineConfig pool to create sub-pool from: %s. Retrying after %s", err, interval)
+		})
+	if getErr != nil {
+		return fmt.Errorf("failed to get Machine Config Pool %s to create sub-pool from: %w", w, getErr)
+	}
+
+	nodeList, err := f.getNodesForPool(p)
+	if err != nil {
+		return err
+	}
+	// pick the first node in the list so we only have a pool of one
+	node := nodeList.Items[0]
+
+	// create a new pool with a subset of the nodes
+	l := fmt.Sprintf("node-role.kubernetes.io/%s", n)
+
+	// label nodes
+	nodeCopy := node.DeepCopy()
+	nodeCopy.Labels[l] = ""
+
+	log.Printf("adding label %s to node %s\n", l, node.Name)
+	updateErr := backoff.RetryNotify(
+		func() error {
+			return f.Client.Update(context.TODO(), nodeCopy)
+		},
+		defaultBackoff,
+		func(err error, interval time.Duration) {
+			log.Printf("failed to label node %s: %s... retrying after %s", node.Name, err, interval)
+		})
+	if updateErr != nil {
+		log.Printf("failed to label node %s: %s\n", node.Name, l)
+		return fmt.Errorf("couldn't label node %s: %w", node.Name, updateErr)
+	}
+
+	nodeLabel := make(map[string]string)
+	nodeLabel[l] = ""
+	poolLabels := make(map[string]string)
+	poolLabels["pools.operator.machineconfiguration.openshift.io/e2e"] = ""
+	newPool := &mcfgv1.MachineConfigPool{
+		ObjectMeta: metav1.ObjectMeta{Name: n, Labels: poolLabels},
+		Spec: mcfgv1.MachineConfigPoolSpec{
+			NodeSelector: &metav1.LabelSelector{
+				MatchLabels: nodeLabel,
+			},
+			MachineConfigSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      mcfgv1.MachineConfigRoleLabelKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{w, n},
+					},
+				},
+			},
+		},
+	}
+
+	// We create but don't clean up, we'll call a function for this since we need to
+	// re-label hosts first.
+	createErr := backoff.RetryNotify(
+		func() error {
+			err := f.Client.Create(context.TODO(), newPool, nil)
+			if apierrors.IsAlreadyExists(err) {
+				return nil
+			}
+			return err
+		},
+		defaultBackoff,
+		func(err error, interval time.Duration) {
+			log.Printf("failed to create Machine Config Pool %s: %s... retrying after %s", n, err, interval)
+		})
+	if createErr != nil {
+		return fmt.Errorf("failed to create Machine Config Pool %s: %w", n, createErr)
+	}
+
+	// wait for pool to come up
+	err = wait.PollImmediate(machineOperationRetryInterval, machineOperationTimeout, func() (bool, error) {
+		pool := mcfgv1.MachineConfigPool{}
+		err := f.Client.Get(context.TODO(), types.NamespacedName{Name: n}, &pool)
+		if err != nil {
+			log.Printf("failed to find Machine Config Pool %s\n", n)
+			return false, err
+		}
+
+		for _, c := range pool.Status.Conditions {
+			if c.Type == mcfgv1.MachineConfigPoolUpdated {
+				if c.Status == core.ConditionTrue {
+					return true, nil
+				}
+			}
+		}
+
+		log.Printf("%s Machine Config Pool has not updated... retrying\n", n)
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed waiting for Machine Config Pool %s to become available: %w", n, err)
+	}
+
+	log.Printf("successfully created Machine Config Pool %s\n", n)
+	return nil
+}
+
+func (f *Framework) createInvalidMachineConfigPool(n string) error {
+	p := &mcfgv1.MachineConfigPool{
+		ObjectMeta: metav1.ObjectMeta{Name: n},
+		Spec: mcfgv1.MachineConfigPoolSpec{
+			Paused: false,
+		},
+	}
+
+	createErr := backoff.RetryNotify(
+		func() error {
+			err := f.Client.Create(context.TODO(), p, nil)
+			if apierrors.IsAlreadyExists(err) {
+				log.Printf("Machine Config Pool %s already exists", n)
+				return nil
+			}
+			return err
+		},
+		defaultBackoff,
+		func(err error, interval time.Duration) {
+			log.Printf("error creating Machine Config Pool %s: %s... retrying after %s", n, err, interval)
+		})
+	if createErr != nil {
+		return fmt.Errorf("failed to create Machine Config Pool %s: %w", n, createErr)
+	}
+	return nil
+}
+
+func (f *Framework) cleanUpMachineConfigPool(n string) error {
+	p := &mcfgv1.MachineConfigPool{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: n}, p)
+	if err != nil {
+		return fmt.Errorf("failed to get Machine Config Pool %s for cleanup: %w", n, err)
+	}
+	log.Printf("cleaning up Machine Config Pool %s", n)
+	err = f.Client.Delete(context.TODO(), p)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup Machine Config Pool %s: %w", n, err)
+	}
+	return nil
+}
+
+func (f *Framework) restoreNodeLabelsForPool(n string) error {
+	p := &mcfgv1.MachineConfigPool{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: n}, p)
+	if err != nil {
+		return fmt.Errorf("failed to get Machine Config Pool %s for cleanup: %w", n, err)
+	}
+
+	nodeList, err := f.getNodesForPool(p)
+	nodes := nodeList.Items
+	if err != nil {
+		return fmt.Errorf("failed to find nodes while cleaning up Machine Config Pool %s: %w", n, err)
+	}
+	rmPoolLabel := utils.GetFirstNodeRoleLabel(p.Spec.NodeSelector.MatchLabels)
+
+	err = f.removeLabelFromNode(rmPoolLabel, nodes)
+	if err != nil {
+		return err
+	}
+
+	// Unlabeling the nodes triggers an update of the affected nodes because the nodes
+	// will then start using a different rendered pool. e.g a node that used to be labeled
+	// with "e2e,worker" and becomes labeled with "worker" switches from "rendered-e2e-*"
+	// to "rendered-worker-*". If we didn't wait, the node might have tried to use the
+	// e2e pool that would be gone when we remove it with the next call
+	err = f.waitForNodesToHaveARenderedPool(nodes, n)
+	if err != nil {
+		return fmt.Errorf("failed removing nodes from Machine Config Pool %s: %w", n, err)
+	}
+	err = wait.PollImmediate(machineOperationRetryInterval, machineOperationTimeout, func() (bool, error) {
+		pool := mcfgv1.MachineConfigPool{}
+		err := f.Client.Get(context.TODO(), types.NamespacedName{Name: n}, &pool)
+		if err != nil {
+			return false, fmt.Errorf("failed to get Machine Config Pool %s: %w", n, err)
+		}
+		for _, c := range pool.Status.Conditions {
+			if c.Type == mcfgv1.MachineConfigPoolUpdated && c.Status == core.ConditionTrue {
+				return true, nil
+			}
+		}
+
+		log.Printf("the Machine Config Pool %s has not updated yet\n", n)
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed waiting for nodes to reboot after being unlabeled: %w", err)
+	}
+
+	return nil
+}
+
+func (f *Framework) getNodesForPool(p *mcfgv1.MachineConfigPool) (core.NodeList, error) {
+	var nodeList core.NodeList
+	opts := &dynclient.ListOptions{
+		LabelSelector: labels.SelectorFromSet(p.Spec.NodeSelector.MatchLabels),
+	}
+	listErr := backoff.Retry(
+		func() error {
+			return f.Client.List(context.TODO(), &nodeList, opts)
+		},
+		defaultBackoff)
+	if listErr != nil {
+		return nodeList, fmt.Errorf("couldn't list nodes with selector %s: %w", p.Spec.NodeSelector.MatchLabels, listErr)
+	}
+	return nodeList, nil
+}
+
+func (f *Framework) removeLabelFromNode(l string, nodes []core.Node) error {
+	for _, n := range nodes {
+		c := n.DeepCopy()
+		delete(c.Labels, l)
+
+		fmt.Printf("removing label %s from node %s\n", l, c.Name)
+		err := f.Client.Update(context.TODO(), c)
+		if err != nil {
+			return fmt.Errorf("failed to remove label %s from node %s: %s", l, c.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// waitForNodesToHaveARenderedPool waits until all nodes passed through a
+// parameter transition to a rendered configuration from a pool. A typical
+// use-case is when a node is unlabeled from a pool and must wait until Machine
+// Config Operator makes the node use the other available pool. Only then it is
+// safe to remove the pool the node was labeled with, otherwise the node might
+// still use the deleted pool on next reboot and enter a Degraded state.
+func (f *Framework) waitForNodesToHaveARenderedPool(nodes []core.Node, n string) error {
+	p := &mcfgv1.MachineConfigPool{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: n}, p)
+	if err != nil {
+		return fmt.Errorf("failed to find Machine Config Pool %s: %w", n, err)
+	}
+
+	fmt.Printf("waiting for nodes to reach %s\n", p.Spec.Configuration.Name)
+	return wait.PollImmediateInfinite(machineOperationRetryInterval, func() (bool, error) {
+		for _, loopNode := range nodes {
+			node := &core.Node{}
+			err := backoff.Retry(func() error {
+				return f.Client.Get(context.TODO(), types.NamespacedName{Name: loopNode.Name}, node)
+			}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), maxRetries))
+
+			if err != nil {
+				return false, err
+			}
+
+			fmt.Printf("Node %s has config %s, desired config %s state %s",
+				node.Name,
+				node.Annotations["machineconfiguration.openshift.io/currentConfig"],
+				node.Annotations["machineconfiguration.openshift.io/desiredConfig"],
+				node.Annotations["machineconfiguration.openshift.io/state"])
+
+			if node.Annotations["machineconfiguration.openshift.io/desiredConfig"] != p.Spec.Configuration.Name ||
+				node.Annotations["machineconfiguration.openshift.io/currentConfig"] != node.Annotations["machineconfiguration.openshift.io/desiredConfig"] {
+				log.Printf("node %s still updating", node.Name)
+				return false, nil
+			}
+			log.Printf("node %s was updated", node.Name)
+		}
+		log.Printf("all nodes in Machine Config Pool %s were updated successfully", n)
+		return true, nil
+	})
 }
