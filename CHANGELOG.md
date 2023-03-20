@@ -19,6 +19,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Fix openscap image substitution in Makefile so that the correct image is used.
 
+- Fix github operator image workflow to listen to the master branch, added
+  bundle image, and openscap image build jobs to the workflow. Also added
+  a special Dockerfile for the bundle image so that the bundle image can
+  point to the correct images.
+
 ### Deprecations
 
 -
