@@ -7,7 +7,7 @@ export GOARCH = $(shell go env GOARCH)
 
 # Runtime variables
 # =================
-DEFAULT_REPO=quay.io/compliance-operator
+DEFAULT_REPO=ghcr.io/complianceascode
 IMAGE_REPO?=$(DEFAULT_REPO)
 RUNTIME?=podman
 # Required for podman < 3.4.7 and buildah to use microdnf in fedora 35
@@ -92,7 +92,7 @@ BENCHMARK_PKG?=github.com/ComplianceAsCode/compliance-operator/pkg/utils
 # go source files, ignore vendor directory
 SRC = $(shell find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./_output/*")
 
-MUST_GATHER_IMAGE_PATH?=$(IMAGE_REPO)/must-gather
+MUST_GATHER_IMAGE_PATH?=$(IMAGE_REPO)/must-gather-ocp
 MUST_GATHER_IMAGE_TAG?=$(TAG)
 
 # Kubernetes variables
@@ -141,9 +141,9 @@ CONTENT_IMAGE?=$(DEFAULT_CONTENT_IMAGE)
 E2E_CONTENT_IMAGE_PATH?=ghcr.io/complianceascode/k8scontent:latest
 # We specifically omit the tag here since we use this for testing
 # different images referenced by different tags.
-E2E_BROKEN_CONTENT_IMAGE_PATH?=quay.io/compliance-operator/test-broken-content
+E2E_BROKEN_CONTENT_IMAGE_PATH?=ghcr.io/complianceascode/test-broken-content-ocp
 
-MUST_GATHER_IMAGE_PATH?=quay.io/compliance-operator/must-gather
+MUST_GATHER_IMAGE_PATH?=ghcr.io/complianceascode/must-gather-ocp
 MUST_GATHER_IMAGE_TAG?=latest
 
 # New Makefile variables
@@ -671,7 +671,7 @@ push-release: package-version-to-tag ## Create a commit for the release change, 
 	git push $(GIT_REMOTE) ocp-0.1
 
 .PHONY: release-images
-release-images: package-version-to-tag push catalog ## Build container images, bundle images, and catalog images and push them to an image registry (default: quay.io/compliance-operator).
+release-images: package-version-to-tag push catalog ## Build container images, bundle images, and catalog images and push them to an image registry (default: ghcr.io/complianceascode).
 	$(RUNTIME) image tag $(OPERATOR_IMAGE) $(OPERATOR_TAG_BASE):latest
 	$(RUNTIME) image tag $(BUNDLE_IMG) $(BUNDLE_TAG_BASE):latest
 	$(RUNTIME) image tag $(CATALOG_IMG) $(CATALOG_TAG_BASE):latest
