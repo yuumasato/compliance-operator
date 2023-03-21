@@ -2,16 +2,40 @@ name: Release latest
 
 on:
   push:
-    branches:
-      - main
+    branches: [ 'master' ]
 
 jobs:
   # Push to latest
-  container-push-latest:
+  operator-container-push-latest:
     uses: metal-toolbox/container-push/.github/workflows/container-push.yml@main
     with:
       name: compliance-operator
       registry_org: complianceascode
       tag: latest
       dockerfile_path: build/Dockerfile
+      vendor: 'Compliance Operator Authors'
+  bundle-container-push-latest:
+    uses: metal-toolbox/container-push/.github/workflows/container-push.yml@main
+    with:
+      name: compliance-operator-bundle
+      registry_org: complianceascode
+      tag: latest
+      dockerfile_path: bundle-latest.Dockerfile
+      vendor: 'Compliance Operator Authors'
+  openscap-container-push-latest:
+    uses: metal-toolbox/container-push/.github/workflows/container-push.yml@main
+    with:
+      name: openscap-ocp
+      registry_org: complianceascode
+      tag: latest
+      dockerfile_path: images/openscap/Dockerfile
+      vendor: 'Compliance Operator Authors'
+  catalog-container-push-latest:
+    needs: bundle-container-push-latest
+    uses: metal-toolbox/container-push/.github/workflows/container-push.yml@main
+    with:
+      name: compliance-operator-catalog
+      registry_org: complianceascode
+      tag: latest
+      dockerfile_path: catalog.Dockerfile
       vendor: 'Compliance Operator Authors'
