@@ -455,6 +455,17 @@ catalog-image: opm ## Build a catalog image.
 	$(OPM) generate dockerfile $(TMP_DIR)
 	$(RUNTIME) build -f $(CATALOG_DOCKERFILE) -t $(CATALOG_IMG)
 	rm -rf $(TMP_DIR) $(CATALOG_DOCKERFILE)
+# Generate the catalog dockerfile and the catalog json file
+# This is mainly used for github workflows to build the catalog image
+.PHONY: catalog-docker
+catalog-docker: opm ## Prepare the catalog dockerfile and the catalog json file.
+	$(eval CATALOG_DIR := catalog)
+	$(eval CATALOG_DOCKERFILE := $(CATALOG_DIR).Dockerfile)
+	rm -f $(CATALOG_DIR).Dockerfile
+	rm -f $(CATALOG_DIR)/compliance-operator-catalog.json
+	mv catalog/preamble.json $(CATALOG_DIR)/compliance-operator-catalog.json
+	$(OPM) render $(BUNDLE_IMGS) >> $(CATALOG_DIR)/compliance-operator-catalog.json
+	$(OPM) generate dockerfile $(CATALOG_DIR)
 
 .PHONY: catalog
 catalog: catalog-image catalog-push ## Build and push a catalog image.
