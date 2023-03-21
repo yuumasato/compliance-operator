@@ -70,7 +70,7 @@ func (f *Framework) setUp() error {
 func (f *Framework) tearDown() error {
 	// Make sure all scans are cleaned up before we delete the CRDs. Scans should be cleaned up
 	// because they're owned by ScanSettingBindings or ScanSuites, which should be cleaned up
-	// by each individual test either directly or through deferred cleanup. If the test fail
+	// by each individual test either directly or through deferred cleanup. If the test fails
 	// because there are scans that haven't been cleaned up, we could have a bug in the
 	// tests.
 	err := f.waitForScanCleanup()
@@ -85,7 +85,7 @@ func (f *Framework) tearDown() error {
 	// (which may be the case with parallel tests), making it possible for some
 	// resources to get cleaned up before others. We don't want that to happen with
 	// cluster resources like CRDs, because it will orphan custom resource instances
-	//that haven't been cleaned up, yet.
+	// that haven't been cleaned up, yet.
 	log.Printf("cleaning up namespaced resources in %s\n", f.OperatorNamespace)
 	err = f.cleanUpFromYAMLFile(f.NamespacedManPath)
 	if err != nil {
