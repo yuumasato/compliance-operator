@@ -31,7 +31,6 @@ jobs:
       dockerfile_path: images/openscap/Dockerfile
       vendor: 'Compliance Operator Authors'
   catalog-container-push-latest:
-    needs: bundle-container-push-latest
     uses: metal-toolbox/container-push/.github/workflows/container-push.yml@main
     with:
       name: compliance-operator-catalog
