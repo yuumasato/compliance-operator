@@ -30,7 +30,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removals
 
--
+- The `compliance_scan_error_total` metric was designed to count individual
+  scan errors. As a result, one of the metric keys contained the scan error,
+  which is large. The length and uniqueness of the metric itself can cause
+  issues in Prometheus, as noted in [Metric and Label Naming best
+  practices](https://prometheus.io/docs/practices/naming/#labels). The error
+  in the metric has been removed to reduce cardinality. Please see the [bug
+  report](https://issues.redhat.com/browse/OCPBUGS-1803) for more details.
 
 ### Security
 
