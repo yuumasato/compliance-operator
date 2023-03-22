@@ -69,25 +69,25 @@ type Framework struct {
 
 	restMapper *restmapper.DeferredDiscoveryRESTMapper
 
-	projectRoot        string
-	globalManPath      string
-	localOperatorArgs  string
-	kubeconfigPath     string
-	testType           string
-	schemeMutex        sync.Mutex
-	LocalOperator      bool
-	skipCleanupOnError bool
+	projectRoot       string
+	globalManPath     string
+	localOperatorArgs string
+	kubeconfigPath    string
+	testType          string
+	schemeMutex       sync.Mutex
+	LocalOperator     bool
+	cleanupOnError    bool
 }
 
 type frameworkOpts struct {
-	projectRoot        string
-	kubeconfigPath     string
-	globalManPath      string
-	namespacedManPath  string
-	localOperatorArgs  string
-	testType           string
-	isLocalOperator    bool
-	skipCleanupOnError bool
+	projectRoot       string
+	kubeconfigPath    string
+	globalManPath     string
+	namespacedManPath string
+	localOperatorArgs string
+	testType          string
+	isLocalOperator   bool
+	cleanupOnError    bool
 }
 
 const (
@@ -97,14 +97,14 @@ const (
 )
 
 const (
-	ProjRootFlag           = "root"
-	KubeConfigFlag         = "kubeconfig"
-	NamespacedManPathFlag  = "namespacedMan"
-	GlobalManPathFlag      = "globalMan"
-	LocalOperatorFlag      = "localOperator"
-	LocalOperatorArgs      = "localOperatorArgs"
-	SkipCleanupOnErrorFlag = "skipCleanupOnError"
-	TestTypeFlag           = "testType"
+	ProjRootFlag          = "root"
+	KubeConfigFlag        = "kubeconfig"
+	NamespacedManPathFlag = "namespacedMan"
+	GlobalManPathFlag     = "globalMan"
+	LocalOperatorFlag     = "localOperator"
+	LocalOperatorArgs     = "localOperatorArgs"
+	CleanupOnErrorFlag    = "cleanupOnError"
+	TestTypeFlag          = "testType"
 
 	TestOperatorNamespaceEnv = "TEST_OPERATOR_NAMESPACE"
 	TestWatchNamespaceEnv    = "TEST_WATCH_NAMESPACE"
@@ -118,9 +118,11 @@ func (opts *frameworkOpts) addToFlagSet(flagset *flag.FlagSet) {
 	flagset.StringVar(&opts.globalManPath, GlobalManPathFlag, "", "path to operator manifest")
 	flagset.StringVar(&opts.localOperatorArgs, LocalOperatorArgs, "",
 		"flags that the operator needs (while using --up-local). example: \"--flag1 value1 --flag2=value2\"")
-	flagset.BoolVar(&opts.skipCleanupOnError, SkipCleanupOnErrorFlag, false,
-		"If set as true, the cleanup function responsible to remove all artifacts "+
-			"will be skipped if an error is faced.")
+	flagset.BoolVar(&opts.cleanupOnError, CleanupOnErrorFlag, false,
+		"If set to true, the test runner will attempt to cleanup all test resources "+
+			"if the test failed. By default, test resources are not cleaned up "+
+			"after failed tests to help debug test issues. This option has no effect on successful test runs, "+
+			"in which case test resources are automatically cleaned up.")
 	flagset.StringVar(&opts.testType, TestTypeFlag, TestTypeAll,
 		"Defines the type of tests to run. (Options: all, serial, parallel)")
 }
@@ -169,13 +171,13 @@ func newFramework(opts *frameworkOpts) (*Framework, error) {
 		OperatorNamespace: operatorNamespace,
 		LocalOperator:     opts.isLocalOperator,
 
-		projectRoot:        opts.projectRoot,
-		globalManPath:      opts.globalManPath,
-		localOperatorArgs:  opts.localOperatorArgs,
-		kubeconfigPath:     opts.kubeconfigPath,
-		restMapper:         restMapper,
-		skipCleanupOnError: opts.skipCleanupOnError,
-		testType:           opts.testType,
+		projectRoot:       opts.projectRoot,
+		globalManPath:     opts.globalManPath,
+		localOperatorArgs: opts.localOperatorArgs,
+		kubeconfigPath:    opts.kubeconfigPath,
+		restMapper:        restMapper,
+		cleanupOnError:    opts.cleanupOnError,
+		testType:          opts.testType,
 	}
 	return framework, nil
 }

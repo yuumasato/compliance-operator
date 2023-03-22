@@ -121,11 +121,11 @@ E2E_GO_TEST_FLAGS?=-v -test.timeout 120m
 # By default we run all tests; available options: all, parallel, serial
 E2E_TEST_TYPE?=all
 
-# By default, the tests skip cleanup on failures. Set this variable to false if you prefer
-# the tests to cleanup regardless of test status, e.g.:
-# E2E_SKIP_CLEANUP_ON_ERROR=false make e2e
-E2E_SKIP_CLEANUP_ON_ERROR?=true
-E2E_ARGS=-root=$(PROJECT_DIR) -globalMan=$(TEST_CRD) -namespacedMan=$(TEST_DEPLOY) -skipCleanupOnError=$(E2E_SKIP_CLEANUP_ON_ERROR) -testType=$(E2E_TEST_TYPE)
+# By default, the test runner won't cleanup resources from failed test runs. Set this
+# variable to true if you prefer the tests to cleanup regardless of test status, e.g.:
+# E2E_CLEANUP_ON_ERROR=true make e2e
+E2E_CLEANUP_ON_ERROR?=false
+E2E_ARGS=-root=$(PROJECT_DIR) -globalMan=$(TEST_CRD) -namespacedMan=$(TEST_DEPLOY) -cleanupOnError=$(E2E_CLEANUP_ON_ERROR) -testType=$(E2E_TEST_TYPE)
 TEST_OPTIONS?=
 # Skip pushing the container to your cluster
 E2E_SKIP_CONTAINER_PUSH?=false

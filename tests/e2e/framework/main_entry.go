@@ -50,7 +50,7 @@ func MainEntry(m *testing.M) {
 
 	// Do suite teardown only if we have a successful test run or if we don't care
 	// about removing the test resources if the test failed.
-	if exitCode == 0 || (exitCode > 0 && !f.skipCleanupOnError) {
+	if exitCode == 0 || (exitCode > 0 && !f.cleanupOnError) {
 		if err = f.tearDown(); err != nil {
 			log.Fatal(err)
 		}
