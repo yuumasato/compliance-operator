@@ -24,6 +24,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   a special Dockerfile for the bundle image so that the bundle image can
   point to the correct images.
 
+- Modify API resource collector to detect if fetched resource is yaml string and
+  convert it to json when found, this is necessary because some of the API resources
+  are not available in json format, and we need to convert it to json format so that
+  it can be read by OpenSCAP.
+
 ### Deprecations
 
 -

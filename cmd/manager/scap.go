@@ -33,6 +33,7 @@ import (
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	mcfgcommon "github.com/openshift/machine-config-operator/pkg/controller/common"
 	"github.com/wI2L/jsondiff"
+	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimejson "k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -652,9 +653,28 @@ func filter(ctx context.Context, rawobj []byte, filter string) ([]byte, error) {
 		return nil, err
 	}
 
-	out, marshallErr := json.Marshal(&v)
-	if marshallErr != nil {
-		return nil, fmt.Errorf("Error marshalling json: %w", marshallErr)
+	var out []byte
+	var err error
+	switch val := v.(type) {
+	case string:
+		// If filter result is a string type, check if it is YAML
+		var yamlData map[string]interface{}
+		err = yaml.Unmarshal([]byte(val), &yamlData)
+		if err != nil {
+			// If it is not YAML, return the string as is
+			out = []byte(val)
+		} else {
+			// If it is YAML, convert it to JSON
+			out, err = json.Marshal(yamlData)
+			if err != nil {
+				return nil, fmt.Errorf("error marshalling JSON: %w", err)
+			}
+		}
+	default:
+		out, err = json.Marshal(&v)
+		if err != nil {
+			return nil, fmt.Errorf("error marshalling JSON: %w", err)
+		}
 	}
 	_, isNotEOF := iter.Next()
 	if isNotEOF {
