@@ -17,8 +17,6 @@ import (
 	"time"
 
 	backoff "github.com/cenkalti/backoff/v4"
-	imagev1 "github.com/openshift/api/image/v1"
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1156,33 +1154,6 @@ func getPoolNodeRoleSelector() map[string]string {
 	return utils.GetNodeRoleSelector(testPoolName)
 }
 
-func assertMustHaveParsedProfiles(f *framework.Framework, name string, productType, productName string) error {
-	var pl compv1alpha1.ProfileList
-	lo := &client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			compv1alpha1.ProfileBundleOwnerLabel: name,
-		}),
-	}
-	if err := f.Client.List(goctx.TODO(), &pl, lo); err != nil {
-		return err
-	}
-	if len(pl.Items) <= 0 {
-		return fmt.Errorf("Profiles weren't parsed from the ProfileBundle. Expected more than one, got %d", len(pl.Items))
-	}
-
-	for _, prof := range pl.Items {
-		if prof.Annotations[compv1alpha1.ProductTypeAnnotation] != productType {
-			return fmt.Errorf("expected %s to be %s, got %s instead", compv1alpha1.ProductTypeAnnotation, productType, prof.Annotations[compv1alpha1.ProductTypeAnnotation])
-		}
-
-		if prof.Annotations[compv1alpha1.ProductAnnotation] != productName {
-			return fmt.Errorf("expected %s to be %s, got %s instead", compv1alpha1.ProductAnnotation, productName, prof.Annotations[compv1alpha1.ProductAnnotation])
-		}
-	}
-
-	return nil
-}
-
 func doesRuleExist(f *framework.Framework, namespace, ruleName string) (error, bool) {
 	return doesObjectExist(f, "Rule", namespace, ruleName)
 }
@@ -1204,110 +1175,6 @@ func doesObjectExist(f *framework.Framework, kind, namespace, name string) (erro
 	}
 
 	return err, false
-}
-
-func findRuleReference(profile *compv1alpha1.Profile, ruleName string) bool {
-	for _, ruleRef := range profile.Rules {
-		if string(ruleRef) == ruleName {
-			return true
-		}
-	}
-
-	return false
-}
-
-func waitForDeploymentContentUpdate(t *testing.T, f *framework.Framework, name, imgDigest string) error {
-	lo := &client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"profile-bundle": name,
-			"workload":       "profileparser",
-		}),
-	}
-
-	var depls appsv1.DeploymentList
-	var lastErr error
-	timeouterr := wait.Poll(retryInterval, timeout, func() (bool, error) {
-		lastErr = f.Client.List(goctx.TODO(), &depls, lo)
-		if lastErr != nil {
-			E2ELogf(t, "Retrying. Got error: %v\n", lastErr)
-			return false, nil
-		}
-		depl := depls.Items[0]
-		currentImg := depl.Spec.Template.Spec.InitContainers[0].Image
-		// The image will have a different path, but the digest should be the same
-		if !strings.HasSuffix(currentImg, imgDigest) {
-			E2ELogf(t, "Retrying. Content image isn't up-to-date yet in the Deployment\n")
-			return false, nil
-		}
-		return true, nil
-	})
-	// Error in function call
-	if lastErr != nil {
-		return lastErr
-	}
-	// Timeout
-	if timeouterr != nil {
-		return timeouterr
-	}
-
-	E2ELogf(t, "Profile parser Deployment updated\n")
-
-	var pods corev1.PodList
-	timeouterr = wait.Poll(retryInterval, timeout, func() (bool, error) {
-		lastErr = f.Client.List(goctx.TODO(), &pods, lo)
-		if lastErr != nil {
-			E2ELogf(t, "Retrying. Got error: %v\n", lastErr)
-			return false, nil
-		}
-
-		// Deployment updates will trigger a rolling update, so we might have
-		// more than one pod. We only care about the newest
-		pod := utils.FindNewestPod(pods.Items)
-
-		currentImg := pod.Spec.InitContainers[0].Image
-		if !strings.HasSuffix(currentImg, imgDigest) {
-			E2ELogf(t, "Retrying. Content image isn't up-to-date yet in the Pod\n")
-			return false, nil
-		}
-		if len(pod.Status.InitContainerStatuses) != 2 {
-			E2ELogf(t, "Retrying. Content parsing isn't done yet\n")
-			return false, nil
-		}
-
-		// The profileparser will take time, so we know it'll be index 1
-		ppStatus := pod.Status.InitContainerStatuses[1]
-		if !ppStatus.Ready {
-			E2ELogf(t, "Retrying. Content parsing isn't done yet (container not ready yet)\n")
-			return false, nil
-		}
-		return true, nil
-	})
-	// Error in function call
-	if lastErr != nil {
-		return lastErr
-	}
-	// Timeout
-	if timeouterr != nil {
-		return timeouterr
-	}
-	E2ELogf(t, "Profile parser Deployment Done\n")
-	return nil
-}
-
-func assertMustHaveParsedRules(f *framework.Framework, name string) error {
-	var rl compv1alpha1.RuleList
-	lo := &client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			compv1alpha1.ProfileBundleOwnerLabel: name,
-		}),
-	}
-	if err := f.Client.List(goctx.TODO(), &rl, lo); err != nil {
-		return err
-	}
-	if len(rl.Items) <= 0 {
-		return fmt.Errorf("Rules weren't parsed from the ProfileBundle. Expected more than one, got %d", len(rl.Items))
-	}
-	return nil
 }
 
 func scanHasValidPVCReference(f *framework.Framework, namespace, scanName string) error {
@@ -1825,58 +1692,6 @@ func reRunScan(t *testing.T, f *framework.Framework, scanName, namespace string)
 
 	E2ELogf(t, "Scan re-launched")
 	return nil
-}
-
-func createImageStream(f *framework.Framework, ctx *framework.Context, iSName, ns, imgPath string) error {
-	stream := &imagev1.ImageStream{
-		TypeMeta:   metav1.TypeMeta{APIVersion: imagev1.SchemeGroupVersion.String(), Kind: "ImageStream"},
-		ObjectMeta: metav1.ObjectMeta{Name: iSName, Namespace: ns},
-		Spec: imagev1.ImageStreamSpec{
-			Tags: []imagev1.TagReference{
-				{
-					Name: "latest",
-					From: &corev1.ObjectReference{
-						Kind: "DockerImage",
-						Name: imgPath,
-					},
-					ReferencePolicy: imagev1.TagReferencePolicy{
-						Type: imagev1.LocalTagReferencePolicy,
-					},
-				},
-			},
-		},
-	}
-	return f.Client.Create(goctx.TODO(), stream, getCleanupOpts(ctx))
-}
-
-func updateImageStreamTag(f *framework.Framework, iSName, ns, imgPath string) error {
-	foundstream := &imagev1.ImageStream{}
-	key := types.NamespacedName{Name: iSName, Namespace: ns}
-	if err := f.Client.Get(goctx.TODO(), key, foundstream); err != nil {
-		return err
-	}
-
-	stream := foundstream.DeepCopy()
-	// Updated tracked image reference
-	stream.Spec.Tags[0].From.Name = imgPath
-	return f.Client.Update(goctx.TODO(), stream)
-}
-
-func getImageStreamUpdatedDigest(f *framework.Framework, iSName string, ns string) (error, string) {
-	stream := &imagev1.ImageStream{}
-	tagItemNum := 0
-	key := types.NamespacedName{Name: iSName, Namespace: ns}
-	for tagItemNum < 2 {
-		if err := f.Client.Get(goctx.TODO(), key, stream); err != nil {
-			return err, ""
-		}
-		tagItemNum = len(stream.Status.Tags[0].Items)
-		time.Sleep(2 * time.Second)
-	}
-
-	// Last tag item is at index 0
-	imgDigest := stream.Status.Tags[0].Items[0].Image
-	return nil, imgDigest
 }
 
 func updateSuiteContentImage(t *testing.T, f *framework.Framework, newImg, suiteName, suiteNs string) error {
