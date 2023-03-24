@@ -12,6 +12,33 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func NewFramework() *Framework {
+	fopts := &frameworkOpts{}
+	fopts.addToFlagSet(flag.CommandLine)
+
+	kcFlag := flag.Lookup(KubeConfigFlag)
+	if kcFlag == nil {
+		flag.StringVar(&fopts.kubeconfigPath, KubeConfigFlag, "", "path to kubeconfig")
+	}
+
+	flag.Parse()
+
+	if kcFlag != nil {
+		fopts.kubeconfigPath = kcFlag.Value.String()
+	}
+
+	f, err := newFramework(fopts)
+	if err != nil {
+		log.Fatalf("Failed to create framework: %v", err)
+	}
+	Global = f
+	return f
+}
+
+func (f *Framework) CleanUpOnError() bool {
+	return f.cleanupOnError
+}
+
 func MainEntry(m *testing.M) {
 	fopts := &frameworkOpts{}
 	fopts.addToFlagSet(flag.CommandLine)
@@ -39,7 +66,7 @@ func MainEntry(m *testing.M) {
 	Global = f
 
 	// Do suite setup
-	if err := f.setUp(); err != nil {
+	if err := f.SetUp(); err != nil {
 		log.Fatal(err)
 	}
 
@@ -51,15 +78,15 @@ func MainEntry(m *testing.M) {
 
 	// Do suite teardown only if we have a successful test run or if we don't care
 	// about removing the test resources if the test failed.
-	if exitCode == 0 || (exitCode > 0 && !f.cleanupOnError) {
-		if err = f.tearDown(); err != nil {
+	if exitCode == 0 || (exitCode > 0 && f.cleanupOnError) {
+		if err = f.TearDown(); err != nil {
 			log.Fatal(err)
 		}
 	}
 	os.Exit(exitCode)
 }
 
-func (f *Framework) setUp() error {
+func (f *Framework) SetUp() error {
 	log.Printf("switching to %s directory to setup and execute tests", f.projectRoot)
 	err := os.Chdir(f.projectRoot)
 	if err != nil {
@@ -105,11 +132,11 @@ func (f *Framework) setUp() error {
 		return fmt.Errorf("timed out waiting for deployment to become available: %w", err)
 	}
 
-	err = f.waitForProfileBundleStatus("rhcos4")
+	err = f.WaitForProfileBundleStatus("rhcos4")
 	if err != nil {
 		return err
 	}
-	err = f.waitForProfileBundleStatus("ocp4")
+	err = f.WaitForProfileBundleStatus("ocp4")
 	if err != nil {
 		return err
 	}
@@ -141,7 +168,7 @@ func (f *Framework) setUp() error {
 // deleting the cluster-wide resources, like roles, service accounts, or the deployment.
 // If we don't properly cleanup resources before deleting CRDs, it leaves resources in a
 // terminating state, making them harder to cleanup.
-func (f *Framework) tearDown() error {
+func (f *Framework) TearDown() error {
 	// Make sure all scans are cleaned up before we delete the CRDs. Scans should be cleaned up
 	// because they're owned by ScanSettingBindings or ScanSuites, which should be cleaned up
 	// by each individual test either directly or through deferred cleanup. If the test fails

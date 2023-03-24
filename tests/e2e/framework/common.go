@@ -357,7 +357,7 @@ func (f *Framework) ensureTestNamespaceExists() error {
 
 // waitForProfileBundleStatus will poll until the compliancescan that we're
 // lookingfor reaches a certain status, or until a timeout is reached.
-func (f *Framework) waitForProfileBundleStatus(name string) error {
+func (f *Framework) WaitForProfileBundleStatus(name string) error {
 	pb := &compv1alpha1.ProfileBundle{}
 	var lastErr error
 	// retry and ignore errors until timeout
