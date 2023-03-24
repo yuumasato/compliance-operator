@@ -570,3 +570,50 @@ if it is longer than timeout, we will terminate the scan or retry.
 
 A timeout scan will send a warning on retries, and the scan will have an
 error result.
+
+## How to Use Compliance Operator with HyperShift Management Cluster
+
+Compliance Operator is able to run platform scan on the HyperShift Managment cluster
+for the Hosted Cluster with a tailoredProfile.
+
+Currently, we only support CIS profile and PCI-DSS profile, in order to scan Hosted
+Cluster, you need to create a tailoredProfile and then set the value of
+`ocp4-hypershift-cluster` to the name of the Hosted Cluster you want to scan,
+you can either extend `ocp4-cis` or `ocp4-pci-dss`.
+
+```yaml
+apiVersion: compliance.openshift.io/v1alpha1
+kind: TailoredProfile
+metadata:
+ name: cis-compliance-hypershift
+ namespace: openshift-compliance
+ annotations:
+   compliance.openshift.io/product-type: Platform
+spec:
+ title: CIS Benchmark for Hypershift
+ description: CIS Benchmark for Hypershift Master-plane components
+ extends: ocp4-cis
+ setValues:
+   - name: ocp4-hypershift-cluster
+     value: "<hypershift-hosted-cluster-name>"
+     rationale: This value is used for HyperShift version detection
+```
+
+And after you save the edit, you can then apply the edited `tailoredProfile`,
+and create a `ScanSettingBinding` to run the scan:
+
+```yaml
+apiVersion: compliance.openshift.io/v1alpha1
+kind: ScanSettingBinding
+metadata:
+ name: cis-compliance-hypershift
+ namespace: openshift-compliance
+profiles:
+ - name: cis-compliance-hypershift
+   kind: TailoredProfile
+   apiGroup: compliance.openshift.io/v1alpha1
+settingsRef:
+ name: default
+ kind: ScanSetting
+ apiGroup: compliance.openshift.io/v1alpha1
+ ```
