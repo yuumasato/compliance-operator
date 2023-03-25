@@ -361,7 +361,7 @@ func (f *Framework) WaitForProfileBundleStatus(name string, status compv1alpha1.
 	pb := &compv1alpha1.ProfileBundle{}
 	var lastErr error
 	// retry and ignore errors until timeout
-	timeouterr := wait.Poll(retryInterval, timeout, func() (bool, error) {
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
 		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: f.OperatorNamespace}, pb)
 		if lastErr != nil {
 			if apierrors.IsNotFound(lastErr) {

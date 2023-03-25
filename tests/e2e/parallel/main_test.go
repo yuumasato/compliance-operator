@@ -8,7 +8,10 @@ import (
 	"testing"
 
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/ComplianceAsCode/compliance-operator/tests/e2e/framework"
 	"k8s.io/apimachinery/pkg/types"
@@ -415,6 +418,101 @@ func TestInvalidBundleWithNoTag(t *testing.T) {
 	defer f.Client.Delete(context.TODO(), pb)
 
 	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamInvalid); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestParsingErrorRestartsParserInitContainer(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	var (
+		badImage  = fmt.Sprintf("%s:%s", brokenContentImagePath, "from")
+		goodImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "to")
+	)
+
+	pbName := framework.GetObjNameFromTest(t)
+
+	pb := &compv1alpha1.ProfileBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pbName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ProfileBundleSpec{
+			ContentImage: badImage,
+			ContentFile:  framework.OcpContentFile,
+		},
+	}
+
+	if err := f.Client.Create(context.TODO(), pb, nil); err != nil {
+		t.Fatalf("failed to create ProfileBundle %s: %s", pbName, err)
+	}
+	defer f.Client.Delete(context.TODO(), pb)
+
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamInvalid); err != nil {
+		t.Fatal(err)
+	}
+
+	// list the pods with profilebundle=pbName
+	var lastErr error
+	timeouterr := wait.Poll(framework.RetryInterval, framework.Timeout, func() (bool, error) {
+		podList := &corev1.PodList{}
+		inNs := client.InNamespace(f.OperatorNamespace)
+		withLabel := client.MatchingLabels{"profile-bundle": pbName}
+		if lastErr := f.Client.List(context.TODO(), podList, inNs, withLabel); lastErr != nil {
+			return false, lastErr
+		}
+
+		if len(podList.Items) != 1 {
+			return false, fmt.Errorf("expected one parser pod, listed %d", len(podList.Items))
+		}
+		parserPod := &podList.Items[0]
+
+		// check that pod's initContainerStatuses field with name=profileparser has restartCount > 0 and that
+		// lastState.Terminated.ExitCode != 0. This way we'll know we're restarting the init container
+		// and retrying the parsing
+		for i := range parserPod.Status.InitContainerStatuses {
+			ics := parserPod.Status.InitContainerStatuses[i]
+			if ics.Name != "profileparser" {
+				continue
+			}
+			if ics.RestartCount < 1 {
+				log.Println("The profileparser did not restart (yet?)")
+				return false, nil
+			}
+
+			// wait until we get the restarted state
+			if ics.LastTerminationState.Terminated == nil {
+				log.Println("The profileparser does not have terminating state")
+				return false, nil
+			}
+			if ics.LastTerminationState.Terminated.ExitCode == 0 {
+				return true, fmt.Errorf("profileparser finished unsuccessfully")
+			}
+		}
+
+		return true, nil
+	})
+
+	if err := framework.ProcessErrorOrTimeout(lastErr, timeouterr, "waiting for ProfileBundle parser to restart"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Fix the image and wait for the profilebundle to be parsed OK
+	getPb := &compv1alpha1.ProfileBundle{}
+	if err := f.Client.Get(context.TODO(), types.NamespacedName{Name: pbName, Namespace: f.OperatorNamespace}, getPb); err != nil {
+		t.Fatalf("failed to get ProfileBundle %s: %s", pbName, err)
+	}
+
+	updatePb := getPb.DeepCopy()
+	updatePb.Spec.ContentImage = goodImage
+	if err := f.Client.Update(context.TODO(), updatePb); err != nil {
+		t.Fatalf("failed to update ProfileBundle %s: %s", pbName, err)
+	}
+
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid); err != nil {
 		t.Fatal(err)
 	}
 }

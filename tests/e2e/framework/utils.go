@@ -123,6 +123,18 @@ func GetObjNameFromTest(t *testing.T) string {
 	return strings.Trim(testNameNoDoubleHyphens, "-")
 }
 
+func ProcessErrorOrTimeout(err, timeoutErr error, message string) error {
+	// Error in function call
+	if err != nil {
+		return fmt.Errorf("got error when %s: %w", message, err)
+	}
+	// Timeout
+	if timeoutErr != nil {
+		return fmt.Errorf("timed out when %s: %w", message, timeoutErr)
+	}
+	return nil
+}
+
 func (f *Framework) UpdateImageStreamTag(iSName, imagePath, namespace string) error {
 	s := &imagev1.ImageStream{}
 	key := types.NamespacedName{Name: iSName, Namespace: namespace}
@@ -162,7 +174,7 @@ func (f *Framework) WaitForDeploymentContentUpdate(pbName, imgDigest string) err
 
 	var depls appsv1.DeploymentList
 	var lastErr error
-	timeouterr := wait.Poll(retryInterval, timeout, func() (bool, error) {
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
 		lastErr = f.Client.List(context.TODO(), &depls, lo)
 		if lastErr != nil {
 			log.Printf("failed getting deployment list: %s... retrying\n", lastErr)
@@ -189,7 +201,7 @@ func (f *Framework) WaitForDeploymentContentUpdate(pbName, imgDigest string) err
 	log.Printf("profile parser deployment updated\n")
 
 	var pods corev1.PodList
-	timeouterr = wait.Poll(retryInterval, timeout, func() (bool, error) {
+	timeouterr = wait.Poll(RetryInterval, Timeout, func() (bool, error) {
 		lastErr = f.Client.List(context.TODO(), &pods, lo)
 		if lastErr != nil {
 			log.Printf("failed to list pods: %s... retrying", lastErr)
