@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -132,11 +133,11 @@ func (f *Framework) SetUp() error {
 		return fmt.Errorf("timed out waiting for deployment to become available: %w", err)
 	}
 
-	err = f.WaitForProfileBundleStatus("rhcos4")
+	err = f.WaitForProfileBundleStatus("rhcos4", compv1alpha1.DataStreamValid)
 	if err != nil {
 		return err
 	}
-	err = f.WaitForProfileBundleStatus("ocp4")
+	err = f.WaitForProfileBundleStatus("ocp4", compv1alpha1.DataStreamValid)
 	if err != nil {
 		return err
 	}

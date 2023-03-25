@@ -75,7 +75,7 @@ func TestProfileModification(t *testing.T) {
 	// This should get cleaned up at the end of the test
 	defer f.Client.Delete(context.TODO(), origPb)
 
-	if err := f.WaitForProfileBundleStatus(pbName); err != nil {
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid); err != nil {
 		t.Fatalf("failed waiting for the ProfileBundle to become available: %s", err)
 	}
 	if err := f.AssertMustHaveParsedProfiles(pbName, string(compv1alpha1.ScanTypeNode), "redhat_enterprise_linux_coreos_4"); err != nil {
@@ -115,7 +115,7 @@ func TestProfileModification(t *testing.T) {
 	}
 
 	// Wait for the update to happen, the PB will flip first to pending, then to valid
-	if err := f.WaitForProfileBundleStatus(pbName); err != nil {
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid); err != nil {
 		t.Fatalf("failed to parse ProfileBundle %s: %s", pbName, err)
 	}
 
@@ -182,7 +182,7 @@ func TestProfileISTagUpdate(t *testing.T) {
 	}
 	defer f.Client.Delete(context.TODO(), pb)
 
-	if err := f.WaitForProfileBundleStatus(pbName); err != nil {
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid); err != nil {
 		t.Fatalf("failed waiting for the ProfileBundle to become available: %s", err)
 	}
 	if err := f.AssertMustHaveParsedProfiles(pbName, string(compv1alpha1.ScanTypeNode), "redhat_enterprise_linux_coreos_4"); err != nil {
@@ -291,7 +291,7 @@ func TestProfileISTagOtherNs(t *testing.T) {
 	}
 	defer f.Client.Delete(context.TODO(), pb)
 
-	if err := f.WaitForProfileBundleStatus(pbName); err != nil {
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid); err != nil {
 		t.Fatalf("failed waiting for ProfileBundle to parse: %s", err)
 	}
 	if err := f.AssertMustHaveParsedProfiles(pbName, string(compv1alpha1.ScanTypeNode), "redhat_enterprise_linux_coreos_4"); err != nil {
@@ -357,4 +357,34 @@ func TestProfileISTagOtherNs(t *testing.T) {
 		t.Fatalf("rule %s unexpectedly found", unlinkedRuleName)
 	}
 
+}
+
+func TestInvalidBundleWithUnexistentRef(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	const (
+		unexistentImage = "bad-namespace/bad-image:latest"
+	)
+
+	pbName := framework.GetObjNameFromTest(t)
+
+	pb := &compv1alpha1.ProfileBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pbName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ProfileBundleSpec{
+			ContentImage: unexistentImage,
+			ContentFile:  framework.RhcosContentFile,
+		},
+	}
+
+	if err := f.Client.Create(context.TODO(), pb, nil); err != nil {
+		t.Fatalf("failed to create ProfileBundle %s: %s", pbName, err)
+	}
+	defer f.Client.Delete(context.TODO(), pb)
+
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamInvalid); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -30,37 +30,6 @@ import (
 func TestE2E(t *testing.T) {
 	executeTests(t,
 		testExecution{
-			Name:       "TestInvalidBundleWithUnexistentRef",
-			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				const (
-					unexistentImage = "bad-namespace/bad-image:latest"
-				)
-
-				pbName := getObjNameFromTest(t)
-
-				pb := &compv1alpha1.ProfileBundle{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      pbName,
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ProfileBundleSpec{
-						ContentImage: unexistentImage,
-						ContentFile:  rhcosContentFile,
-					},
-				}
-
-				if err := f.Client.Create(goctx.TODO(), pb, getCleanupOpts(ctx)); err != nil {
-					return err
-				}
-
-				if err := waitForProfileBundleStatus(t, f, namespace, pbName, compv1alpha1.DataStreamInvalid); err != nil {
-					return err
-				}
-				return nil
-			},
-		},
-		testExecution{
 			Name:       "TestInvalidBundleWithNoTag",
 			IsParallel: true,
 			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {

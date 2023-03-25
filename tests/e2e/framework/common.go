@@ -357,7 +357,7 @@ func (f *Framework) ensureTestNamespaceExists() error {
 
 // waitForProfileBundleStatus will poll until the compliancescan that we're
 // lookingfor reaches a certain status, or until a timeout is reached.
-func (f *Framework) WaitForProfileBundleStatus(name string) error {
+func (f *Framework) WaitForProfileBundleStatus(name string, status compv1alpha1.DataStreamStatusType) error {
 	pb := &compv1alpha1.ProfileBundle{}
 	var lastErr error
 	// retry and ignore errors until timeout
@@ -372,14 +372,14 @@ func (f *Framework) WaitForProfileBundleStatus(name string) error {
 			return false, nil
 		}
 
-		if pb.Status.DataStreamStatus == compv1alpha1.DataStreamValid {
+		if pb.Status.DataStreamStatus == status {
 			return true, nil
 		}
-		log.Printf("waiting ProfileBundle %s to become %s (%s)\n", name, compv1alpha1.DataStreamValid, pb.Status.DataStreamStatus)
+		log.Printf("waiting ProfileBundle %s to become %s (%s)\n", name, status, pb.Status.DataStreamStatus)
 		return false, nil
 	})
 	if timeouterr != nil {
-		return fmt.Errorf("ProfileBundle %s failed to reach state %s", name, compv1alpha1.DataStreamValid)
+		return fmt.Errorf("ProfileBundle %s failed to reach state %s", name, status)
 	}
 	log.Printf("ProfileBundle ready (%s)\n", pb.Status.DataStreamStatus)
 	return nil
