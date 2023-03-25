@@ -1,0 +1,14 @@
+on:
+  push:
+    paths:
+      - 'images/testcontent/**'
+
+jobs:
+  test-broken-content-latest:
+    uses: metal-toolbox/container-push/.github/workflows/container-push.yml@main
+    with:
+      name: test-broken-content-ocp
+      registry_org: complianceascode
+      tag: latest
+      dockerfile_path: images/testcontent/broken-content.Dockerfile
+      vendor: 'Compliance Operator Authors'
