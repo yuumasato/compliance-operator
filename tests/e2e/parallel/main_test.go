@@ -388,3 +388,33 @@ func TestInvalidBundleWithUnexistentRef(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestInvalidBundleWithNoTag(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	const (
+		noTagImage = "bad-namespace/bad-image"
+	)
+
+	pbName := framework.GetObjNameFromTest(t)
+
+	pb := &compv1alpha1.ProfileBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pbName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ProfileBundleSpec{
+			ContentImage: noTagImage,
+			ContentFile:  framework.RhcosContentFile,
+		},
+	}
+
+	if err := f.Client.Create(context.TODO(), pb, nil); err != nil {
+		t.Fatalf("failed to create ProfileBundle %s: %s", pbName, err)
+	}
+	defer f.Client.Delete(context.TODO(), pb)
+
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamInvalid); err != nil {
+		t.Fatal(err)
+	}
+}
