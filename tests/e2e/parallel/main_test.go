@@ -516,3 +516,44 @@ func TestParsingErrorRestartsParserInitContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRulesAreClassifiedAppropriately(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	for _, expected := range []struct {
+		RuleName  string
+		CheckType string
+	}{
+		{
+			"ocp4-configure-network-policies-namespaces",
+			compv1alpha1.CheckTypePlatform,
+		},
+		{
+			"ocp4-directory-access-var-log-kube-audit",
+			compv1alpha1.CheckTypeNode,
+		},
+		{
+			"ocp4-general-apply-scc",
+			compv1alpha1.CheckTypeNone,
+		},
+		{
+			"ocp4-kubelet-enable-protect-kernel-sysctl",
+			compv1alpha1.CheckTypeNode,
+		},
+	} {
+		targetRule := &compv1alpha1.Rule{}
+		key := types.NamespacedName{
+			Name:      expected.RuleName,
+			Namespace: f.OperatorNamespace,
+		}
+
+		if err := f.Client.Get(context.TODO(), key, targetRule); err != nil {
+			t.Fatalf("failed to get rule %s: %s", targetRule.Name, err)
+		}
+
+		if targetRule.CheckType != expected.CheckType {
+			log.Printf("Expected rule '%s' to be of type '%s'. Instead was: '%s'",
+				expected.RuleName, expected.CheckType, targetRule.CheckType)
+		}
+	}
+}

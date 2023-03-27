@@ -30,49 +30,6 @@ import (
 func TestE2E(t *testing.T) {
 	executeTests(t,
 		testExecution{
-			Name:       "TestRulesAreClassifiedAppropriately",
-			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				for _, expected := range []struct {
-					RuleName  string
-					CheckType string
-				}{
-					{
-						"ocp4-configure-network-policies-namespaces",
-						compv1alpha1.CheckTypePlatform,
-					},
-					{
-						"ocp4-directory-access-var-log-kube-audit",
-						compv1alpha1.CheckTypeNode,
-					},
-					{
-						"ocp4-general-apply-scc",
-						compv1alpha1.CheckTypeNone,
-					},
-					{
-						"ocp4-kubelet-enable-protect-kernel-sysctl",
-						compv1alpha1.CheckTypeNode,
-					},
-				} {
-					targetRule := &compv1alpha1.Rule{}
-					key := types.NamespacedName{
-						Name:      expected.RuleName,
-						Namespace: namespace,
-					}
-
-					if err := f.Client.Get(goctx.TODO(), key, targetRule); err != nil {
-						return err
-					}
-
-					if targetRule.CheckType != expected.CheckType {
-						E2EErrorf(t, "Expected rule '%s' to be of type '%s'. Instead was: '%s'",
-							expected.RuleName, expected.CheckType, targetRule.CheckType)
-					}
-				}
-				return nil
-			},
-		},
-		testExecution{
 			Name:       "TestSingleScanSucceeds",
 			IsParallel: true,
 			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
