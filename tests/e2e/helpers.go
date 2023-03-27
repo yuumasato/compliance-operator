@@ -1,14 +1,12 @@
 package e2e
 
 import (
-	"bufio"
 	"bytes"
 	goctx "context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path"
 	"regexp"
 	"strconv"
@@ -43,10 +41,6 @@ var shouldLogContainerOutput bool
 var brokenContentImagePath string
 
 var defaultBackoff = backoff.WithMaxRetries(backoff.NewExponentialBackOff(), maxRetries)
-
-var (
-	curlCMD = "curl -ks -H \"Authorization: Bearer `cat /var/run/secrets/kubernetes.io/serviceaccount/token`\" "
-)
 
 type ObjectResouceVersioner interface {
 	client.Object
@@ -98,11 +92,6 @@ func E2EErrorf(t *testing.T, format string, args ...interface{}) {
 func E2EFatalf(t *testing.T, format string, args ...interface{}) {
 	t.Helper()
 	t.Fatalf(fmt.Sprintf("E2E-FAILURE: %s: %s", time.Now().Format(time.RFC3339), format), args...)
-}
-
-// Returns the namespace specific metrics endpoint
-func getTestMetricsCMD(namespace string) string {
-	return curlCMD + fmt.Sprintf("https://metrics.%s.svc:8585/metrics-co", namespace)
 }
 
 func getObjNameFromTest(t *testing.T) string {
@@ -1177,18 +1166,6 @@ func doesObjectExist(f *framework.Framework, kind, namespace, name string) (erro
 	return err, false
 }
 
-func scanHasValidPVCReference(f *framework.Framework, namespace, scanName string) error {
-	scan := &compv1alpha1.ComplianceScan{}
-	err := f.Client.Get(goctx.TODO(), types.NamespacedName{Name: scanName, Namespace: namespace}, scan)
-	if err != nil {
-		return err
-	}
-	pvc := &corev1.PersistentVolumeClaim{}
-	pvcName := scan.Status.ResultsStorage.Name
-	pvcNamespace := scan.Status.ResultsStorage.Namespace
-	return f.Client.Get(goctx.TODO(), types.NamespacedName{Name: pvcName, Namespace: pvcNamespace}, pvc)
-}
-
 func waitForCronJobWithSchedule(t *testing.T, f *framework.Framework, namespace, suiteName, schedule string) error {
 	job := &batchv1.CronJob{}
 	jobName := compsuitectrl.GetRerunnerName(suiteName)
@@ -1739,69 +1716,4 @@ func processErrorOrTimeout(err, timeoutErr error, message string) error {
 		return fmt.Errorf("Timed out when %s: %w", message, timeoutErr)
 	}
 	return nil
-}
-
-func getMetricResults(t *testing.T, namespace string) string {
-	ocPath, err := exec.LookPath("oc")
-	if err != nil {
-		t.Fatal(err)
-	}
-	// We're just under test.
-	// G204 (CWE-78): Subprocess launched with variable (Confidence: HIGH, Severity: MEDIUM)
-	// #nosec
-	cmd := exec.Command(ocPath,
-		"run", "--rm", "-i", "--restart=Never", "--image=registry.fedoraproject.org/fedora-minimal:latest",
-		"-n", namespace, "metrics-test", "--", "bash", "-c",
-		getTestMetricsCMD(namespace),
-	)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Errorf("error getting output %s", err)
-	}
-	t.Logf("metrics output:\n%s\n", string(out))
-	return string(out)
-}
-
-func assertMetric(t *testing.T, content, metric string, expected int) error {
-	if val := parseMetric(t, content, metric); val != expected {
-		return fmt.Errorf("expected %v for counter %s, got %v", expected, metric, val)
-	}
-	return nil
-}
-
-func assertEachMetric(t *testing.T, namespace string, expectedMetrics map[string]int) error {
-	metricErrs := make([]error, 0)
-	metricsOutput := getMetricResults(t, namespace)
-	for metric, i := range expectedMetrics {
-		err := assertMetric(t, metricsOutput, metric, i)
-		if err != nil {
-			metricErrs = append(metricErrs, err)
-		}
-	}
-	if len(metricErrs) > 0 {
-		for err := range metricErrs {
-			t.Log(err)
-		}
-		return errors.New("unexpected metrics value")
-	}
-	return nil
-}
-
-func parseMetric(t *testing.T, content, metric string) int {
-	scanner := bufio.NewScanner(strings.NewReader(content))
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, metric) {
-			fields := strings.Fields(line)
-			if len(fields) != 2 {
-				t.Errorf("invalid metric")
-			}
-			i, err := strconv.Atoi(fields[1])
-			if err != nil {
-				t.Errorf("invalid metric value")
-			}
-			return i
-		}
-	}
-	return 0
 }

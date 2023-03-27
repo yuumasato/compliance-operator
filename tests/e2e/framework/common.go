@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -724,4 +725,131 @@ func (f *Framework) waitForNodesToHaveARenderedPool(nodes []core.Node, n string)
 		log.Printf("all nodes in Machine Config Pool %s were updated successfully", n)
 		return true, nil
 	})
+}
+
+func (f *Framework) WaitForScanStatus(namespace, name string, targetStatus compv1alpha1.ComplianceScanStatusPhase) error {
+	exampleComplianceScan := &compv1alpha1.ComplianceScan{}
+	var lastErr error
+	defer f.logContainerOutput(namespace, name)
+	// retry and ignore errors until timeout
+	timeoutErr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, exampleComplianceScan)
+		if lastErr != nil {
+			if apierrors.IsNotFound(lastErr) {
+				log.Printf("Waiting for availability of %s compliancescan\n", name)
+				return false, nil
+			}
+			log.Printf("Retrying. Got error: %v\n", lastErr)
+			return false, nil
+		}
+
+		if exampleComplianceScan.Status.Phase == targetStatus {
+			return true, nil
+		}
+		log.Printf("Waiting for run of %s compliancescan (%s)\n", name, exampleComplianceScan.Status.Phase)
+		return false, nil
+	})
+
+	if timeoutErr != nil {
+		return fmt.Errorf("failed waiting for scan %s due to timeout: %s", name, timeoutErr)
+	}
+	if lastErr != nil {
+		return fmt.Errorf("failed waiting for scan %s: %s", name, lastErr)
+	}
+
+	log.Printf("ComplianceScan ready (%s)\n", exampleComplianceScan.Status.Phase)
+	return nil
+}
+
+func (f *Framework) logContainerOutput(namespace, name string) {
+	logContainerOutputEnv := os.Getenv("LOG_CONTAINER_OUTPUT")
+	if logContainerOutputEnv == "" {
+		return
+	}
+
+	// Try all container/init variants for each pod and the pod itself (self), log nothing if the container is not applicable.
+	containers := []string{"self", "api-resource-collector", "log-collector", "scanner", "content-container"}
+	artifacts := os.Getenv("ARTIFACT_DIR")
+	if artifacts == "" {
+		return
+	}
+	pods, err := f.getPodsForScan(name)
+	if err != nil {
+		log.Printf("Warning: Error getting pods for container logging: %s", err)
+	} else {
+		for _, pod := range pods {
+			for _, con := range containers {
+				logOpts := &core.PodLogOptions{}
+				if con != "self" {
+					logOpts.Container = con
+				}
+				req := f.KubeClient.CoreV1().Pods(namespace).GetLogs(pod.Name, logOpts)
+				podLogs, err := req.Stream(context.TODO())
+				if err != nil {
+					// Silence this error if the container is not valid for the pod
+					if !apierrors.IsBadRequest(err) {
+						log.Printf("error getting logs for %s/%s: reason: %v, err: %v\n", pod.Name, con, apierrors.ReasonForError(err), err)
+					}
+					continue
+				}
+				buf := new(bytes.Buffer)
+				_, err = io.Copy(buf, podLogs)
+				if err != nil {
+					log.Printf("error copying logs for %s/%s: %v\n", pod.Name, con, err)
+					continue
+				}
+				logs := buf.String()
+				if len(logs) == 0 {
+					log.Printf("no logs for %s/%s\n", pod.Name, con)
+				} else {
+					err := writeToArtifactsDir(artifacts, name, pod.Name, con, logs)
+					if err != nil {
+						log.Printf("error writing logs for %s/%s: %v\n", pod.Name, con, err)
+					} else {
+						log.Printf("wrote logs for %s/%s\n", pod.Name, con)
+					}
+				}
+			}
+		}
+	}
+}
+
+func (f *Framework) getPodsForScan(scanName string) ([]core.Pod, error) {
+	selectPods := map[string]string{
+		compv1alpha1.ComplianceScanLabel: scanName,
+	}
+	var pods core.PodList
+	lo := &dynclient.ListOptions{
+		LabelSelector: labels.SelectorFromSet(selectPods),
+	}
+	err := f.Client.List(context.TODO(), &pods, lo)
+	if err != nil {
+		return nil, err
+	}
+	return pods.Items, nil
+}
+
+func (f *Framework) AssertScanIsCompliant(name, namespace string) error {
+	cs := &compv1alpha1.ComplianceScan{}
+	defer f.logContainerOutput(namespace, name)
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, cs)
+	if err != nil {
+		return err
+	}
+	if cs.Status.Result != compv1alpha1.ResultCompliant {
+		return fmt.Errorf("scan result was %s instead of %s", compv1alpha1.ResultCompliant, cs.Status.Result)
+	}
+	return nil
+}
+
+func (f *Framework) AssertScanHasValidPVCReference(scanName, namespace string) error {
+	scan := &compv1alpha1.ComplianceScan{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: scanName, Namespace: namespace}, scan)
+	if err != nil {
+		return err
+	}
+	pvc := &core.PersistentVolumeClaim{}
+	pvcName := scan.Status.ResultsStorage.Name
+	pvcNamespace := scan.Status.ResultsStorage.Namespace
+	return f.Client.Get(context.TODO(), types.NamespacedName{Name: pvcName, Namespace: pvcNamespace}, pvc)
 }

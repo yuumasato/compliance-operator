@@ -1,10 +1,17 @@
 package framework
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log"
+	"os"
+	"os/exec"
+	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -263,4 +270,98 @@ func (f *Framework) CreateImageStream(iSName, namespace, imgPath string) (*image
 	}
 	err := f.Client.Create(context.TODO(), stream, nil)
 	return stream, err
+}
+
+func writeToArtifactsDir(dir, scan, pod, container, log string) error {
+	logPath := path.Join(dir, fmt.Sprintf("%s_%s_%s.log", scan, pod, container))
+	logFile, err := os.Create(logPath)
+	if err != nil {
+		return err
+	}
+	// #nosec G307
+	defer logFile.Close()
+	_, err = io.WriteString(logFile, log)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func AssertEachMetric(namespace string, expectedMetrics map[string]int) error {
+	metricErrs := make([]error, 0)
+	metricsOutput, err := getMetricResults(namespace)
+	if err != nil {
+		return err
+	}
+	for metric, i := range expectedMetrics {
+		err := assertMetric(metricsOutput, metric, i)
+		if err != nil {
+			metricErrs = append(metricErrs, err)
+		}
+	}
+	if len(metricErrs) > 0 {
+		for err := range metricErrs {
+			log.Println(err)
+		}
+		return errors.New("unexpected metrics value")
+	}
+	return nil
+}
+
+func assertMetric(content, metric string, expected int) error {
+	val, err := parseMetric(content, metric)
+	if err != nil {
+		return err
+	}
+	if val != expected {
+		return fmt.Errorf("expected %v for counter %s, got %v", expected, metric, val)
+	}
+	return nil
+}
+
+// parseMetrics checks the contents for the number of metrics as a substring
+// and returns the number of occurrences along with any errors.
+func parseMetric(content, metric string) (int, error) {
+	scanner := bufio.NewScanner(strings.NewReader(content))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, metric) {
+			fields := strings.Fields(line)
+			if len(fields) != 2 {
+				return 0, fmt.Errorf("invalid metric")
+			}
+			i, err := strconv.Atoi(fields[1])
+			if err != nil {
+				return 0, fmt.Errorf("invalid metric value")
+			}
+			return i, nil
+		}
+	}
+	return 0, nil
+}
+
+func getMetricResults(namespace string) (string, error) {
+	ocPath, err := exec.LookPath("oc")
+	if err != nil {
+		return "", err
+	}
+	// We're just under test.
+	// G204 (CWE-78): Subprocess launched with variable (Confidence: HIGH, Severity: MEDIUM)
+	// #nosec
+	cmd := exec.Command(ocPath,
+		"run", "--rm", "-i", "--restart=Never", "--image=registry.fedoraproject.org/fedora-minimal:latest",
+		"-n", namespace, "metrics-test", "--", "bash", "-c",
+		getTestMetricsCMD(namespace),
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("error getting output %s", err)
+	}
+	log.Printf("metrics output:\n%s\n", string(out))
+	return string(out), nil
+}
+
+func getTestMetricsCMD(namespace string) string {
+	var curlCMD = "curl -ks -H \"Authorization: Bearer `cat /var/run/secrets/kubernetes.io/serviceaccount/token`\" "
+	return curlCMD + fmt.Sprintf("https://metrics.%s.svc:8585/metrics-co", namespace)
 }

@@ -30,65 +30,6 @@ import (
 func TestE2E(t *testing.T) {
 	executeTests(t,
 		testExecution{
-			Name:       "TestSingleScanSucceeds",
-			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				scanName := getObjNameFromTest(t)
-				testScan := &compv1alpha1.ComplianceScan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      scanName,
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ComplianceScanSpec{
-						Profile: "xccdf_org.ssgproject.content_profile_moderate",
-						Content: rhcosContentFile,
-						Rule:    "xccdf_org.ssgproject.content_rule_no_netrc_files",
-						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
-							Debug: true,
-						},
-					},
-				}
-				// use Context's create helper to create the object and add a cleanup function for the new object
-				err := f.Client.Create(goctx.TODO(), testScan, getCleanupOpts(ctx))
-				if err != nil {
-					return err
-				}
-
-				waitForScanStatus(t, f, namespace, scanName, compv1alpha1.PhaseDone)
-
-				err = scanResultIsExpected(t, f, namespace, scanName, compv1alpha1.ResultCompliant)
-				if err != nil {
-					return err
-				}
-
-				aggrString := fmt.Sprintf("compliance_operator_compliance_scan_status_total{name=\"%s\",phase=\"AGGREGATING\",result=\"NOT-AVAILABLE\"}", scanName)
-				metricsSet := map[string]int{
-					fmt.Sprintf("compliance_operator_compliance_scan_status_total{name=\"%s\",phase=\"DONE\",result=\"COMPLIANT\"}", scanName):          1,
-					fmt.Sprintf("compliance_operator_compliance_scan_status_total{name=\"%s\",phase=\"LAUNCHING\",result=\"NOT-AVAILABLE\"}", scanName): 1,
-					fmt.Sprintf("compliance_operator_compliance_scan_status_total{name=\"%s\",phase=\"PENDING\",result=\"\"}", scanName):                1,
-					fmt.Sprintf("compliance_operator_compliance_scan_status_total{name=\"%s\",phase=\"RUNNING\",result=\"NOT-AVAILABLE\"}", scanName):   1,
-				}
-
-				var metErr error
-				// Aggregating may be variable, could be registered 1 to 3 times.
-				for i := 1; i < 4; i++ {
-					metricsSet[aggrString] = i
-					err = assertEachMetric(t, namespace, metricsSet)
-					if err == nil {
-						metErr = nil
-						break
-					}
-					metErr = err
-				}
-
-				if metErr != nil {
-					return metErr
-				}
-
-				return scanHasValidPVCReference(f, namespace, scanName)
-			},
-		},
-		testExecution{
 			Name:       "TestScanProducesRemediations",
 			IsParallel: true,
 			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
