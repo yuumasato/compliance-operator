@@ -1412,3 +1412,42 @@ func CheckPodLimit(c kubernetes.Interface, podName, namespace, cpuLimit, memLimi
 		return true, nil
 	}
 }
+
+func (f *Framework) AssertHasCheck(suiteName, scanName string, check compv1alpha1.ComplianceCheckResult) error {
+	var getCheck compv1alpha1.ComplianceCheckResult
+
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: check.Name, Namespace: check.Namespace}, &getCheck)
+	if err != nil {
+		return err
+	}
+
+	if getCheck.Status != check.Status {
+		return fmt.Errorf("expected result %s got result %s", check.Status, getCheck.Status)
+	}
+
+	if getCheck.ID != check.ID {
+		return fmt.Errorf("expected ID %s got ID %s", check.ID, getCheck.ID)
+	}
+
+	if getCheck.Labels == nil {
+		return fmt.Errorf("complianceCheckResult has no labels")
+	}
+
+	if getCheck.Labels[compv1alpha1.SuiteLabel] != suiteName {
+		return fmt.Errorf("did not find expected suite name label %s, found %s", suiteName, getCheck.Labels[compv1alpha1.SuiteLabel])
+	}
+
+	if getCheck.Labels[compv1alpha1.ComplianceScanLabel] != scanName {
+		return fmt.Errorf("did not find expected scan name label %s, found %s", scanName, getCheck.Labels[compv1alpha1.ComplianceScanLabel])
+	}
+
+	if getCheck.Labels[compv1alpha1.ComplianceCheckResultSeverityLabel] != string(getCheck.Severity) {
+		return fmt.Errorf("did not find expected severity name label %s, found %s", suiteName, getCheck.Labels[compv1alpha1.ComplianceCheckResultSeverityLabel])
+	}
+
+	if getCheck.Labels[compv1alpha1.ComplianceCheckResultStatusLabel] != string(getCheck.Status) {
+		return fmt.Errorf("did not find expected status name label %s, found %s", suiteName, getCheck.Labels[compv1alpha1.ComplianceCheckResultStatusLabel])
+	}
+
+	return nil
+}

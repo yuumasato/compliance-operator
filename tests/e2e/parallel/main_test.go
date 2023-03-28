@@ -2388,3 +2388,124 @@ func TestScanSettingBindingWatchesTailoredProfile(t *testing.T) {
 	}
 
 }
+
+func TestManualRulesTailoredProfile(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	var baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "kubeletconfig")
+	const requiredRule = "kubelet-eviction-thresholds-set-soft-imagefs-available"
+	pbName := framework.GetObjNameFromTest(t)
+	prefixName := func(profName, ruleBaseName string) string { return profName + "-" + ruleBaseName }
+
+	ocpPb := &compv1alpha1.ProfileBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pbName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ProfileBundleSpec{
+			ContentImage: baselineImage,
+			ContentFile:  framework.OcpContentFile,
+		},
+	}
+	if err := f.Client.Create(context.TODO(), ocpPb, nil); err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), ocpPb)
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that if the rule we are going to test is there
+	requiredRuleName := prefixName(pbName, requiredRule)
+	err, found := framework.Global.DoesRuleExist(f.OperatorNamespace, requiredRuleName)
+	if err != nil {
+		t.Fatal(err)
+	} else if !found {
+		t.Fatalf("Expected rule %s not found", requiredRuleName)
+	}
+
+	suiteName := "manual-rules-test-node"
+	masterScanName := fmt.Sprintf("%s-master", suiteName)
+
+	tp := &compv1alpha1.TailoredProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.TailoredProfileSpec{
+			Title:       "manual-rules-test",
+			Description: "A test tailored profile to test manual-rules",
+			ManualRules: []compv1alpha1.RuleReferenceSpec{
+				{
+					Name:      prefixName(pbName, requiredRule),
+					Rationale: "To be tested",
+				},
+			},
+		},
+	}
+
+	createTPErr := f.Client.Create(context.TODO(), tp, nil)
+	if createTPErr != nil {
+		t.Fatal(createTPErr)
+	}
+	defer f.Client.Delete(context.TODO(), tp)
+
+	ssb := &compv1alpha1.ScanSettingBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Profiles: []compv1alpha1.NamedObjectReference{
+			{
+				APIGroup: "compliance.openshift.io/v1alpha1",
+				Kind:     "TailoredProfile",
+				Name:     suiteName,
+			},
+		},
+		SettingsRef: &compv1alpha1.NamedObjectReference{
+			APIGroup: "compliance.openshift.io/v1alpha1",
+			Kind:     "ScanSetting",
+			Name:     "default",
+		},
+	}
+
+	err = f.Client.Create(context.TODO(), ssb, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), ssb)
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// the check should be shown as manual
+	checkResult := compv1alpha1.ComplianceCheckResult{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-kubelet-eviction-thresholds-set-soft-imagefs-available", masterScanName),
+			Namespace: f.OperatorNamespace,
+		},
+		ID:       "xccdf_org.ssgproject.content_rule_kubelet_eviction_thresholds_set_soft_imagefs_available",
+		Status:   compv1alpha1.CheckResultManual,
+		Severity: compv1alpha1.CheckResultSeverityMedium,
+	}
+	err = f.AssertHasCheck(suiteName, masterScanName, checkResult)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	inNs := client.InNamespace(f.OperatorNamespace)
+	withLabel := client.MatchingLabels{"profile-bundle": pbName}
+
+	remList := &compv1alpha1.ComplianceRemediationList{}
+	err = f.Client.List(context.TODO(), remList, inNs, withLabel)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(remList.Items) != 0 {
+		t.Fatal("expected no remediation")
+	}
+}
