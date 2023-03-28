@@ -2509,3 +2509,118 @@ func TestManualRulesTailoredProfile(t *testing.T) {
 		t.Fatal("expected no remediation")
 	}
 }
+
+func TestCheckDefaultKubeletConfig(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	var baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "kubelet_default")
+	const requiredRule = "kubelet-test-cipher"
+	pbName := framework.GetObjNameFromTest(t)
+	prefixName := func(profName, ruleBaseName string) string { return profName + "-" + ruleBaseName }
+
+	ocpPb := &compv1alpha1.ProfileBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pbName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ProfileBundleSpec{
+			ContentImage: baselineImage,
+			ContentFile:  framework.OcpContentFile,
+		},
+	}
+	if err := f.Client.Create(context.TODO(), ocpPb, nil); err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), ocpPb)
+	err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that if the rule we are going to test is there
+	requiredRuleName := prefixName(pbName, requiredRule)
+	err, found := f.DoesRuleExist(ocpPb.Namespace, requiredRuleName)
+	if err != nil {
+		t.Fatal(err)
+	} else if !found {
+		t.Fatalf("Expected rule %s not found", requiredRuleName)
+	}
+
+	suiteName := "kubelet-default-test-suite"
+
+	tp := &compv1alpha1.TailoredProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.TailoredProfileSpec{
+			Title:       "kubelet-default-test",
+			Description: "A test tailored profile to test default kubelet",
+			EnableRules: []compv1alpha1.RuleReferenceSpec{
+				{
+					Name:      prefixName(pbName, requiredRule),
+					Rationale: "To be tested",
+				},
+			},
+			SetValues: []compv1alpha1.VariableValueSpec{
+				{
+					Name:      prefixName(pbName, "var-kubelet-tls-cipher-suites-regex"),
+					Rationale: "Value to be set",
+					Value:     "^(TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384|TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384|TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256|TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256|TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256|TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256)$",
+				},
+			},
+		},
+	}
+
+	createTPErr := f.Client.Create(context.TODO(), tp, nil)
+	if createTPErr != nil {
+		t.Fatal(createTPErr)
+	}
+	defer f.Client.Delete(context.TODO(), tp)
+
+	ssb := &compv1alpha1.ScanSettingBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Profiles: []compv1alpha1.NamedObjectReference{
+			{
+				APIGroup: "compliance.openshift.io/v1alpha1",
+				Kind:     "TailoredProfile",
+				Name:     suiteName,
+			},
+		},
+		SettingsRef: &compv1alpha1.NamedObjectReference{
+			APIGroup: "compliance.openshift.io/v1alpha1",
+			Kind:     "ScanSetting",
+			Name:     "default",
+		},
+	}
+
+	err = f.Client.Create(context.TODO(), ssb, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), ssb)
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// the check should be shown as manual
+	checkResult := compv1alpha1.ComplianceCheckResult{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-kubelet-test-cipher", suiteName),
+			Namespace: f.OperatorNamespace,
+		},
+		ID:       "xccdf_org.ssgproject.content_rule_kubelet_test_cipher",
+		Status:   compv1alpha1.CheckResultPass,
+		Severity: compv1alpha1.CheckResultSeverityMedium,
+	}
+	err = f.AssertHasCheck(suiteName, suiteName, checkResult)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
