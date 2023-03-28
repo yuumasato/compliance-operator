@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/api/rbac/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -923,4 +924,26 @@ func (f *Framework) AssertScanHasValidPVCReference(scanName, namespace string) e
 	pvcName := scan.Status.ResultsStorage.Name
 	pvcNamespace := scan.Status.ResultsStorage.Namespace
 	return f.Client.Get(context.TODO(), types.NamespacedName{Name: pvcName, Namespace: pvcNamespace}, pvc)
+}
+
+func (f *Framework) AssertScanHasValidPVCReferenceWithSize(scanName, size, namespace string) error {
+	scan := &compv1alpha1.ComplianceScan{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: scanName, Namespace: namespace}, scan)
+	if err != nil {
+		return err
+	}
+	pvc := &core.PersistentVolumeClaim{}
+	pvcName := scan.Status.ResultsStorage.Name
+	pvcNamespace := scan.Status.ResultsStorage.Namespace
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: pvcName, Namespace: pvcNamespace}, pvc)
+	if err != nil {
+		return err
+	}
+	qty := resource.MustParse(size)
+	if qty.Cmp(*pvc.Status.Capacity.Storage()) != 0 {
+		expected := qty.String()
+		current := pvc.Status.Capacity.Storage().String()
+		return fmt.Errorf("Error: PVC '%s' storage doesn't match expected value. Has '%s', Expected '%s'", pvc.Name, current, expected)
+	}
+	return nil
 }

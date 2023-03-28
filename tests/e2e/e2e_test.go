@@ -30,42 +30,6 @@ import (
 func TestE2E(t *testing.T) {
 	executeTests(t,
 		testExecution{
-			Name:       "TestSingleScanWithStorageSucceeds",
-			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				scanName := getObjNameFromTest(t)
-				testScan := &compv1alpha1.ComplianceScan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      scanName,
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ComplianceScanSpec{
-						Profile: "xccdf_org.ssgproject.content_profile_moderate",
-						Content: rhcosContentFile,
-						Rule:    "xccdf_org.ssgproject.content_rule_no_netrc_files",
-						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
-							RawResultStorage: compv1alpha1.RawResultStorageSettings{
-								Size: "2Gi",
-							},
-							Debug: true,
-						},
-					},
-				}
-				// use Context's create helper to create the object and add a cleanup function for the new object
-				err := f.Client.Create(goctx.TODO(), testScan, getCleanupOpts(ctx))
-				if err != nil {
-					return err
-				}
-				waitForScanStatus(t, f, namespace, scanName, compv1alpha1.PhaseDone)
-
-				err = scanResultIsExpected(t, f, namespace, scanName, compv1alpha1.ResultCompliant)
-				if err != nil {
-					return err
-				}
-				return scanHasValidPVCReferenceWithSize(f, namespace, scanName, "2Gi")
-			},
-		},
-		testExecution{
 			Name:       "TestScanWithUnexistentResourceFails",
 			IsParallel: true,
 			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
