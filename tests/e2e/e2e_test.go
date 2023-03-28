@@ -87,32 +87,6 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		testExecution{
-			Name:       "TestScanWithInvalidProfileFails",
-			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				exampleComplianceScan := &compv1alpha1.ComplianceScan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-scan-w-invalid-profile",
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ComplianceScanSpec{
-						Profile: "xccdf_org.ssgproject.content_profile_coreos-unexistent",
-						Content: rhcosContentFile,
-						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
-							Debug: true,
-						},
-					},
-				}
-				// use Context's create helper to create the object and add a cleanup function for the new object
-				err := f.Client.Create(goctx.TODO(), exampleComplianceScan, getCleanupOpts(ctx))
-				if err != nil {
-					return err
-				}
-				waitForScanStatus(t, f, namespace, "test-scan-w-invalid-profile", compv1alpha1.PhaseDone)
-				return scanResultIsExpected(t, f, namespace, "test-scan-w-invalid-profile", compv1alpha1.ResultError)
-			},
-		},
-		testExecution{
 			Name:       "TestMalformedTailoredScanFails",
 			IsParallel: true,
 			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {

@@ -1126,3 +1126,36 @@ func TestScanWithInvalidContentFails(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestScanWithInvalidProfileFails(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	scanName := "test-scan-w-invalid-profile"
+	exampleComplianceScan := &compv1alpha1.ComplianceScan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceScanSpec{
+			Profile: "xccdf_org.ssgproject.content_profile_coreos-unexistent",
+			Content: framework.RhcosContentFile,
+			ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+				Debug: true,
+			},
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err := f.Client.Create(context.TODO(), exampleComplianceScan, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), exampleComplianceScan)
+	err = f.WaitForScanStatus(f.OperatorNamespace, scanName, compv1alpha1.PhaseDone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.AssertScanIsInError(scanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
