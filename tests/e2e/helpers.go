@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
-	compscanctrl "github.com/ComplianceAsCode/compliance-operator/pkg/controller/compliancescan"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/utils"
 	"github.com/ComplianceAsCode/compliance-operator/tests/e2e/framework"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -1058,38 +1057,6 @@ func createAndRemoveEtcSecurettyPod(namespace, name, nodeName string) *corev1.Po
 
 func waitForPod(podCallback wait.ConditionFunc) error {
 	return wait.PollImmediate(retryInterval, timeout, podCallback)
-}
-
-// check if pod name has priority class set to the given value.
-func checkPodLimit(t *testing.T, c kubernetes.Interface, podName, namespace, cpuLimit, memLimit string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(goctx.TODO(), podName, metav1.GetOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return false, err
-		}
-
-		if apierrors.IsNotFound(err) {
-			E2ELogf(t, "Pod %s not found yet", podName)
-			return false, nil
-		}
-
-		for i := range pod.Spec.Containers {
-			cnt := &pod.Spec.Containers[i]
-			if cnt.Name != compscanctrl.PlatformScanResourceCollectorName && cnt.Name != compscanctrl.OpenSCAPScanContainerName {
-				continue
-			}
-
-			if cnt.Resources.Limits.Cpu().String() != cpuLimit {
-				return false, fmt.Errorf("container %s in pod %s has cpu limit %s, expected %s", cnt.Name, podName, cnt.Resources.Limits.Cpu().String(), cpuLimit)
-			}
-
-			if cnt.Resources.Limits.Memory().String() != memLimit {
-				return false, fmt.Errorf("container %s in pod %s has memory limit %s, expected %s", cnt.Name, podName, cnt.Resources.Limits.Cpu().String(), cpuLimit)
-			}
-		}
-
-		return true, nil
-	}
 }
 
 // initContainerComplated returns a ConditionFunc that passes if all init containers have succeeded

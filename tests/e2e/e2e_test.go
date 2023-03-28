@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -353,116 +352,6 @@ func TestE2E(t *testing.T) {
 		//		return removeNodeTaint(t, f, taintedNode.Name, taintKey)
 		//	},
 		//},
-		testExecution{
-			Name:       "TestScanSettingBinding",
-			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				objName := getObjNameFromTest(t)
-				const defaultCpuLimit = "100m"
-				const testMemoryLimit = "432Mi"
-
-				rhcosPb := &compv1alpha1.ProfileBundle{}
-				err := f.Client.Get(goctx.TODO(), types.NamespacedName{Name: "rhcos4", Namespace: f.OperatorNamespace}, rhcosPb)
-				if err != nil {
-					t.Fatalf("unable to get rhcos4 profile bundle required for test: %s", err)
-				}
-
-				rhcos4e8profile := &compv1alpha1.Profile{}
-				key := types.NamespacedName{Namespace: namespace, Name: rhcosPb.Name + "-e8"}
-				if err := f.Client.Get(goctx.TODO(), key, rhcos4e8profile); err != nil {
-					return err
-				}
-
-				scanSettingName := objName + "-setting"
-				scanSetting := compv1alpha1.ScanSetting{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      scanSettingName,
-						Namespace: namespace,
-					},
-					ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
-						AutoApplyRemediations: false,
-					},
-					ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
-						Debug: true,
-						ScanLimits: map[corev1.ResourceName]resource.Quantity{
-							corev1.ResourceMemory: resource.MustParse(testMemoryLimit),
-						},
-					},
-					Roles: []string{"master", "worker"},
-				}
-
-				if err := f.Client.Create(goctx.TODO(), &scanSetting, getCleanupOpts(ctx)); err != nil {
-					return err
-				}
-
-				scanSettingBindingName := "generated-suite"
-				scanSettingBinding := compv1alpha1.ScanSettingBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      scanSettingBindingName,
-						Namespace: namespace,
-					},
-					Profiles: []compv1alpha1.NamedObjectReference{
-						// TODO: test also OCP profile when it works completely
-						{
-							Name:     rhcos4e8profile.Name,
-							Kind:     "Profile",
-							APIGroup: "compliance.openshift.io/v1alpha1",
-						},
-					},
-					SettingsRef: &compv1alpha1.NamedObjectReference{
-						Name:     scanSetting.Name,
-						Kind:     "ScanSetting",
-						APIGroup: "compliance.openshift.io/v1alpha1",
-					},
-				}
-
-				if err := f.Client.Create(goctx.TODO(), &scanSettingBinding, getCleanupOpts(ctx)); err != nil {
-					return err
-				}
-
-				// Wait until the suite finishes, thus verifying the suite exists
-				if err := waitForSuiteScansStatus(t, f, namespace, scanSettingBindingName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant); err != nil {
-					return err
-				}
-
-				masterScanKey := types.NamespacedName{Namespace: namespace, Name: rhcos4e8profile.Name + "-master"}
-				masterScan := &compv1alpha1.ComplianceScan{}
-				if err := f.Client.Get(goctx.TODO(), masterScanKey, masterScan); err != nil {
-					return err
-				}
-
-				if masterScan.Spec.Debug != true {
-					E2EErrorf(t, "Expected that the settings set debug to true in master scan")
-				}
-
-				workerScanKey := types.NamespacedName{Namespace: namespace, Name: rhcos4e8profile.Name + "-worker"}
-				workerScan := &compv1alpha1.ComplianceScan{}
-				if err := f.Client.Get(goctx.TODO(), workerScanKey, workerScan); err != nil {
-					return err
-				}
-
-				if workerScan.Spec.Debug != true {
-					E2EErrorf(t, "Expected that the settings set debug to true in workers scan")
-				}
-
-				podList := &corev1.PodList{}
-				if err := f.Client.List(goctx.TODO(), podList, client.InNamespace(namespace), client.MatchingLabels(map[string]string{
-					"workload": "scanner",
-				})); err != nil {
-					return err
-				}
-				// check if the scanning pod has properly been created and has priority class set
-				for _, pod := range podList.Items {
-					if strings.Contains(pod.Name, workerScan.Name) {
-						if err := waitForPod(checkPodLimit(t, f.KubeClient, pod.Name, namespace, defaultCpuLimit, testMemoryLimit)); err != nil {
-							return err
-						}
-					}
-				}
-
-				return nil
-			},
-		},
 		testExecution{
 			Name:       "TestScanSettingBindingTailoringAndNonDefaultRole",
 			IsParallel: true,

@@ -36,6 +36,7 @@ import (
 
 	"github.com/ComplianceAsCode/compliance-operator/pkg/apis"
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
+	compscanctrl "github.com/ComplianceAsCode/compliance-operator/pkg/controller/compliancescan"
 	compsuitectrl "github.com/ComplianceAsCode/compliance-operator/pkg/controller/compliancesuite"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/utils"
 )
@@ -1379,4 +1380,35 @@ func (f *Framework) WaitForCronJobWithSchedule(namespace, suiteName, schedule st
 	}
 	log.Printf("Found %s CronJob\n", jobName)
 	return nil
+}
+
+func CheckPodLimit(c kubernetes.Interface, podName, namespace, cpuLimit, memLimit string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+
+		if apierrors.IsNotFound(err) {
+			log.Printf("Pod %s not found yet\n", podName)
+			return false, nil
+		}
+
+		for i := range pod.Spec.Containers {
+			cnt := &pod.Spec.Containers[i]
+			if cnt.Name != compscanctrl.PlatformScanResourceCollectorName && cnt.Name != compscanctrl.OpenSCAPScanContainerName {
+				continue
+			}
+
+			if cnt.Resources.Limits.Cpu().String() != cpuLimit {
+				return false, fmt.Errorf("container %s in pod %s has cpu limit %s, expected %s", cnt.Name, podName, cnt.Resources.Limits.Cpu().String(), cpuLimit)
+			}
+
+			if cnt.Resources.Limits.Memory().String() != memLimit {
+				return false, fmt.Errorf("container %s in pod %s has memory limit %s, expected %s", cnt.Name, podName, cnt.Resources.Limits.Cpu().String(), cpuLimit)
+			}
+		}
+
+		return true, nil
+	}
 }
