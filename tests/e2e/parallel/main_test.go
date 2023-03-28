@@ -2,6 +2,7 @@ package parallel_e2e
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -2244,4 +2245,146 @@ func TestScanSettingBindingUsesDefaultScanSetting(t *testing.T) {
 	if binding.SettingsRef.Name != "default" {
 		t.Fatal("Expected the settings reference to use the default ScanSetting")
 	}
+}
+
+func TestScanSettingBindingWatchesTailoredProfile(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	tpName := framework.GetObjNameFromTest(t)
+	bindingName := framework.GetObjNameFromTest(t)
+
+	tp := &compv1alpha1.TailoredProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      tpName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.TailoredProfileSpec{
+			Title:       "TestScanProducesRemediations",
+			Description: "TestScanProducesRemediations",
+			DisableRules: []compv1alpha1.RuleReferenceSpec{
+				{
+					Name:      "no-such-rule",
+					Rationale: "testing",
+				},
+			},
+			Extends: "ocp4-cis",
+		},
+	}
+
+	err := f.Client.Create(context.TODO(), tp, nil)
+	if err != nil {
+		t.Fatal("failed to create tailored profile")
+	}
+	defer f.Client.Delete(context.TODO(), tp)
+
+	// make sure the TP is created with an error as expected
+	err = wait.Poll(framework.RetryInterval, framework.Timeout, func() (bool, error) {
+		tpGet := &compv1alpha1.TailoredProfile{}
+		getErr := f.Client.Get(context.TODO(), types.NamespacedName{Name: tpName, Namespace: f.OperatorNamespace}, tpGet)
+		if getErr != nil {
+			// not gettable yet? retry
+			return false, nil
+		}
+
+		if tpGet.Status.State != compv1alpha1.TailoredProfileStateError {
+			return false, errors.New("expected the TP to be created with an error")
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scanSettingBinding := compv1alpha1.ScanSettingBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      bindingName,
+			Namespace: f.OperatorNamespace,
+		},
+		Profiles: []compv1alpha1.NamedObjectReference{
+			{
+				Name:     bindingName,
+				Kind:     "TailoredProfile",
+				APIGroup: "compliance.openshift.io/v1alpha1",
+			},
+		},
+		SettingsRef: &compv1alpha1.NamedObjectReference{
+			Name:     "default",
+			Kind:     "ScanSetting",
+			APIGroup: "compliance.openshift.io/v1alpha1",
+		},
+	}
+
+	if err := f.Client.Create(context.TODO(), &scanSettingBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), &scanSettingBinding)
+
+	// Wait until the suite binding receives an error condition
+	err = wait.Poll(framework.RetryInterval, framework.Timeout, func() (bool, error) {
+		ssbGet := &compv1alpha1.ScanSettingBinding{}
+		getErr := f.Client.Get(context.TODO(), types.NamespacedName{Name: bindingName, Namespace: f.OperatorNamespace}, ssbGet)
+		if getErr != nil {
+			// not gettable yet? retry
+			return false, nil
+		}
+
+		readyCond := ssbGet.Status.Conditions.GetCondition("Ready")
+		if readyCond == nil {
+			return false, nil
+		}
+		if readyCond.Status != corev1.ConditionFalse && readyCond.Reason != "Invalid" {
+			return false, fmt.Errorf("expected ready=false, reason=invalid, got %v", readyCond)
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Fix the TP
+	tpGet := &compv1alpha1.TailoredProfile{}
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: tpName, Namespace: f.OperatorNamespace}, tpGet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tpUpdate := tpGet.DeepCopy()
+	tpUpdate.Spec.DisableRules = []compv1alpha1.RuleReferenceSpec{
+		{
+			Name:      "ocp4-file-owner-scheduler-kubeconfig",
+			Rationale: "testing",
+		},
+	}
+
+	err = f.Client.Update(context.TODO(), tpUpdate)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for the binding to transition to ready state
+	// Wait until the suite binding receives an error condition
+	err = wait.Poll(framework.RetryInterval, framework.Timeout, func() (bool, error) {
+		ssbGet := &compv1alpha1.ScanSettingBinding{}
+		getErr := f.Client.Get(context.TODO(), types.NamespacedName{Name: bindingName, Namespace: f.OperatorNamespace}, ssbGet)
+		if getErr != nil {
+			// not gettable yet? retry
+			return false, nil
+		}
+
+		readyCond := ssbGet.Status.Conditions.GetCondition("Ready")
+		if readyCond == nil {
+			return false, nil
+		}
+		if readyCond.Status != corev1.ConditionTrue && readyCond.Reason != "Processed" {
+			// don't return an error right away, let the poll just fail if it takes too long
+			return false, nil
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 }
