@@ -3,6 +3,7 @@ package framework
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -758,6 +759,76 @@ func (f *Framework) WaitForScanStatus(namespace, name string, targetStatus compv
 	}
 
 	log.Printf("ComplianceScan ready (%s)\n", exampleComplianceScan.Status.Phase)
+	return nil
+}
+
+// waitForScanStatus will poll until the compliancescan that we're lookingfor reaches a certain status, or until
+// a timeout is reached.
+func (f *Framework) WaitForSuiteScansStatus(namespace, name string, targetStatus compv1alpha1.ComplianceScanStatusPhase, targetComplianceStatus compv1alpha1.ComplianceScanStatusResult) error {
+	suite := &compv1alpha1.ComplianceSuite{}
+	var lastErr error
+	// retry and ignore errors until timeout
+	defer f.logContainerOutput(namespace, name)
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, suite)
+		if lastErr != nil {
+			if apierrors.IsNotFound(lastErr) {
+				log.Printf("waiting for availability of %s compliancesuite\n", name)
+				return false, nil
+			}
+			log.Printf("retrying. Got error: %v\n", lastErr)
+			return false, nil
+		}
+
+		if suite.Status.Phase != targetStatus {
+			log.Printf("waiting until suite %s reaches target status '%s'. Current status: %s", suite.Name, targetStatus, suite.Status.Phase)
+			return false, nil
+		}
+
+		// The suite is now done, make sure the compliance status is expected
+		if suite.Status.Result != targetComplianceStatus {
+			return false, fmt.Errorf("expecting %s got %s", targetComplianceStatus, suite.Status.Result)
+		}
+
+		// If we were expecting an error, there's no use checking the scans
+		if targetComplianceStatus == compv1alpha1.ResultError {
+			return true, nil
+		}
+
+		// Now as a sanity check make sure that the scan statuses match the aggregated
+		// suite status
+
+		// Got the suite. There should be at least one scan or else we're still initialising
+		if len(suite.Status.ScanStatuses) < 1 {
+			return false, errors.New("not enough scan statuses")
+		}
+
+		//Examine the scan status both in the suite status and the scan
+		for _, scanStatus := range suite.Status.ScanStatuses {
+			if scanStatus.Phase != targetStatus {
+				return false, fmt.Errorf("suite in status %s but scan wrapper %s in status %s", targetStatus, scanStatus.Name, scanStatus.Phase)
+			}
+
+			// If the status was present in the suite, then /any/ error
+			// should fail the test as the scans should be read /from/
+			// the scan itself
+			f.WaitForScanStatus(namespace, scanStatus.Name, targetStatus)
+		}
+
+		return true, nil
+	})
+
+	// Error in function call
+	if lastErr != nil {
+		return lastErr
+	}
+
+	// Timeout
+	if timeouterr != nil {
+		return timeouterr
+	}
+
+	log.Printf("All scans in ComplianceSuite have finished (%s)\n", suite.Name)
 	return nil
 }
 

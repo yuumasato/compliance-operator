@@ -623,3 +623,78 @@ func TestSingleScanSucceeds(t *testing.T) {
 		t.Fatalf("failed to assert PVC reference for scan %s: %s", scanName, err)
 	}
 }
+
+func TestScanProducesRemediations(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	bindingName := framework.GetObjNameFromTest(t)
+	tpName := framework.GetObjNameFromTest(t)
+
+	// When using a profile directly, the profile name gets re-used
+	// in the scan. By using a tailored profile we ensure that
+	// the scan is unique and we get no clashes.
+	tp := &compv1alpha1.TailoredProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      tpName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.TailoredProfileSpec{
+			Title:       "TestScanProducesRemediations",
+			Description: "TestScanProducesRemediations",
+			Extends:     "ocp4-moderate",
+		},
+	}
+
+	createTPErr := f.Client.Create(context.TODO(), tp, nil)
+	if createTPErr != nil {
+		t.Fatal(createTPErr)
+	}
+	defer f.Client.Delete(context.TODO(), tp)
+	scanSettingBinding := compv1alpha1.ScanSettingBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      bindingName,
+			Namespace: f.OperatorNamespace,
+		},
+		Profiles: []compv1alpha1.NamedObjectReference{
+			{
+				Name:     tpName,
+				Kind:     "TailoredProfile",
+				APIGroup: "compliance.openshift.io/v1alpha1",
+			},
+		},
+		SettingsRef: &compv1alpha1.NamedObjectReference{
+			Name:     "default",
+			Kind:     "ScanSetting",
+			APIGroup: "compliance.openshift.io/v1alpha1",
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err := f.Client.Create(context.TODO(), &scanSettingBinding, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), &scanSettingBinding)
+	if err := f.WaitForSuiteScansStatus(f.OperatorNamespace, bindingName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant); err != nil {
+		t.Fatal(err)
+	}
+
+	// Since the scan was not compliant, there should be some remediations and none
+	// of them should be an error
+	inNs := client.InNamespace(f.OperatorNamespace)
+	withLabel := client.MatchingLabels{compv1alpha1.SuiteLabel: bindingName}
+	fmt.Println(inNs, withLabel)
+	remList := &compv1alpha1.ComplianceRemediationList{}
+	err = f.Client.List(context.TODO(), remList, inNs, withLabel)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(remList.Items) == 0 {
+		t.Fatal("expected at least one remediation")
+	}
+	for _, rem := range remList.Items {
+		if rem.Status.ApplicationState != compv1alpha1.RemediationNotApplied {
+			t.Fatal("expected all remediations are unapplied when scan finishes")
+		}
+	}
+}
