@@ -1050,3 +1050,67 @@ func (f *Framework) GetPodsForScan(scanName string) ([]core.Pod, error) {
 	}
 	return pods.Items, nil
 }
+
+// WaitForRemediationState will poll until the complianceRemediation that we're lookingfor gets applied, or until
+// a timeout is reached.
+func (f *Framework) WaitForRemediationState(name, namespace string, state compv1alpha1.RemediationApplicationState) error {
+	rem := &compv1alpha1.ComplianceRemediation{}
+	var lastErr error
+	// retry and ignore errors until timeout
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
+		if lastErr != nil {
+			if apierrors.IsNotFound(lastErr) {
+				log.Printf("Waiting for availability of %s ComplianceRemediation\n", name)
+				return false, nil
+			}
+			log.Printf("Retrying. Got error: %v\n", lastErr)
+			return false, nil
+		}
+
+		if rem.Status.ApplicationState == state {
+			return true, nil
+		}
+		log.Printf("Waiting for run of %s ComplianceRemediation (%s)\n", name, rem.Status.ApplicationState)
+		return false, nil
+	})
+	// Error in function call
+	if lastErr != nil {
+		return lastErr
+	}
+	// Timeout
+	if timeouterr != nil {
+		return timeouterr
+	}
+	log.Printf("ComplianceRemediation ready (%s)\n", rem.Status.ApplicationState)
+	return nil
+}
+
+func (f *Framework) WaitForObjectToExist(name, namespace string, obj dynclient.Object) error {
+	var lastErr error
+	// retry and ignore errors until timeout
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, obj)
+		if lastErr != nil {
+			if apierrors.IsNotFound(lastErr) {
+				log.Printf("Waiting for availability of %s ComplianceRemediation\n", name)
+				return false, nil
+			}
+			log.Printf("Retrying. Got error: %v\n", lastErr)
+			return false, nil
+		}
+
+		return true, nil
+	})
+	// Error in function call
+	if lastErr != nil {
+		return lastErr
+	}
+	// Timeout
+	if timeouterr != nil {
+		return timeouterr
+	}
+
+	log.Printf("Object found '%s' found\n", name)
+	return nil
+}

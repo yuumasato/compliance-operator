@@ -86,66 +86,6 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		testExecution{
-			Name:       "TestApplyGenericRemediation",
-			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				remName := "test-apply-generic-remediation"
-				unstruct := &unstructured.Unstructured{}
-				unstruct.SetUnstructuredContent(map[string]interface{}{
-					"kind":       "ConfigMap",
-					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
-						"name":      "generic-rem-cm",
-						"namespace": namespace,
-					},
-					"data": map[string]interface{}{
-						"key": "value",
-					},
-				})
-
-				genericRem := &compv1alpha1.ComplianceRemediation{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      remName,
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ComplianceRemediationSpec{
-						ComplianceRemediationSpecMeta: compv1alpha1.ComplianceRemediationSpecMeta{
-							Apply: true,
-						},
-						Current: compv1alpha1.ComplianceRemediationPayload{
-							Object: unstruct,
-						},
-					},
-				}
-				// use Context's create helper to create the object and add a cleanup function for the new object
-				err := f.Client.Create(goctx.TODO(), genericRem, getCleanupOpts(ctx))
-				if err != nil {
-					return err
-				}
-				err = waitForRemediationState(t, f, namespace, remName, compv1alpha1.RemediationApplied)
-				if err != nil {
-					return err
-				}
-
-				cm := &corev1.ConfigMap{}
-				err = waitForObjectToExist(t, f, "generic-rem-cm", namespace, cm)
-				if err != nil {
-					return err
-				}
-				val, ok := cm.Data["key"]
-				if !ok || val != "value" {
-					return fmt.Errorf("ComplianceRemediation '%s' generated a malformed ConfigMap", remName)
-				}
-
-				// verify object is marked as created by the operator
-				if !compv1alpha1.RemediationWasCreatedByOperator(cm) {
-					return fmt.Errorf("ComplianceRemediation '%s' is missing controller annotation '%s'",
-						remName, compv1alpha1.RemediationCreatedByOperatorAnnotation)
-				}
-				return nil
-			},
-		},
-		testExecution{
 			Name:       "TestPatchGenericRemediation",
 			IsParallel: true,
 			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {

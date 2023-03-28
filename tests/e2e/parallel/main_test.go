@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -1393,5 +1394,65 @@ func TestMissingPodInRunningState(t *testing.T) {
 	err = f.AssertScanIsCompliant(scanName, f.OperatorNamespace)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestApplyGenericRemediation(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	remName := "test-apply-generic-remediation"
+	unstruct := &unstructured.Unstructured{}
+	unstruct.SetUnstructuredContent(map[string]interface{}{
+		"kind":       "ConfigMap",
+		"apiVersion": "v1",
+		"metadata": map[string]interface{}{
+			"name":      "generic-rem-cm",
+			"namespace": f.OperatorNamespace,
+		},
+		"data": map[string]interface{}{
+			"key": "value",
+		},
+	})
+
+	genericRem := &compv1alpha1.ComplianceRemediation{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      remName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceRemediationSpec{
+			ComplianceRemediationSpecMeta: compv1alpha1.ComplianceRemediationSpecMeta{
+				Apply: true,
+			},
+			Current: compv1alpha1.ComplianceRemediationPayload{
+				Object: unstruct,
+			},
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err := f.Client.Create(context.TODO(), genericRem, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), genericRem)
+	err = f.WaitForRemediationState(remName, f.OperatorNamespace, compv1alpha1.RemediationApplied)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cm := &corev1.ConfigMap{}
+	cmName := "generic-rem-cm"
+	err = f.WaitForObjectToExist(cmName, f.OperatorNamespace, cm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	val, ok := cm.Data["key"]
+	if !ok || val != "value" {
+		t.Fatalf("ComplianceRemediation '%s' generated a malformed ConfigMap", remName)
+	}
+
+	// verify object is marked as created by the operator
+	if !compv1alpha1.RemediationWasCreatedByOperator(cm) {
+		t.Fatalf("ComplianceRemediation '%s' is missing controller annotation '%s'",
+			remName, compv1alpha1.RemediationCreatedByOperatorAnnotation)
 	}
 }
