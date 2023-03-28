@@ -87,61 +87,6 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		testExecution{
-			Name:       "TestSingleTailoredScanSucceeds",
-			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				tailoringCM := &corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-single-tailored-scan-succeeds-cm",
-						Namespace: namespace,
-					},
-					Data: map[string]string{
-						"tailoring.xml": `<?xml version="1.0" encoding="UTF-8"?>
-<xccdf-1.2:Tailoring xmlns:xccdf-1.2="http://checklists.nist.gov/xccdf/1.2" id="xccdf_compliance.openshift.io_tailoring_test-tailoredprofile">
-	<xccdf-1.2:benchmark href="/content/ssg-rhcos4-ds.xml"></xccdf-1.2:benchmark>
-	<xccdf-1.2:version time="2020-04-28T07:04:13Z">1</xccdf-1.2:version>
-	<xccdf-1.2:Profile id="xccdf_compliance.openshift.io_profile_test-tailoredprofile">
-		<xccdf-1.2:title>Test Tailored Profile</xccdf-1.2:title>
-		<xccdf-1.2:description>Test Tailored Profile</xccdf-1.2:description>
-		<xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_no_netrc_files" selected="true"></xccdf-1.2:select>
-	</xccdf-1.2:Profile>
-</xccdf-1.2:Tailoring>`,
-					},
-				}
-
-				err := f.Client.Create(goctx.TODO(), tailoringCM, getCleanupOpts(ctx))
-				if err != nil {
-					return err
-				}
-
-				exampleComplianceScan := &compv1alpha1.ComplianceScan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-single-tailored-scan-succeeds",
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ComplianceScanSpec{
-						Profile: "xccdf_compliance.openshift.io_profile_test-tailoredprofile",
-						Content: rhcosContentFile,
-						Rule:    "xccdf_org.ssgproject.content_rule_no_netrc_files",
-						TailoringConfigMap: &compv1alpha1.TailoringConfigMapRef{
-							Name: tailoringCM.Name,
-						},
-						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
-							Debug: true,
-						},
-					},
-				}
-				// use Context's create helper to create the object and add a cleanup function for the new object
-				err = f.Client.Create(goctx.TODO(), exampleComplianceScan, getCleanupOpts(ctx))
-				if err != nil {
-					return err
-				}
-				waitForScanStatus(t, f, namespace, "test-single-tailored-scan-succeeds", compv1alpha1.PhaseDone)
-
-				return scanResultIsExpected(t, f, namespace, "test-single-tailored-scan-succeeds", compv1alpha1.ResultCompliant)
-			},
-		},
-		testExecution{
 			Name:       "TestSingleTailoredPlatformScanSucceeds",
 			IsParallel: true,
 			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {

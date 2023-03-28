@@ -837,3 +837,65 @@ func TestScanStorageOutOfLimitRangeFails(t *testing.T) {
 	}
 
 }
+
+func TestSingleTailoredScanSucceeds(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	scanName := framework.GetObjNameFromTest(t)
+	tailoringCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-single-tailored-scan-succeeds-cm",
+			Namespace: f.OperatorNamespace,
+		},
+		Data: map[string]string{
+			"tailoring.xml": `<?xml version="1.0" encoding="UTF-8"?>
+<xccdf-1.2:Tailoring xmlns:xccdf-1.2="http://checklists.nist.gov/xccdf/1.2" id="xccdf_compliance.openshift.io_tailoring_test-tailoredprofile">
+<xccdf-1.2:benchmark href="/content/ssg-rhcos4-ds.xml"></xccdf-1.2:benchmark>
+<xccdf-1.2:version time="2020-04-28T07:04:13Z">1</xccdf-1.2:version>
+<xccdf-1.2:Profile id="xccdf_compliance.openshift.io_profile_test-tailoredprofile">
+<xccdf-1.2:title>Test Tailored Profile</xccdf-1.2:title>
+<xccdf-1.2:description>Test Tailored Profile</xccdf-1.2:description>
+<xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_no_netrc_files" selected="true"></xccdf-1.2:select>
+</xccdf-1.2:Profile>
+</xccdf-1.2:Tailoring>`,
+		},
+	}
+
+	err := f.Client.Create(context.TODO(), tailoringCM, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), tailoringCM)
+
+	exampleComplianceScan := &compv1alpha1.ComplianceScan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceScanSpec{
+			Profile: "xccdf_compliance.openshift.io_profile_test-tailoredprofile",
+			Content: framework.RhcosContentFile,
+			Rule:    "xccdf_org.ssgproject.content_rule_no_netrc_files",
+			TailoringConfigMap: &compv1alpha1.TailoringConfigMapRef{
+				Name: tailoringCM.Name,
+			},
+			ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+				Debug: true,
+			},
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err = f.Client.Create(context.TODO(), exampleComplianceScan, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), exampleComplianceScan)
+	err = f.WaitForScanStatus(f.OperatorNamespace, scanName, compv1alpha1.PhaseDone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.AssertScanIsCompliant(scanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
