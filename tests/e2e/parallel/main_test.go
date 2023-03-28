@@ -1159,3 +1159,68 @@ func TestScanWithInvalidProfileFails(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestMalformedTailoredScanFails(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	cmName := "test-malformed-tailored-scan-fails-cm"
+	tailoringCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cmName,
+			Namespace: f.OperatorNamespace,
+		},
+		// The tailored profile's namespace is wrong. It should be xccdf-1.2, but it was
+		// declared as xccdf. So it should report an error
+		Data: map[string]string{
+			"tailoring.xml": `<?xml version="1.0" encoding="UTF-8"?>
+<xccdf-1.2:Tailoring xmlns:xccdf="http://checklists.nist.gov/xccdf/1.2" id="xccdf_compliance.openshift.io_tailoring_test-tailoredprofile">
+<xccdf-1.2:benchmark href="/content/ssg-rhcos4-ds.xml"></xccdf-1.2:benchmark>
+<xccdf-1.2:version time="2020-04-28T07:04:13Z">1</xccdf-1.2:version>
+<xccdf-1.2:Profile id="xccdf_compliance.openshift.io_profile_test-tailoredprofile">
+<xccdf-1.2:title>Test Tailored Profile</xccdf-1.2:title>
+<xccdf-1.2:description>Test Tailored Profile</xccdf-1.2:description>
+<xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_no_netrc_files" selected="true"></xccdf-1.2:select>
+</xccdf-1.2:Profile>
+</xccdf-1.2:Tailoring>`,
+		},
+	}
+
+	err := f.Client.Create(context.TODO(), tailoringCM, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), tailoringCM)
+
+	scanName := "test-malformed-tailored-scan-fails"
+	exampleComplianceScan := &compv1alpha1.ComplianceScan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceScanSpec{
+			Profile: "xccdf_compliance.openshift.io_profile_test-tailoredprofile",
+			Content: framework.RhcosContentFile,
+			Rule:    "xccdf_org.ssgproject.content_rule_no_netrc_files",
+			ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+				Debug: true,
+			},
+			TailoringConfigMap: &compv1alpha1.TailoringConfigMapRef{
+				Name: tailoringCM.Name,
+			},
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err = f.Client.Create(context.TODO(), exampleComplianceScan, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), exampleComplianceScan)
+	err = f.WaitForScanStatus(f.OperatorNamespace, scanName, compv1alpha1.PhaseDone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.AssertScanIsInError(scanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
