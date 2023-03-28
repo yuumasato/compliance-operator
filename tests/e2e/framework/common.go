@@ -18,6 +18,7 @@ import (
 	imagev1 "github.com/openshift/api/image/v1"
 	mcfgapi "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/rbac/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -35,6 +36,7 @@ import (
 
 	"github.com/ComplianceAsCode/compliance-operator/pkg/apis"
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
+	compsuitectrl "github.com/ComplianceAsCode/compliance-operator/pkg/controller/compliancesuite"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/utils"
 )
 
@@ -1341,4 +1343,40 @@ func CheckPodPriorityClass(c kubernetes.Interface, podName, namespace, priorityC
 
 		return true, nil
 	}
+}
+
+func (f *Framework) WaitForCronJobWithSchedule(namespace, suiteName, schedule string) error {
+	job := &batchv1.CronJob{}
+	jobName := compsuitectrl.GetRerunnerName(suiteName)
+	var lastErr error
+	// retry and ignore errors until timeout
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: jobName, Namespace: namespace}, job)
+		if lastErr != nil {
+			if apierrors.IsNotFound(lastErr) {
+				log.Printf("waiting for availability of %s CronJob\n", jobName)
+				return false, nil
+			}
+			log.Printf("Retrying. Got error: %v\n", lastErr)
+			return false, nil
+		}
+
+		if job.Spec.Schedule != schedule {
+			log.Printf("Retrying. Schedule in found job (%s) doesn't match excpeted schedule: %s\n",
+				job.Spec.Schedule, schedule)
+			return false, nil
+		}
+
+		return true, nil
+	})
+	// Error in function call
+	if lastErr != nil {
+		return lastErr
+	}
+	// Timeout
+	if timeouterr != nil {
+		return timeouterr
+	}
+	log.Printf("Found %s CronJob\n", jobName)
+	return nil
 }

@@ -1886,3 +1886,93 @@ func TestScheduledSuiteInvalidPriorityClass(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestScheduledSuiteUpdate(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	suiteName := framework.GetObjNameFromTest(t)
+	workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
+	selectWorkers := map[string]string{
+		"node-role.kubernetes.io/worker": "",
+	}
+
+	initialSchedule := "0 * * * *"
+	testSuite := &compv1alpha1.ComplianceSuite{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceSuiteSpec{
+			ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
+				AutoApplyRemediations: false,
+				Schedule:              initialSchedule,
+			},
+			Scans: []compv1alpha1.ComplianceScanSpecWrapper{
+				{
+					Name: workerScanName,
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ContentImage: contentImagePath,
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Content:      framework.RhcosContentFile,
+						Rule:         "xccdf_org.ssgproject.content_rule_no_netrc_files",
+						NodeSelector: selectWorkers,
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							Debug: true,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err := f.Client.Create(context.TODO(), testSuite, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), testSuite)
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = f.WaitForCronJobWithSchedule(f.OperatorNamespace, suiteName, initialSchedule)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get new reference of suite
+	foundSuite := &compv1alpha1.ComplianceSuite{}
+	key := types.NamespacedName{Name: testSuite.Name, Namespace: testSuite.Namespace}
+	if err = f.Client.Get(context.TODO(), key, foundSuite); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update schedule
+	testSuiteCopy := foundSuite.DeepCopy()
+	updatedSchedule := "*/2 * * * *"
+	testSuiteCopy.Spec.Schedule = updatedSchedule
+	if err = f.Client.Update(context.TODO(), testSuiteCopy); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = f.WaitForCronJobWithSchedule(f.OperatorNamespace, suiteName, updatedSchedule); err != nil {
+		t.Fatal(err)
+	}
+
+	// Clean up
+	// Get new reference of suite
+	foundSuite = &compv1alpha1.ComplianceSuite{}
+	if err = f.Client.Get(context.TODO(), key, foundSuite); err != nil {
+		t.Fatal(err)
+	}
+
+	// Remove cronjob so it doesn't keep running while other tests are running
+	testSuiteCopy = foundSuite.DeepCopy()
+	updatedSchedule = ""
+	testSuiteCopy.Spec.Schedule = updatedSchedule
+	if err = f.Client.Update(context.TODO(), testSuiteCopy); err != nil {
+		t.Fatal(err)
+	}
+}
