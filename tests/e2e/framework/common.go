@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	psapi "k8s.io/pod-security-admission/api"
 	dynclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
@@ -1315,4 +1316,29 @@ func (f *Framework) AssertResultStorageHasExpectedItemsAfterRotation(expected in
 	}
 	log.Printf("raw result checker's output matches rotation policy.")
 	return nil
+}
+
+func WaitForPod(podCallback wait.ConditionFunc) error {
+	return wait.PollImmediate(RetryInterval, Timeout, podCallback)
+}
+
+func CheckPodPriorityClass(c kubernetes.Interface, podName, namespace, priorityClass string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+
+		if apierrors.IsNotFound(err) {
+			log.Printf("Pod %s not found yet\n", podName)
+			return false, nil
+		}
+
+		if pod.Spec.PriorityClassName != priorityClass {
+			log.Printf("pod %s has priority class %s, expected %s\n", podName, pod.Spec.PriorityClassName, priorityClass)
+			return true, nil
+		}
+
+		return true, nil
+	}
 }

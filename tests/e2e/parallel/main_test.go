@@ -6,10 +6,12 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strings"
 	"testing"
 
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -1728,6 +1730,89 @@ func TestScheduledSuite(t *testing.T) {
 	defer f.Client.Delete(context.TODO(), rotationCheckerPod)
 
 	err = f.AssertResultStorageHasExpectedItemsAfterRotation(1, f.OperatorNamespace, rotationCheckerPod.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestScheduledSuitePriorityClass(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	suiteName := "test-scheduled-suite-priority-class"
+	workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
+	selectWorkers := map[string]string{
+		"node-role.kubernetes.io/worker": "",
+	}
+
+	priorityClass := &schedulingv1.PriorityClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "e2e-compliance-suite-high-priority",
+		},
+		Value: 100,
+	}
+
+	// Ensure that the priority class is created
+	err := f.Client.Create(context.TODO(), priorityClass, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), priorityClass)
+
+	testSuite := &compv1alpha1.ComplianceSuite{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceSuiteSpec{
+			ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
+				AutoApplyRemediations: false,
+			},
+			Scans: []compv1alpha1.ComplianceScanSpecWrapper{
+				{
+					Name: workerScanName,
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ContentImage: contentImagePath,
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Content:      framework.RhcosContentFile,
+						Rule:         "xccdf_org.ssgproject.content_rule_no_netrc_files",
+						NodeSelector: selectWorkers,
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							PriorityClass: "e2e-compliance-suite-high-priority",
+							RawResultStorage: compv1alpha1.RawResultStorageSettings{
+								Rotation: 1,
+							},
+							Debug: true,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err = f.Client.Create(context.TODO(), testSuite, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), testSuite)
+
+	podList := &corev1.PodList{}
+	err = f.Client.List(context.TODO(), podList, client.InNamespace(f.OperatorNamespace), client.MatchingLabels(map[string]string{
+		"workload": "scanner",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// check if the scanning pod has properly been created and has priority class set
+	for _, pod := range podList.Items {
+		if strings.Contains(pod.Name, workerScanName) {
+			if err := framework.WaitForPod(framework.CheckPodPriorityClass(f.KubeClient, pod.Name, f.OperatorNamespace, "e2e-compliance-suite-high-priority")); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultCompliant)
 	if err != nil {
 		t.Fatal(err)
 	}
