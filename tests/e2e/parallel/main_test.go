@@ -19,12 +19,19 @@ import (
 )
 
 var brokenContentImagePath string
+var contentImagePath string
 
 func TestMain(m *testing.M) {
 	f := framework.NewFramework()
 	err := f.SetUp()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	contentImagePath = os.Getenv("CONTENT_IMAGE")
+	if contentImagePath == "" {
+		fmt.Println("Please set the 'CONTENT_IMAGE' environment variable")
+		os.Exit(1)
 	}
 
 	brokenContentImagePath = os.Getenv("BROKEN_CONTENT_IMAGE")
@@ -894,6 +901,71 @@ func TestSingleTailoredScanSucceeds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = f.AssertScanIsCompliant(scanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSingleTailoredPlatformScanSucceeds(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	scanName := framework.GetObjNameFromTest(t)
+	tailoringCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-tailored-platform-scan-succeeds-cm",
+			Namespace: f.OperatorNamespace,
+		},
+		Data: map[string]string{
+			"tailoring.xml": `<?xml version="1.0" encoding="UTF-8"?>
+<xccdf-1.2:Tailoring xmlns:xccdf-1.2="http://checklists.nist.gov/xccdf/1.2" id="xccdf_compliance.openshift.io_tailoring_tailoredplatformprofile">
+<xccdf-1.2:benchmark href="/content/ssg-ocp4-ds.xml"></xccdf-1.2:benchmark>
+<xccdf-1.2:version time="2020-11-27T11:58:27Z">1</xccdf-1.2:version>
+<xccdf-1.2:Profile id="xccdf_compliance.openshift.io_profile_test-tailoredplatformprofile">
+<xccdf-1.2:title override="true">Test Tailored Platform profile</xccdf-1.2:title>
+<xccdf-1.2:description override="true">This is a test for platform profile tailoring</xccdf-1.2:description>
+<xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_cluster_version_operator_exists" selected="true"></xccdf-1.2:select>
+</xccdf-1.2:Profile>
+</xccdf-1.2:Tailoring>`,
+		},
+	}
+
+	err := f.Client.Create(context.TODO(), tailoringCM, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), tailoringCM)
+
+	exampleComplianceScan := &compv1alpha1.ComplianceScan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceScanSpec{
+			ScanType:     compv1alpha1.ScanTypePlatform,
+			ContentImage: contentImagePath,
+			Profile:      "xccdf_compliance.openshift.io_profile_test-tailoredplatformprofile",
+			Rule:         "xccdf_org.ssgproject.content_rule_cluster_version_operator_exists",
+			Content:      framework.OcpContentFile,
+			TailoringConfigMap: &compv1alpha1.TailoringConfigMapRef{
+				Name: tailoringCM.Name,
+			},
+			ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+				Debug: true,
+			},
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err = f.Client.Create(context.TODO(), exampleComplianceScan, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), exampleComplianceScan)
+	err = f.WaitForScanStatus(f.OperatorNamespace, scanName, compv1alpha1.PhaseDone)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	err = f.AssertScanIsCompliant(scanName, f.OperatorNamespace)
 	if err != nil {
 		t.Fatal(err)
