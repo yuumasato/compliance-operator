@@ -30,68 +30,6 @@ import (
 func TestE2E(t *testing.T) {
 	executeTests(t,
 		testExecution{
-			Name:       "TestScanStorageOutOfLimitRangeFails",
-			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				// Create LimitRange
-				lr := &corev1.LimitRange{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pvc-limitrange",
-						Namespace: namespace,
-					},
-					Spec: corev1.LimitRangeSpec{
-						Limits: []corev1.LimitRangeItem{
-							{
-								Type: corev1.LimitTypePersistentVolumeClaim,
-								Max: corev1.ResourceList{
-									corev1.ResourceStorage: resource.MustParse("5Gi"),
-								},
-							},
-						},
-					},
-				}
-				if err := f.Client.Create(goctx.TODO(), lr, getCleanupOpts(ctx)); err != nil {
-					return err
-				}
-
-				scanName := getObjNameFromTest(t)
-				testScan := &compv1alpha1.ComplianceScan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      scanName,
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ComplianceScanSpec{
-						Profile: "xccdf_org.ssgproject.content_profile_moderate",
-						Content: rhcosContentFile,
-						Rule:    "xccdf_org.ssgproject.content_rule_no_netrc_files",
-						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
-							RawResultStorage: compv1alpha1.RawResultStorageSettings{
-								Size: "6Gi",
-							},
-							Debug: true,
-						},
-					},
-				}
-				// use Context's create helper to create the object and add a cleanup function for the new object
-				err := f.Client.Create(goctx.TODO(), testScan, getCleanupOpts(ctx))
-				if err != nil {
-					return err
-				}
-				waitForScanStatus(t, f, namespace, scanName, compv1alpha1.PhaseDone)
-
-				err = scanResultIsExpected(t, f, namespace, scanName, compv1alpha1.ResultError)
-				if err != nil {
-					return err
-				}
-
-				// Clean up limitrange
-				if err := f.Client.Delete(goctx.TODO(), lr); err != nil {
-					return err
-				}
-				return nil
-			},
-		},
-		testExecution{
 			Name: "TestScanStorageOutOfQuotaRangeFails",
 			// This can't be parallel since it's a global quota for the namespace
 			IsParallel: false,

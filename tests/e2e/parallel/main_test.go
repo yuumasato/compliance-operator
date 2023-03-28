@@ -9,6 +9,7 @@ import (
 
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -778,4 +779,61 @@ func TestScanWithUnexistentResourceFails(t *testing.T) {
 	if err = f.ScanHasWarnings(scanName, f.OperatorNamespace); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestScanStorageOutOfLimitRangeFails(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	// Create LimitRange
+	lr := &corev1.LimitRange{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pvc-limitrange",
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: corev1.LimitRangeSpec{
+			Limits: []corev1.LimitRangeItem{
+				{
+					Type: corev1.LimitTypePersistentVolumeClaim,
+					Max: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("5Gi"),
+					},
+				},
+			},
+		},
+	}
+	if err := f.Client.Create(context.TODO(), lr, nil); err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), lr)
+
+	scanName := framework.GetObjNameFromTest(t)
+	testScan := &compv1alpha1.ComplianceScan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceScanSpec{
+			Profile: "xccdf_org.ssgproject.content_profile_moderate",
+			Content: framework.RhcosContentFile,
+			Rule:    "xccdf_org.ssgproject.content_rule_no_netrc_files",
+			ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+				RawResultStorage: compv1alpha1.RawResultStorageSettings{
+					Size: "6Gi",
+				},
+				Debug: true,
+			},
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err := f.Client.Create(context.TODO(), testScan, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), testScan)
+	f.WaitForScanStatus(f.OperatorNamespace, scanName, compv1alpha1.PhaseDone)
+	err = f.AssertScanIsInError(scanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 }

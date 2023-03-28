@@ -927,6 +927,22 @@ func (f *Framework) AssertScanIsNonCompliant(name, namespace string) error {
 	return nil
 }
 
+func (f *Framework) AssertScanIsInError(name, namespace string) error {
+	cs := &compv1alpha1.ComplianceScan{}
+	defer f.logContainerOutput(namespace, name)
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, cs)
+	if err != nil {
+		return err
+	}
+	if cs.Status.Result != compv1alpha1.ResultError {
+		return fmt.Errorf("scan result was %s instead of %s", compv1alpha1.ResultError, cs.Status.Result)
+	}
+	if cs.Status.ErrorMessage == "" {
+		return fmt.Errorf("scan 'errormsg' is empty, but it should be set")
+	}
+	return nil
+}
+
 func (f *Framework) AssertScanHasValidPVCReference(scanName, namespace string) error {
 	scan := &compv1alpha1.ComplianceScan{}
 	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: scanName, Namespace: namespace}, scan)
