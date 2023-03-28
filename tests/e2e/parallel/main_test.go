@@ -2136,3 +2136,71 @@ func TestScanSettingBinding(t *testing.T) {
 	}
 
 }
+
+func TestScanSettingBindingTailoringAndNonDefaultRole(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	tpName := "non-default-role-tp"
+	scanSettingBindingName := "non-default-role-ssb"
+
+	tp := &compv1alpha1.TailoredProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      tpName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.TailoredProfileSpec{
+			Title:       "TestCisForE2EPool",
+			Description: "TestCisForE2EPool",
+			Extends:     "ocp4-cis",
+			SetValues: []compv1alpha1.VariableValueSpec{
+				{
+					Name:      "ocp4-var-role-master",
+					Rationale: "targets the e2e pool",
+					Value:     "e2e",
+				},
+				{
+					Name:      "ocp4-var-role-worker",
+					Rationale: "targets the e2e pool",
+					Value:     "e2e",
+				},
+			},
+		},
+	}
+
+	createTPErr := f.Client.Create(context.TODO(), tp, nil)
+	if createTPErr != nil {
+		t.Fatal(createTPErr)
+	}
+	defer f.Client.Delete(context.TODO(), tp)
+
+	scanSettingBinding := compv1alpha1.ScanSettingBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanSettingBindingName,
+			Namespace: f.OperatorNamespace,
+		},
+		Profiles: []compv1alpha1.NamedObjectReference{
+			{
+				Name:     tpName,
+				Kind:     "TailoredProfile",
+				APIGroup: "compliance.openshift.io/v1alpha1",
+			},
+		},
+		SettingsRef: &compv1alpha1.NamedObjectReference{
+			Name:     "e2e-default",
+			Kind:     "ScanSetting",
+			APIGroup: "compliance.openshift.io/v1alpha1",
+		},
+	}
+
+	err := f.Client.Create(context.TODO(), &scanSettingBinding, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), &scanSettingBinding)
+
+	// it's enough to check that the scan finishes
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, scanSettingBindingName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
