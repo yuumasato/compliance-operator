@@ -1169,3 +1169,150 @@ func (f *Framework) SuiteErrorMessageMatchesRegex(namespace, name, regexToMatch 
 	}
 	return nil
 }
+
+// WaitForReScanStatus will poll until the compliancescan that we're lookingfor reaches a certain status for a re-scan, or until
+// a timeout is reached.
+func (f *Framework) WaitForReScanStatus(namespace, name string, targetStatus compv1alpha1.ComplianceScanStatusPhase) error {
+	foundScan := &compv1alpha1.ComplianceScan{}
+	// unset initial index
+	var scanIndex int64 = -1
+	var lastErr error
+	// retry and ignore errors until timeout
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, foundScan)
+		if lastErr != nil {
+			if apierrors.IsNotFound(lastErr) {
+				log.Printf("Waiting for availability of %s compliancescan\n", name)
+				return false, nil
+			}
+			log.Printf("Retrying. Got error: %v\n", lastErr)
+			return false, nil
+		}
+		// Set index
+		if scanIndex == -1 {
+			scanIndex = foundScan.Status.CurrentIndex
+			log.Printf("Initial scan index set to %d. Waiting for re-scan\n", scanIndex)
+			return false, nil
+		} else if foundScan.Status.CurrentIndex == scanIndex {
+			log.Printf("re-scan hasn't taken place. CurrentIndex %d. Waiting for re-scan\n", scanIndex)
+			return false, nil
+		}
+
+		if foundScan.Status.Phase == targetStatus {
+			return true, nil
+		}
+		log.Printf("Waiting for run of %s compliancescan (%s)\n", name, foundScan.Status.Phase)
+		return false, nil
+	})
+	// Error in function call
+	if lastErr != nil {
+		return lastErr
+	}
+	// Timeout
+	if timeouterr != nil {
+		return timeouterr
+	}
+	log.Printf("ComplianceScan ready (%s)\n", foundScan.Status.Phase)
+	return nil
+}
+
+func (f *Framework) GetRawResultClaimNameFromScan(namespace, scanName string) (string, error) {
+	scan := &compv1alpha1.ComplianceScan{}
+	key := types.NamespacedName{Name: scanName, Namespace: namespace}
+	log.Printf("Getting scan to fetch raw storage reference from it: %s/%s", namespace, scanName)
+	err := f.Client.Get(context.TODO(), key, scan)
+	if err != nil {
+		return "", err
+	}
+
+	referenceName := scan.Status.ResultsStorage.Name
+	if referenceName == "" {
+		return "", fmt.Errorf("ResultStorage reference in scan '%s' was empty", scanName)
+	}
+	return referenceName, nil
+}
+
+func GetRotationCheckerWorkload(namespace, rawResultName string) *core.Pod {
+	return &core.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rotation-checker",
+			Namespace: namespace,
+		},
+		Spec: core.PodSpec{
+			RestartPolicy: core.RestartPolicyOnFailure,
+			Containers: []core.Container{
+				{
+					Name:    "checker",
+					Image:   "registry.access.redhat.com/ubi8/ubi-minimal",
+					Command: []string{"/bin/bash", "-c", "ls /raw-results | grep -v 'lost+found'"},
+					VolumeMounts: []core.VolumeMount{
+						{
+							Name:      "raw-results",
+							MountPath: "/raw-results",
+							ReadOnly:  true,
+						},
+					},
+				},
+			},
+			Volumes: []core.Volume{
+				{
+					Name: "raw-results",
+					VolumeSource: core.VolumeSource{
+						PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+							ClaimName: rawResultName,
+							ReadOnly:  true,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (f *Framework) AssertResultStorageHasExpectedItemsAfterRotation(expected int, namespace, checkerPodName string) error {
+	// wait for pod to be ready
+	pod := &core.Pod{}
+	key := types.NamespacedName{Name: checkerPodName, Namespace: namespace}
+	log.Printf("Waiting until the raw result checker workload is done: %s/%s", namespace, checkerPodName)
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		err := f.Client.Get(context.TODO(), key, pod)
+		if err != nil {
+			log.Printf("Got an error while fetching the result checker workload. retrying: %s", err)
+			return false, nil
+		}
+		if pod.Status.Phase == core.PodSucceeded {
+			return true, nil
+		} else if pod.Status.Phase == core.PodFailed {
+			log.Printf("Pod failed!")
+			return true, fmt.Errorf("status checker pod failed unexpectedly: %s", pod.Status.Message)
+		}
+		log.Printf("Pod not done. retrying.")
+		return false, nil
+	})
+	if timeouterr != nil {
+		return timeouterr
+	}
+	logopts := &core.PodLogOptions{
+		Container: "checker",
+	}
+	log.Printf("raw result checker workload is done. Getting logs.")
+	req := f.KubeClient.CoreV1().Pods(namespace).GetLogs(checkerPodName, logopts)
+	podLogs, err := req.Stream(context.Background())
+	if err != nil {
+		return err
+	}
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		return fmt.Errorf("error in copy information from podLogs to buffer")
+	}
+	logs := buf.String()
+	got := len(strings.Split(strings.Trim(logs, "\n"), "\n"))
+	if got != expected {
+		return fmt.Errorf(
+			"unexpected number of directories came from the result checker.\n"+
+				" Expected: %d. Got: %d. Output:\n%s", expected, got, logs)
+	}
+	log.Printf("raw result checker's output matches rotation policy.")
+	return nil
+}
