@@ -2204,3 +2204,44 @@ func TestScanSettingBindingTailoringAndNonDefaultRole(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestScanSettingBindingUsesDefaultScanSetting(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	objName := framework.GetObjNameFromTest(t)
+	scanSettingBindingName := objName + "-binding"
+	scanSettingBinding := compv1alpha1.ScanSettingBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanSettingBindingName,
+			Namespace: f.OperatorNamespace,
+		},
+		Profiles: []compv1alpha1.NamedObjectReference{
+			{
+				Name:     "ocp4-cis",
+				Kind:     "Profile",
+				APIGroup: "compliance.openshift.io/v1alpha1",
+			},
+		},
+	}
+	if err := f.Client.Create(context.TODO(), &scanSettingBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), &scanSettingBinding)
+
+	// Wait until the suite finishes
+	err := f.WaitForSuiteScansStatus(f.OperatorNamespace, scanSettingBindingName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bindingKey := types.NamespacedName{Namespace: f.OperatorNamespace, Name: scanSettingBindingName}
+	binding := &compv1alpha1.ScanSettingBinding{}
+	if err := f.Client.Get(context.TODO(), bindingKey, binding); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure the binding used the `default` ScanSetting.
+	if binding.SettingsRef.Name != "default" {
+		t.Fatal("Expected the settings reference to use the default ScanSetting")
+	}
+}
