@@ -87,39 +87,6 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		testExecution{
-			Name:       "TestScanWithNodeSelectorNoMatches",
-			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				scanName := getObjNameFromTest(t)
-				selectNone := map[string]string{
-					"node-role.kubernetes.io/no-matches": "",
-				}
-				testComplianceScan := &compv1alpha1.ComplianceScan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      scanName,
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ComplianceScanSpec{
-						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
-						Content:      rhcosContentFile,
-						Rule:         "xccdf_org.ssgproject.content_rule_no_netrc_files",
-						NodeSelector: selectNone,
-						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
-							Debug:             true,
-							ShowNotApplicable: true,
-						},
-					},
-				}
-				// use Context's create helper to create the object and add a cleanup function for the new object
-				err := f.Client.Create(goctx.TODO(), testComplianceScan, getCleanupOpts(ctx))
-				if err != nil {
-					return err
-				}
-				waitForScanStatus(t, f, namespace, scanName, compv1alpha1.PhaseDone)
-				return scanResultIsExpected(t, f, namespace, scanName, compv1alpha1.ResultNotApplicable)
-			},
-		},
-		testExecution{
 			Name:       "TestScanWithInvalidScanTypeFails",
 			IsParallel: true,
 			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {

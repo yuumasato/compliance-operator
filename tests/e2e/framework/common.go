@@ -927,6 +927,19 @@ func (f *Framework) AssertScanIsNonCompliant(name, namespace string) error {
 	return nil
 }
 
+func (f *Framework) AssertScanIsNotApplicable(name, namespace string) error {
+	cs := &compv1alpha1.ComplianceScan{}
+	defer f.logContainerOutput(namespace, name)
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, cs)
+	if err != nil {
+		return err
+	}
+	if cs.Status.Result != compv1alpha1.ResultNotApplicable {
+		return fmt.Errorf("scan result was %s instead of %s", compv1alpha1.ResultNotApplicable, cs.Status.Result)
+	}
+	return nil
+}
+
 func (f *Framework) AssertScanIsInError(name, namespace string) error {
 	cs := &compv1alpha1.ComplianceScan{}
 	defer f.logContainerOutput(namespace, name)
