@@ -1116,28 +1116,6 @@ func waitForPod(podCallback wait.ConditionFunc) error {
 }
 
 // check if pod name has priority class set to the given value.
-func checkPodPriorityClass(t *testing.T, c kubernetes.Interface, podName, namespace, priorityClass string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(goctx.TODO(), podName, metav1.GetOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return false, err
-		}
-
-		if apierrors.IsNotFound(err) {
-			E2ELogf(t, "Pod %s not found yet", podName)
-			return false, nil
-		}
-
-		if pod.Spec.PriorityClassName != priorityClass {
-			E2ELogf(t, "pod %s has priority class %s, expected %s", podName, pod.Spec.PriorityClassName, priorityClass)
-			return true, nil
-		}
-
-		return true, nil
-	}
-}
-
-// check if pod name has priority class set to the given value.
 func checkPodLimit(t *testing.T, c kubernetes.Interface, podName, namespace, cpuLimit, memLimit string) wait.ConditionFunc {
 	return func() (bool, error) {
 		pod, err := c.CoreV1().Pods(namespace).Get(goctx.TODO(), podName, metav1.GetOptions{})

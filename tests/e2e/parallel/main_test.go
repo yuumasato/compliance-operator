@@ -1817,3 +1817,72 @@ func TestScheduledSuitePriorityClass(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestScheduledSuiteInvalidPriorityClass(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	suiteName := "test-scheduled-suite-invalid-priority-class"
+
+	workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
+	selectWorkers := map[string]string{
+		"node-role.kubernetes.io/worker": "",
+	}
+
+	testSuite := &compv1alpha1.ComplianceSuite{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceSuiteSpec{
+			ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
+				AutoApplyRemediations: false,
+			},
+			Scans: []compv1alpha1.ComplianceScanSpecWrapper{
+				{
+					Name: workerScanName,
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ContentImage: contentImagePath,
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Content:      framework.RhcosContentFile,
+						Rule:         "xccdf_org.ssgproject.content_rule_no_netrc_files",
+						NodeSelector: selectWorkers,
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							PriorityClass: "priority-invalid",
+							RawResultStorage: compv1alpha1.RawResultStorageSettings{
+								Rotation: 1,
+							},
+							Debug: true,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err := f.Client.Create(context.TODO(), testSuite, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), testSuite)
+
+	podList := &corev1.PodList{}
+	err = f.Client.List(context.TODO(), podList, client.InNamespace(f.OperatorNamespace), client.MatchingLabels(map[string]string{
+		"workload": "scanner",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// check if the scanning pod has properly been created and has priority class set
+	for _, pod := range podList.Items {
+		if strings.Contains(pod.Name, workerScanName) {
+			if err := framework.WaitForPod(framework.CheckPodPriorityClass(f.KubeClient, pod.Name, f.OperatorNamespace, "")); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
