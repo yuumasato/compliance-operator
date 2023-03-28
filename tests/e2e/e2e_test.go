@@ -85,52 +85,6 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		testExecution{
-			Name:       "TestSuiteWithInvalidScheduleShowsError",
-			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				suiteName := "test-suite-with-invalid-schedule"
-				testSuite := &compv1alpha1.ComplianceSuite{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      suiteName,
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ComplianceSuiteSpec{
-						ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
-							AutoApplyRemediations: false,
-							Schedule:              "This is WRONG",
-						},
-						Scans: []compv1alpha1.ComplianceScanSpecWrapper{
-							{
-								Name: fmt.Sprintf("%s-workers-scan", suiteName),
-								ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
-									ContentImage: contentImagePath,
-									Profile:      "xccdf_org.ssgproject.content_profile_moderate",
-									Content:      rhcosContentFile,
-									ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
-										Debug: true,
-									},
-									NodeSelector: map[string]string{
-										"node-role.kubernetes.io/worker": "",
-									},
-								},
-							},
-						},
-					},
-				}
-				// use Context's create helper to create the object and add a cleanup function for the new object
-				err := f.Client.Create(goctx.TODO(), testSuite, getCleanupOpts(ctx))
-				if err != nil {
-					return err
-				}
-
-				err = waitForSuiteScansStatus(t, f, namespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultError)
-				if err != nil {
-					return err
-				}
-				return suiteErrorMessageMatchesRegex(t, f, namespace, suiteName, "Suite was invalid: .*")
-			},
-		},
-		testExecution{
 			Name: "TestSuiteScan",
 			// NOTE(jaosorior): This was made a serial test because it runs the long-running, resource-taking and
 			// big AF moderate profile

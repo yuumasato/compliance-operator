@@ -1585,3 +1585,52 @@ func TestGenericRemediationFailsWithUnkownType(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSuiteWithInvalidScheduleShowsError(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	suiteName := "test-suite-with-invalid-schedule"
+	testSuite := &compv1alpha1.ComplianceSuite{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceSuiteSpec{
+			ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
+				AutoApplyRemediations: false,
+				Schedule:              "This is WRONG",
+			},
+			Scans: []compv1alpha1.ComplianceScanSpecWrapper{
+				{
+					Name: fmt.Sprintf("%s-workers-scan", suiteName),
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ContentImage: contentImagePath,
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Content:      framework.RhcosContentFile,
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							Debug: true,
+						},
+						NodeSelector: map[string]string{
+							"node-role.kubernetes.io/worker": "",
+						},
+					},
+				},
+			},
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err := f.Client.Create(context.TODO(), testSuite, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), testSuite)
+
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultError)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.SuiteErrorMessageMatchesRegex(f.OperatorNamespace, suiteName, "Suite was invalid: .*")
+	if err != nil {
+		t.Fatal(err)
+	}
+}

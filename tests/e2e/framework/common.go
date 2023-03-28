@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -1149,5 +1150,22 @@ func (f *Framework) WaitForObjectToUpdate(name, namespace string, obj ObjectReso
 	}
 
 	log.Printf("Object found '%s' found\n", name)
+	return nil
+}
+
+func (f *Framework) SuiteErrorMessageMatchesRegex(namespace, name, regexToMatch string) error {
+	log.Printf("Fetching suite: '%s'\n", name)
+	cs := &compv1alpha1.ComplianceSuite{}
+	key := types.NamespacedName{Name: name, Namespace: namespace}
+	err := f.Client.Get(context.TODO(), key, cs)
+	if err != nil {
+		return err
+	}
+	re := regexp.MustCompile(regexToMatch)
+	if !re.MatchString(cs.Status.ErrorMessage) {
+		return fmt.Errorf("the error message found in the compliance suite '%s' "+
+			"didn't match the expected regex. Found: '%s', Expected regex: '%s'",
+			name, cs.Status.ErrorMessage, regexToMatch)
+	}
 	return nil
 }
