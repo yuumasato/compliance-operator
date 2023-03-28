@@ -4,7 +4,6 @@ import (
 	goctx "context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"runtime"
 	"strings"
 	"testing"
@@ -84,49 +83,6 @@ func TestE2E(t *testing.T) {
 					return err
 				}
 				return nil
-			},
-		},
-		testExecution{
-			Name:       "TestMissingPodInRunningState",
-			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				exampleComplianceScan := &compv1alpha1.ComplianceScan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-missing-pod-scan",
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ComplianceScanSpec{
-						Profile: "xccdf_org.ssgproject.content_profile_moderate",
-						Content: rhcosContentFile,
-						Rule:    "xccdf_org.ssgproject.content_rule_no_netrc_files",
-						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
-							Debug: true,
-						},
-					},
-				}
-				// use Context's create helper to create the object and add a cleanup function for the new object
-				err := f.Client.Create(goctx.TODO(), exampleComplianceScan, getCleanupOpts(ctx))
-				if err != nil {
-					return err
-				}
-				waitForScanStatus(t, f, namespace, "test-missing-pod-scan", compv1alpha1.PhaseRunning)
-				pods, err := getPodsForScan(f, "test-missing-pod-scan")
-				if err != nil {
-					return err
-				}
-				if len(pods) < 1 {
-					return fmt.Errorf("No pods gotten from query for the scan")
-				}
-				podToDelete := pods[rand.Intn(len(pods))]
-				// Delete pod ASAP
-				zeroSeconds := int64(0)
-				do := client.DeleteOptions{GracePeriodSeconds: &zeroSeconds}
-				err = f.Client.Delete(goctx.TODO(), &podToDelete, &do)
-				if err != nil {
-					return err
-				}
-				waitForScanStatus(t, f, namespace, "test-missing-pod-scan", compv1alpha1.PhaseDone)
-				return scanResultIsExpected(t, f, namespace, "test-missing-pod-scan", compv1alpha1.ResultCompliant)
 			},
 		},
 		testExecution{

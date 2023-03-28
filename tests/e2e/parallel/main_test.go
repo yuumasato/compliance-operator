@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"testing"
 
@@ -1334,6 +1335,61 @@ func TestScanWithMissingTailoringCMFailsAndRecovers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = f.AssertScanIsCompliant(scanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMissingPodInRunningState(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	scanName := "test-missing-pod-scan"
+	exampleComplianceScan := &compv1alpha1.ComplianceScan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceScanSpec{
+			Profile: "xccdf_org.ssgproject.content_profile_moderate",
+			Content: framework.RhcosContentFile,
+			Rule:    "xccdf_org.ssgproject.content_rule_no_netrc_files",
+			ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+				Debug: true,
+			},
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err := f.Client.Create(context.TODO(), exampleComplianceScan, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), exampleComplianceScan)
+
+	err = f.WaitForScanStatus(f.OperatorNamespace, scanName, compv1alpha1.PhaseRunning)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pods, err := f.GetPodsForScan(scanName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pods) < 1 {
+		t.Fatal("No pods gotten from query for the scan")
+	}
+	podToDelete := pods[rand.Intn(len(pods))]
+	// Delete pod ASAP
+	zeroSeconds := int64(0)
+	do := client.DeleteOptions{GracePeriodSeconds: &zeroSeconds}
+	err = f.Client.Delete(context.TODO(), &podToDelete, &do)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.WaitForScanStatus(f.OperatorNamespace, scanName, compv1alpha1.PhaseDone)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	err = f.AssertScanIsCompliant(scanName, f.OperatorNamespace)
 	if err != nil {
 		t.Fatal(err)

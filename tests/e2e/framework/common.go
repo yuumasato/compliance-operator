@@ -1035,3 +1035,18 @@ func (f *Framework) GetConfigMapsFromScan(scaninstance *compv1alpha1.ComplianceS
 	}
 	return configmaps.Items, nil
 }
+
+func (f *Framework) GetPodsForScan(scanName string) ([]core.Pod, error) {
+	selectPods := map[string]string{
+		compv1alpha1.ComplianceScanLabel: scanName,
+	}
+	var pods core.PodList
+	lo := &dynclient.ListOptions{
+		LabelSelector: labels.SelectorFromSet(selectPods),
+	}
+	err := f.Client.List(context.TODO(), &pods, lo)
+	if err != nil {
+		return nil, err
+	}
+	return pods.Items, nil
+}
