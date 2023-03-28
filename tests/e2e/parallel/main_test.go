@@ -1976,3 +1976,52 @@ func TestScheduledSuiteUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSuiteWithContentThatDoesNotMatch(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	suiteName := "test-suite-with-non-matching-content"
+	testSuite := &compv1alpha1.ComplianceSuite{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceSuiteSpec{
+			ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
+				AutoApplyRemediations: false,
+			},
+			Scans: []compv1alpha1.ComplianceScanSpecWrapper{
+				{
+					Name: fmt.Sprintf("%s-workers-scan", suiteName),
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ContentImage: fmt.Sprintf("%s:%s", brokenContentImagePath, "broken_os_detection"),
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Content:      "ssg-rhcos4-ds.xml",
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							Debug:             true,
+							ShowNotApplicable: true,
+						},
+						NodeSelector: map[string]string{
+							"node-role.kubernetes.io/worker": "",
+						},
+					},
+				},
+			},
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err := f.Client.Create(context.TODO(), testSuite, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), testSuite)
+
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultNotApplicable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.SuiteErrorMessageMatchesRegex(f.OperatorNamespace, suiteName, "The suite result is not applicable.*")
+	if err != nil {
+		t.Fatal(err)
+	}
+}

@@ -319,23 +319,6 @@ func scanResultIsExpected(t *testing.T, f *framework.Framework, namespace, name 
 	return nil
 }
 
-func suiteErrorMessageMatchesRegex(t *testing.T, f *framework.Framework, namespace, name, regexToMatch string) error {
-	E2ELogf(t, "Fetching suite: '%s'", name)
-	cs := &compv1alpha1.ComplianceSuite{}
-	key := types.NamespacedName{Name: name, Namespace: namespace}
-	err := f.Client.Get(goctx.TODO(), key, cs)
-	if err != nil {
-		return err
-	}
-	re := regexp.MustCompile(regexToMatch)
-	if !re.MatchString(cs.Status.ErrorMessage) {
-		return fmt.Errorf("The error message found in the compliance suite '%s' "+
-			"didn't match the expected regex. Found: '%s', Expected regex: '%s'",
-			name, cs.Status.ErrorMessage, regexToMatch)
-	}
-	return nil
-}
-
 // getNodesWithSelector lists nodes according to a specific selector
 func getNodesWithSelector(f *framework.Framework, labelselector map[string]string) ([]corev1.Node, error) {
 	var nodes corev1.NodeList
