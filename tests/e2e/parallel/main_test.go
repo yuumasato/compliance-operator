@@ -740,3 +740,42 @@ func TestSingleScanWithStorageSucceeds(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestScanWithUnexistentResourceFails(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	var unexistentImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "unexistent_resource")
+	scanName := framework.GetObjNameFromTest(t)
+	testScan := &compv1alpha1.ComplianceScan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scanName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceScanSpec{
+			Profile:      "xccdf_org.ssgproject.content_profile_test",
+			Content:      framework.UnexistentResourceContentFile,
+			ContentImage: unexistentImage,
+			Rule:         "xccdf_org.ssgproject.content_rule_api_server_unexistent_resource",
+			ScanType:     compv1alpha1.ScanTypePlatform,
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err := f.Client.Create(context.TODO(), testScan, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), testScan)
+	err = f.WaitForScanStatus(f.OperatorNamespace, scanName, compv1alpha1.PhaseDone)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = f.AssertScanIsNonCompliant(scanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err = f.ScanHasWarnings(scanName, f.OperatorNamespace); err != nil {
+		t.Fatal(err)
+	}
+}

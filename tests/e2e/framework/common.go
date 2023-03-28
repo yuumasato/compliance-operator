@@ -914,6 +914,19 @@ func (f *Framework) AssertScanIsCompliant(name, namespace string) error {
 	return nil
 }
 
+func (f *Framework) AssertScanIsNonCompliant(name, namespace string) error {
+	cs := &compv1alpha1.ComplianceScan{}
+	defer f.logContainerOutput(namespace, name)
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, cs)
+	if err != nil {
+		return err
+	}
+	if cs.Status.Result != compv1alpha1.ResultNonCompliant {
+		return fmt.Errorf("scan result was %s instead of %s", compv1alpha1.ResultNonCompliant, cs.Status.Result)
+	}
+	return nil
+}
+
 func (f *Framework) AssertScanHasValidPVCReference(scanName, namespace string) error {
 	scan := &compv1alpha1.ComplianceScan{}
 	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: scanName, Namespace: namespace}, scan)
@@ -944,6 +957,18 @@ func (f *Framework) AssertScanHasValidPVCReferenceWithSize(scanName, size, names
 		expected := qty.String()
 		current := pvc.Status.Capacity.Storage().String()
 		return fmt.Errorf("Error: PVC '%s' storage doesn't match expected value. Has '%s', Expected '%s'", pvc.Name, current, expected)
+	}
+	return nil
+}
+
+func (f *Framework) ScanHasWarnings(scanName, namespace string) error {
+	cs := &compv1alpha1.ComplianceScan{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: scanName, Namespace: namespace}, cs)
+	if err != nil {
+		return err
+	}
+	if cs.Status.Warnings == "" {
+		return fmt.Errorf("E2E-FAILURE: Excepted the scan %s to contain a warning", scanName)
 	}
 	return nil
 }

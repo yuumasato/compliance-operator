@@ -463,18 +463,6 @@ func scanResultIsExpected(t *testing.T, f *framework.Framework, namespace, name 
 	return nil
 }
 
-func scanHasWarnings(t *testing.T, f *framework.Framework, namespace, name string) error {
-	cs := &compv1alpha1.ComplianceScan{}
-	err := f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, cs)
-	if err != nil {
-		return err
-	}
-	if cs.Status.Warnings == "" {
-		return fmt.Errorf("E2E-FAILURE: Excepted the scan %s to contain a warning", name)
-	}
-	return nil
-}
-
 func suiteErrorMessageMatchesRegex(t *testing.T, f *framework.Framework, namespace, name, regexToMatch string) error {
 	E2ELogf(t, "Fetching suite: '%s'", name)
 	cs := &compv1alpha1.ComplianceSuite{}

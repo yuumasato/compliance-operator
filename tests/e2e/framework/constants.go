@@ -15,4 +15,5 @@ const (
 	machineOperationTimeout       = time.Minute * 25
 	RhcosContentFile              = "ssg-rhcos4-ds.xml"
 	OcpContentFile                = "ssg-ocp4-ds.xml"
+	UnexistentResourceContentFile = "ocp4-unexistent-resource.xml"
 )
