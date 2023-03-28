@@ -15,7 +15,6 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -80,49 +79,6 @@ func TestE2E(t *testing.T) {
 				}
 				// delete resource quota
 				if err := f.Client.Delete(goctx.TODO(), rq); err != nil {
-					return err
-				}
-				return nil
-			},
-		},
-		testExecution{
-			Name:       "TestGenericRemediationFailsWithUnkownType",
-			IsParallel: true,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				remName := "test-generic-remediation-fails-unkown"
-				genericRem := &compv1alpha1.ComplianceRemediation{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      remName,
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ComplianceRemediationSpec{
-						ComplianceRemediationSpecMeta: compv1alpha1.ComplianceRemediationSpecMeta{
-							Apply: true,
-						},
-						Current: compv1alpha1.ComplianceRemediationPayload{
-							Object: &unstructured.Unstructured{
-								Object: map[string]interface{}{
-									"kind":       "OopsyDoodle",
-									"apiVersion": "foo.bar/v1",
-									"metadata": map[string]interface{}{
-										"name":      "unkown-remediation",
-										"namespace": namespace,
-									},
-									"data": map[string]interface{}{
-										"key": "value",
-									},
-								},
-							},
-						},
-					},
-				}
-				// use Context's create helper to create the object and add a cleanup function for the new object
-				err := f.Client.Create(goctx.TODO(), genericRem, getCleanupOpts(ctx))
-				if err != nil {
-					return err
-				}
-				err = waitForRemediationState(t, f, namespace, remName, compv1alpha1.RemediationError)
-				if err != nil {
 					return err
 				}
 				return nil

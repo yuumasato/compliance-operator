@@ -1543,3 +1543,45 @@ func TestPatchGenericRemediation(t *testing.T) {
 		t.Fatalf("ComplianceRemediation '%s' generated a malformed ConfigMap", remName)
 	}
 }
+
+func TestGenericRemediationFailsWithUnkownType(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	remName := "test-generic-remediation-fails-unkown"
+	genericRem := &compv1alpha1.ComplianceRemediation{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      remName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceRemediationSpec{
+			ComplianceRemediationSpecMeta: compv1alpha1.ComplianceRemediationSpecMeta{
+				Apply: true,
+			},
+			Current: compv1alpha1.ComplianceRemediationPayload{
+				Object: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"kind":       "OopsyDoodle",
+						"apiVersion": "foo.bar/v1",
+						"metadata": map[string]interface{}{
+							"name":      "unkown-remediation",
+							"namespace": f.OperatorNamespace,
+						},
+						"data": map[string]interface{}{
+							"key": "value",
+						},
+					},
+				},
+			},
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err := f.Client.Create(context.TODO(), genericRem, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), genericRem)
+	err = f.WaitForRemediationState(remName, f.OperatorNamespace, compv1alpha1.RemediationError)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

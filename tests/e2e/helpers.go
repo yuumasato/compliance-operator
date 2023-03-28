@@ -279,41 +279,6 @@ func waitForReScanStatus(t *testing.T, f *framework.Framework, namespace, name s
 	return nil
 }
 
-// waitForRemediationState will poll until the complianceRemediation that we're lookingfor gets applied, or until
-// a timeout is reached.
-func waitForRemediationState(t *testing.T, f *framework.Framework, namespace, name string, state compv1alpha1.RemediationApplicationState) error {
-	rem := &compv1alpha1.ComplianceRemediation{}
-	var lastErr error
-	// retry and ignore errors until timeout
-	timeouterr := wait.Poll(retryInterval, timeout, func() (bool, error) {
-		lastErr = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
-		if lastErr != nil {
-			if apierrors.IsNotFound(lastErr) {
-				E2ELogf(t, "Waiting for availability of %s ComplianceRemediation\n", name)
-				return false, nil
-			}
-			E2ELogf(t, "Retrying. Got error: %v\n", lastErr)
-			return false, nil
-		}
-
-		if rem.Status.ApplicationState == state {
-			return true, nil
-		}
-		E2ELogf(t, "Waiting for run of %s ComplianceRemediation (%s)\n", name, rem.Status.ApplicationState)
-		return false, nil
-	})
-	// Error in function call
-	if lastErr != nil {
-		return lastErr
-	}
-	// Timeout
-	if timeouterr != nil {
-		return timeouterr
-	}
-	E2ELogf(t, "ComplianceRemediation ready (%s)\n", rem.Status.ApplicationState)
-	return nil
-}
-
 // waitForScanStatus will poll until the compliancescan that we're lookingfor reaches a certain status, or until
 // a timeout is reached.
 func waitForSuiteScansStatus(t *testing.T, f *framework.Framework, namespace, name string, targetStatus compv1alpha1.ComplianceScanStatusPhase, targetComplianceStatus compv1alpha1.ComplianceScanStatusResult) error {
