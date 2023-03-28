@@ -48,6 +48,11 @@ func (f *Framework) readFile(p *string) ([]byte, error) {
 	return y, nil
 }
 
+type ObjectResouceVersioner interface {
+	dynclient.Object
+	metav1.Common
+}
+
 // readYAML accepts a byte string that is YAML-like and attempts to read
 // it into a slice of byte strings where each element in the slice is a
 // separate YAML document delimited by "---". This is useful for working
@@ -1097,6 +1102,38 @@ func (f *Framework) WaitForObjectToExist(name, namespace string, obj dynclient.O
 				return false, nil
 			}
 			log.Printf("Retrying. Got error: %v\n", lastErr)
+			return false, nil
+		}
+
+		return true, nil
+	})
+	// Error in function call
+	if lastErr != nil {
+		return lastErr
+	}
+	// Timeout
+	if timeouterr != nil {
+		return timeouterr
+	}
+
+	log.Printf("Object found '%s' found\n", name)
+	return nil
+}
+
+func (f *Framework) WaitForObjectToUpdate(name, namespace string, obj ObjectResouceVersioner) error {
+	var lastErr error
+
+	initialVersion := obj.GetResourceVersion()
+
+	// retry and ignore errors until timeout
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, obj)
+		if lastErr != nil {
+			log.Printf("Retrying. Got error: %v\n", lastErr)
+			return false, nil
+		}
+		if obj.GetResourceVersion() == initialVersion {
+			log.Printf("Retrying. Object still doesn't update. got version %s ... wanted %s\n", obj.GetResourceVersion(), initialVersion)
 			return false, nil
 		}
 
