@@ -988,3 +988,37 @@ func (f *Framework) ScanHasWarnings(scanName, namespace string) error {
 	}
 	return nil
 }
+
+// GetNodesWithSelector lists nodes according to a specific selector
+func (f *Framework) GetNodesWithSelector(labelselector map[string]string) ([]core.Node, error) {
+	var nodes core.NodeList
+	lo := &dynclient.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labelselector),
+	}
+	listErr := backoff.Retry(
+		func() error {
+			return f.Client.List(context.TODO(), &nodes, lo)
+		},
+		defaultBackoff)
+	if listErr != nil {
+		return nodes.Items, fmt.Errorf("couldn't list nodes with selector %s: %w", labelselector, listErr)
+	}
+	return nodes.Items, nil
+}
+
+// GetConfigMapsFromScan lists the configmaps from the specified openscap scan instance
+func (f *Framework) GetConfigMapsFromScan(scaninstance *compv1alpha1.ComplianceScan) ([]core.ConfigMap, error) {
+	var configmaps core.ConfigMapList
+	labelselector := map[string]string{
+		compv1alpha1.ComplianceScanLabel: scaninstance.Name,
+		compv1alpha1.ResultLabel:         "",
+	}
+	lo := &dynclient.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labelselector),
+	}
+	err := f.Client.List(context.TODO(), &configmaps, lo)
+	if err != nil {
+		return configmaps.Items, err
+	}
+	return configmaps.Items, nil
+}

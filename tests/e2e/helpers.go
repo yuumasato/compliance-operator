@@ -520,20 +520,6 @@ func getPodsForScan(f *framework.Framework, scanName string) ([]corev1.Pod, erro
 	return pods.Items, nil
 }
 
-// getConfigMapsFromScan lists the configmaps from the specified openscap scan instance
-func getConfigMapsFromScan(f *framework.Framework, scaninstance *compv1alpha1.ComplianceScan) []corev1.ConfigMap {
-	var configmaps corev1.ConfigMapList
-	labelselector := map[string]string{
-		compv1alpha1.ComplianceScanLabel: scaninstance.Name,
-		compv1alpha1.ResultLabel:         "",
-	}
-	lo := &client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(labelselector),
-	}
-	f.Client.List(goctx.TODO(), &configmaps, lo)
-	return configmaps.Items
-}
-
 func assertHasCheck(f *framework.Framework, suiteName, scanName string, check compv1alpha1.ComplianceCheckResult) error {
 	var getCheck compv1alpha1.ComplianceCheckResult
 

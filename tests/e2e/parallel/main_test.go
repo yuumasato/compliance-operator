@@ -971,3 +971,52 @@ func TestSingleTailoredPlatformScanSucceeds(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestScanWithNodeSelectorFiltersCorrectly(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	selectWorkers := map[string]string{
+		"node-role.kubernetes.io/worker": "",
+	}
+	testComplianceScan := &compv1alpha1.ComplianceScan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-filtered-scan",
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceScanSpec{
+			Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+			Content:      framework.RhcosContentFile,
+			Rule:         "xccdf_org.ssgproject.content_rule_no_netrc_files",
+			NodeSelector: selectWorkers,
+			ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+				Debug: true,
+			},
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err := f.Client.Create(context.TODO(), testComplianceScan, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), testComplianceScan)
+	err = f.WaitForScanStatus(f.OperatorNamespace, "test-filtered-scan", compv1alpha1.PhaseDone)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nodes, err := f.GetNodesWithSelector(selectWorkers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configmaps, err := f.GetConfigMapsFromScan(testComplianceScan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != len(configmaps) {
+		t.Fatalf("The number of reports doesn't match the number of selected nodes: %d reports / %d nodes", len(configmaps), len(nodes))
+	}
+	err = f.AssertScanIsCompliant("test-filtered-scan", f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
