@@ -950,7 +950,7 @@ func TestE2E(t *testing.T) {
   <xccdf-1.2:Profile id="xccdf_compliance.openshift.io_profile_test-tailoredplatformprofile">
     <xccdf-1.2:title override="true">Test Tailored Platform profile</xccdf-1.2:title>
     <xccdf-1.2:description override="true">This is a test for platform profile tailoring</xccdf-1.2:description>
-    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_scheduler_no_bind_address" selected="true"></xccdf-1.2:select>
+    <xccdf-1.2:select idref="xccdf_org.ssgproject.content_rule_cluster_version_operator_exists" selected="true"></xccdf-1.2:select>
   </xccdf-1.2:Profile>
 </xccdf-1.2:Tailoring>`,
 					},
@@ -970,7 +970,7 @@ func TestE2E(t *testing.T) {
 						ScanType:     compv1alpha1.ScanTypePlatform,
 						ContentImage: contentImagePath,
 						Profile:      "xccdf_compliance.openshift.io_profile_test-tailoredplatformprofile",
-						Rule:         "xccdf_org.ssgproject.content_rule_scheduler_no_bind_address",
+						Rule:         "xccdf_org.ssgproject.content_rule_cluster_version_operator_exists",
 						Content:      ocpContentFile,
 						TailoringConfigMap: &compv1alpha1.TailoringConfigMapRef{
 							Name: tailoringCM.Name,
