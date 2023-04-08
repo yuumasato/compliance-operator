@@ -197,7 +197,7 @@ github.com/itchyny/gojq
 # github.com/itchyny/timefmt-go v0.1.5
 ## explicit; go 1.17
 github.com/itchyny/timefmt-go
-# github.com/jaytaylor/html2text v0.0.0-20211105163654-bc68cce691ba
+# github.com/jaytaylor/html2text v0.0.0-20230321000545-74c2419ad056
 ## explicit
 github.com/jaytaylor/html2text
 # github.com/josharian/intern v1.0.0
