@@ -3,22 +3,17 @@ package framework
 import (
 	"bufio"
 	"bytes"
-	goctx "context"
 	"fmt"
 	"io"
 	"os"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/util/wait"
 	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	psapi "k8s.io/pod-security-admission/api"
-	"sigs.k8s.io/yaml"
 )
 
 const maxExecutiveEmpties = 100
@@ -146,66 +141,4 @@ func (ctx *Context) GetWatchNamespace() (string, error) {
 	}
 	ctx.watchNamespace = operatorNamespace
 	return ctx.watchNamespace, nil
-}
-
-func (ctx *Context) createFromYAML(yamlFile []byte, skipIfExists bool) error {
-	operatorNamespace, err := ctx.GetOperatorNamespace()
-	if err != nil {
-		return err
-	}
-	scanner := NewYAMLScanner(bytes.NewBuffer(yamlFile))
-	for scanner.Scan() {
-		yamlSpec := scanner.Bytes()
-
-		obj := &unstructured.Unstructured{}
-		jsonSpec, err := yaml.YAMLToJSON(yamlSpec)
-		if err != nil {
-			return fmt.Errorf("could not convert yaml file to json: %w", err)
-		}
-		if err := obj.UnmarshalJSON(jsonSpec); err != nil {
-			return fmt.Errorf("failed to unmarshal object spec: %w", err)
-		}
-		obj.SetNamespace(operatorNamespace)
-		err = ctx.client.CreateWithoutCleanup(goctx.TODO(), obj)
-		if skipIfExists && apierrors.IsAlreadyExists(err) {
-			continue
-		}
-		if err != nil {
-			_, restErr := ctx.restMapper.RESTMappings(obj.GetObjectKind().GroupVersionKind().GroupKind())
-			if restErr == nil {
-				return err
-			}
-			// don't store error, as only error will be timeout. Error from runtime client will be easier for
-			// the user to understand than the timeout error, so just use that if we fail
-			_ = wait.PollImmediate(time.Second*1, time.Second*10, func() (bool, error) {
-				ctx.restMapper.Reset()
-				_, err := ctx.restMapper.RESTMappings(obj.GetObjectKind().GroupVersionKind().GroupKind())
-				if err != nil {
-					return false, nil
-				}
-				return true, nil
-			})
-			err = ctx.client.CreateWithoutCleanup(goctx.TODO(), obj)
-			if skipIfExists && apierrors.IsAlreadyExists(err) {
-				continue
-			}
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("failed to scan manifest: %w", err)
-	}
-	return nil
-}
-
-func (ctx *Context) InitializeClusterResources(cleanupOptions *CleanupOptions) error {
-	// create namespaced resources
-	namespacedYAML, err := os.ReadFile(ctx.namespacedManPath)
-	if err != nil {
-		return fmt.Errorf("failed to read namespaced manifest: %w", err)
-	}
-	return ctx.createFromYAML(namespacedYAML, false)
 }

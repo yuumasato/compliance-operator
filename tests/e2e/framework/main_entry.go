@@ -7,9 +7,38 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
+	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func NewFramework() *Framework {
+	fopts := &frameworkOpts{}
+	fopts.addToFlagSet(flag.CommandLine)
+
+	kcFlag := flag.Lookup(KubeConfigFlag)
+	if kcFlag == nil {
+		flag.StringVar(&fopts.kubeconfigPath, KubeConfigFlag, "", "path to kubeconfig")
+	}
+
+	flag.Parse()
+
+	if kcFlag != nil {
+		fopts.kubeconfigPath = kcFlag.Value.String()
+	}
+
+	f, err := newFramework(fopts)
+	if err != nil {
+		log.Fatalf("Failed to create framework: %v", err)
+	}
+	Global = f
+	return f
+}
+
+func (f *Framework) CleanUpOnError() bool {
+	return f.cleanupOnError
+}
 
 func MainEntry(m *testing.M) {
 	fopts := &frameworkOpts{}
@@ -38,7 +67,7 @@ func MainEntry(m *testing.M) {
 	Global = f
 
 	// Do suite setup
-	if err := f.setUp(); err != nil {
+	if err := f.SetUp(); err != nil {
 		log.Fatal(err)
 	}
 
@@ -50,15 +79,88 @@ func MainEntry(m *testing.M) {
 
 	// Do suite teardown only if we have a successful test run or if we don't care
 	// about removing the test resources if the test failed.
-	if exitCode == 0 || (exitCode > 0 && !f.cleanupOnError) {
-		if err = f.tearDown(); err != nil {
+	if exitCode == 0 || (exitCode > 0 && f.cleanupOnError) {
+		if err = f.TearDown(); err != nil {
 			log.Fatal(err)
 		}
 	}
 	os.Exit(exitCode)
 }
 
-func (f *Framework) setUp() error {
+func (f *Framework) SetUp() error {
+	log.Printf("switching to %s directory to setup and execute tests", f.projectRoot)
+	err := os.Chdir(f.projectRoot)
+	if err != nil {
+		return fmt.Errorf("failed to change directory to project root: %w", err)
+	}
+
+	err = f.ensureTestNamespaceExists()
+	if err != nil {
+		return fmt.Errorf("unable to create or use namespace %s for testing: %w", f.OperatorNamespace, err)
+	}
+
+	log.Printf("creating cluster resources in %s", f.globalManPath)
+	err = f.createFromYAMLFile(&f.globalManPath)
+	if err != nil {
+		return fmt.Errorf("failed to setup test resources: %w", err)
+	}
+
+	err = f.addFrameworks()
+	if err != nil {
+		return err
+	}
+
+	err = f.replaceNamespaceFromManifest()
+	if err != nil {
+		return err
+	}
+
+	log.Printf("creating namespaced resources in %s", *f.NamespacedManPath)
+	err = f.createFromYAMLFile(f.NamespacedManPath)
+	if err != nil {
+		return fmt.Errorf("failed to setup test resources: %w", err)
+	}
+
+	err = f.initializeMetricsTestResources()
+	if err != nil {
+		return fmt.Errorf("failed to initialize cluster resources for metrics: %v", err)
+	}
+
+	retryInterval := time.Second * 5
+	timeout := time.Minute * 30
+	err = f.waitForDeployment("compliance-operator", 1, retryInterval, timeout)
+	if err != nil {
+		return fmt.Errorf("timed out waiting for deployment to become available: %w", err)
+	}
+
+	err = f.WaitForProfileBundleStatus("rhcos4", compv1alpha1.DataStreamValid)
+	if err != nil {
+		return err
+	}
+	err = f.WaitForProfileBundleStatus("ocp4", compv1alpha1.DataStreamValid)
+	if err != nil {
+		return err
+	}
+
+	err = f.updateScanSettingsForDebug()
+	if err != nil {
+		return fmt.Errorf("failed to set scan setting bindings to debug: %w", err)
+	}
+
+	err = f.ensureE2EScanSettings()
+	if err != nil {
+		return fmt.Errorf("failed to configure scan settings for tests: %w", err)
+	}
+
+	err = f.createMachineConfigPool("e2e")
+	if err != nil {
+		return fmt.Errorf("failed to create Machine Config Pool %s: %w", "e2e", err)
+	}
+	err = f.createInvalidMachineConfigPool("e2e-invalid")
+	if err != nil {
+		return fmt.Errorf("failed to create Machine Config Pool %s: %w", "e2e-invalid", err)
+	}
+
 	return nil
 }
 
@@ -67,13 +169,47 @@ func (f *Framework) setUp() error {
 // deleting the cluster-wide resources, like roles, service accounts, or the deployment.
 // If we don't properly cleanup resources before deleting CRDs, it leaves resources in a
 // terminating state, making them harder to cleanup.
-func (f *Framework) tearDown() error {
+func (f *Framework) TearDown() error {
 	// Make sure all scans are cleaned up before we delete the CRDs. Scans should be cleaned up
 	// because they're owned by ScanSettingBindings or ScanSuites, which should be cleaned up
 	// by each individual test either directly or through deferred cleanup. If the test fails
 	// because there are scans that haven't been cleaned up, we could have a bug in the
 	// tests.
 	err := f.waitForScanCleanup()
+	if err != nil {
+		return err
+	}
+
+	log.Printf("cleaning up Profile Bundles")
+	err = f.cleanUpProfileBundle("rhcos4")
+	if err != nil {
+		return fmt.Errorf("failed to cleanup rhcos4 profile bundle: %w", err)
+	}
+	err = f.cleanUpProfileBundle("ocp4")
+	if err != nil {
+		return fmt.Errorf("failed to cleanup ocp4 profile bundle: %w", err)
+	}
+
+	err = f.deleteScanSettings("e2e-default")
+	if err != nil {
+		return err
+	}
+	err = f.deleteScanSettings("e2e-default-auto-apply")
+	if err != nil {
+		return err
+	}
+
+	// unlabel nodes
+	err = f.restoreNodeLabelsForPool("e2e")
+	if err != nil {
+		return err
+	}
+	err = f.cleanUpMachineConfigPool("e2e")
+	if err != nil {
+		return err
+	}
+	// e2e-invalid mcp
+	err = f.cleanUpMachineConfigPool("e2e-invalid")
 	if err != nil {
 		return err
 	}

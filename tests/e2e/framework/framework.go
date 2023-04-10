@@ -231,26 +231,6 @@ func (f *Framework) addToScheme(addToScheme addToSchemeFunc, obj dynclient.Objec
 }
 
 func (f *Framework) runM(m *testing.M) (int, error) {
-	// setup context to use when setting up crd
-	ctx := f.newContext(nil)
-	defer ctx.Cleanup()
-
-	// go test always runs from the test directory; change to project root
-	err := os.Chdir(f.projectRoot)
-	if err != nil {
-		return 0, fmt.Errorf("failed to change directory to project root: %w", err)
-	}
-
-	// create crd
-	globalYAML, err := os.ReadFile(f.globalManPath)
-	if err != nil {
-		return 0, fmt.Errorf("failed to read global resource manifest: %w", err)
-	}
-	err = ctx.createFromYAML(globalYAML, true)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create resource(s) in global resource manifest: %w", err)
-	}
-
 	if !f.LocalOperator {
 		return m.Run(), nil
 	}
