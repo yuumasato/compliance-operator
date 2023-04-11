@@ -793,6 +793,8 @@ rules:
       - compliance.openshift.io
     resources:
       - compliancesuites
+      - scansettings
+      - scansettingbindings
     verbs:
       - get
       - list
