@@ -1773,3 +1773,116 @@ func (f *Framework) ReRunScan(scanName, namespace string) error {
 	log.Printf("rerunning scan %s", scanName)
 	return nil
 }
+
+func (f *Framework) PauseMachinePool(poolName string) error {
+	return f.modMachinePoolPause(poolName, true)
+}
+
+func (f *Framework) ResumeMachinePool(poolName string) error {
+	return f.modMachinePoolPause(poolName, false)
+}
+
+func (f *Framework) modMachinePoolPause(poolName string, pause bool) error {
+	pool := &mcfgv1.MachineConfigPool{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: poolName}, pool)
+	if err != nil {
+		return fmt.Errorf("could not find pool to modify: %s", err)
+	}
+
+	poolCopy := pool.DeepCopy()
+	poolCopy.Spec.Paused = pause
+	err = f.Client.Update(context.TODO(), poolCopy)
+	if err != nil {
+		return fmt.Errorf("failed to update pool: %s", err)
+	}
+
+	return nil
+}
+
+func (f *Framework) ApplyRemediationAndCheck(namespace, name, pool string) error {
+	rem := &compv1alpha1.ComplianceRemediation{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
+	if err != nil {
+		return err
+	}
+	log.Printf("remediation %s found\n", name)
+
+	applyRemediation := func() error {
+		rem.Spec.Apply = true
+		err = f.Client.Update(context.TODO(), rem)
+		if err != nil {
+			return fmt.Errorf("failed to apply remediation: %s", err)
+		}
+		log.Printf("applied remediation %s\n", name)
+		return nil
+	}
+
+	predicate := func(pool *mcfgv1.MachineConfigPool) (bool, error) {
+		// When checking if a MC is applied to a pool, we can't check the pool status
+		// when the pool is paused..
+		source := pool.Status.Configuration.Source
+		if pool.Spec.Paused == true {
+			source = pool.Spec.Configuration.Source
+		}
+
+		for _, mc := range source {
+			if mc.Name == rem.GetMcName() {
+				// When applying a remediation, check that the MC *is* in the pool
+				log.Printf("remediation %s present in pool %s, returning true\n", mc.Name, pool.Name)
+				return true, nil
+			}
+		}
+
+		log.Printf("remediation %s not present in pool %s, returning false\n", rem.GetMcName(), pool.Name)
+		return false, nil
+	}
+
+	err = f.WaitForMachinePoolUpdate(pool, applyRemediation, predicate, nil)
+	if err != nil {
+		return fmt.Errorf("failed to wait for pool to update after applying MC: %v", err)
+	}
+
+	log.Printf("machines updated with remediation")
+	return nil
+}
+
+func (f *Framework) UnApplyRemediationAndCheck(namespace, name, pool string) error {
+	rem := &compv1alpha1.ComplianceRemediation{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
+	if err != nil {
+		return err
+	}
+	log.Printf("remediation found\n")
+
+	applyRemediation := func() error {
+		rem.Spec.Apply = false
+		err = f.Client.Update(context.TODO(), rem)
+		if err != nil {
+			return fmt.Errorf("cannot apply remediation: %s", err)
+		}
+		log.Printf("remediation applied\n")
+		return nil
+	}
+
+	predicate := func(pool *mcfgv1.MachineConfigPool) (bool, error) {
+		// We want to check that the MC created by the operator went away. Let's
+		// poll the pool until we no longer see the remediation in the status
+		for _, mc := range pool.Status.Configuration.Source {
+			if mc.Name == rem.GetMcName() {
+				log.Printf("remediation %s present in pool %s, returning false\n", mc.Name, pool.Name)
+				return false, nil
+			}
+		}
+
+		log.Printf("Remediation %s not present in pool %s, returning true\n", rem.GetMcName(), pool.Name)
+		return true, nil
+	}
+
+	err = f.WaitForMachinePoolUpdate(pool, applyRemediation, predicate, nil)
+	if err != nil {
+		return fmt.Errorf("failed to wait for pool to update after applying MachineConfig: %v", err)
+	}
+
+	log.Printf("machines updated with remediation\n")
+	return nil
+}

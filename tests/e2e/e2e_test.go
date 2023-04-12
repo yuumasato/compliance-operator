@@ -16,8 +16,6 @@ import (
 
 	"github.com/ComplianceAsCode/compliance-operator/tests/e2e/e2eutil"
 	"github.com/ComplianceAsCode/compliance-operator/tests/e2e/framework"
-
-	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 func TestE2E(t *testing.T) {
@@ -77,107 +75,6 @@ func TestE2E(t *testing.T) {
 		//		return removeNodeTaint(t, f, taintedNode.Name, taintKey)
 		//	},
 		//},
-		testExecution{
-			Name:       "TestUnapplyRemediation",
-			IsParallel: false,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				// FIXME, maybe have a func that returns a struct with suite name and scan names?
-				suiteName := "test-unapply-remediation"
-
-				workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
-
-				exampleComplianceSuite := &compv1alpha1.ComplianceSuite{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      suiteName,
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ComplianceSuiteSpec{
-						ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
-							AutoApplyRemediations: false,
-						},
-						Scans: []compv1alpha1.ComplianceScanSpecWrapper{
-							{
-								ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
-									ContentImage: contentImagePath,
-									Profile:      "xccdf_org.ssgproject.content_profile_moderate",
-									Content:      rhcosContentFile,
-									NodeSelector: getPoolNodeRoleSelector(),
-									ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
-										Debug: true,
-									},
-								},
-								Name: workerScanName,
-							},
-						},
-					},
-				}
-
-				err := f.Client.Create(goctx.TODO(), exampleComplianceSuite, getCleanupOpts(ctx))
-				if err != nil {
-					return err
-				}
-
-				// Ensure that all the scans in the suite have finished and are marked as Done
-				err = waitForSuiteScansStatus(t, f, namespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant)
-				if err != nil {
-					return err
-				}
-
-				// Pause the MC so that we have only one reboot
-				err = pauseMachinePool(t, f, testPoolName)
-				if err != nil {
-					return err
-				}
-
-				// Apply both remediations
-				workersNoRootLoginsRemName := fmt.Sprintf("%s-no-direct-root-logins", workerScanName)
-				err = applyRemediationAndCheck(t, f, namespace, workersNoRootLoginsRemName, testPoolName)
-				if err != nil {
-					E2ELogf(t, "WARNING: Got an error while applying remediation '%s': %v", workersNoRootLoginsRemName, err)
-				}
-				E2ELogf(t, "Remediation %s applied", workersNoRootLoginsRemName)
-
-				workersNoEmptyPassRemName := fmt.Sprintf("%s-no-empty-passwords", workerScanName)
-				err = applyRemediationAndCheck(t, f, namespace, workersNoEmptyPassRemName, testPoolName)
-				if err != nil {
-					E2ELogf(t, "WARNING: Got an error while applying remediation '%s': %v", workersNoEmptyPassRemName, err)
-				}
-				E2ELogf(t, "Remediation %s applied", workersNoEmptyPassRemName)
-
-				// unpause the MCP so that the remediation gets applied
-				unPauseMachinePoolAndWait(t, f, testPoolName)
-
-				waitForNodesToBeReady(t, f, "Failed to wait for nodes to come back up after applying MC")
-
-				// Get the resulting MC
-				mcName := types.NamespacedName{Name: fmt.Sprintf("75-%s", workersNoEmptyPassRemName)}
-				mcBoth := &mcfgv1.MachineConfig{}
-				err = f.Client.Get(goctx.TODO(), mcName, mcBoth)
-				E2ELogf(t, "MC %s exists", mcName.Name)
-
-				// Revert one remediation. The MC should stay, but its generation should bump
-				E2ELogf(t, "Will revert remediation %s", workersNoEmptyPassRemName)
-				err = unApplyRemediationAndCheck(t, f, namespace, workersNoEmptyPassRemName, testPoolName)
-				if err != nil {
-					E2ELogf(t, "WARNING: Got an error while unapplying remediation '%s': %v", workersNoEmptyPassRemName, err)
-				}
-				E2ELogf(t, "Remediation %s reverted", workersNoEmptyPassRemName)
-
-				// When we unapply the second remediation, the MC should be deleted, too
-				E2ELogf(t, "Will revert remediation %s", workersNoRootLoginsRemName)
-				err = unApplyRemediationAndCheck(t, f, namespace, workersNoRootLoginsRemName, testPoolName)
-				E2ELogf(t, "Remediation %s reverted", workersNoEmptyPassRemName)
-
-				E2ELogf(t, "No remediation-based MCs should exist now")
-				mcShouldntExist := &mcfgv1.MachineConfig{}
-				err = f.Client.Get(goctx.TODO(), mcName, mcShouldntExist)
-				if err == nil {
-					E2EErrorf(t, "MC %s unexpectedly found", mcName)
-				}
-
-				return nil
-			},
-		},
 		testExecution{
 			Name:       "TestInconsistentResult",
 			IsParallel: false,

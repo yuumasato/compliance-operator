@@ -471,3 +471,112 @@ func TestAutoRemediate(t *testing.T) {
 	// ..as well as the nodes
 	f.WaitForNodesToBeReady()
 }
+
+func TestUnapplyRemediation(t *testing.T) {
+	f := framework.Global
+	// FIXME, maybe have a func that returns a struct with suite name and scan names?
+	suiteName := "test-unapply-remediation"
+
+	workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
+
+	exampleComplianceSuite := &compv1alpha1.ComplianceSuite{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceSuiteSpec{
+			ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
+				AutoApplyRemediations: false,
+			},
+			Scans: []compv1alpha1.ComplianceScanSpecWrapper{
+				{
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ContentImage: contentImagePath,
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Content:      framework.RhcosContentFile,
+						NodeSelector: framework.GetPoolNodeRoleSelector(),
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							Debug: true,
+						},
+					},
+					Name: workerScanName,
+				},
+			},
+		},
+	}
+
+	err := f.Client.Create(context.TODO(), exampleComplianceSuite, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), exampleComplianceSuite)
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Pause the MC so that we have only one reboot
+	err = f.PauseMachinePool(framework.TestPoolName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Apply both remediations
+	workersNoRootLoginsRemName := fmt.Sprintf("%s-no-direct-root-logins", workerScanName)
+	err = f.ApplyRemediationAndCheck(f.OperatorNamespace, workersNoRootLoginsRemName, framework.TestPoolName)
+	if err != nil {
+		log.Printf("WARNING: Got an error while applying remediation '%s': %v\n", workersNoRootLoginsRemName, err)
+	}
+	log.Printf("remediation %s applied", workersNoRootLoginsRemName)
+
+	workersNoEmptyPassRemName := fmt.Sprintf("%s-no-empty-passwords", workerScanName)
+	err = f.ApplyRemediationAndCheck(f.OperatorNamespace, workersNoEmptyPassRemName, framework.TestPoolName)
+	if err != nil {
+		log.Printf("WARNING: Got an error while applying remediation '%s': %v\n", workersNoEmptyPassRemName, err)
+	}
+	log.Printf("remediation %s applied", workersNoEmptyPassRemName)
+
+	// resume the MCP so that the remediation gets applied
+	f.ResumeMachinePool(framework.TestPoolName)
+
+	err = f.WaitForNodesToBeReady()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get the resulting MC
+	mcName := types.NamespacedName{Name: fmt.Sprintf("75-%s", workersNoEmptyPassRemName)}
+	mcBoth := &mcfgv1.MachineConfig{}
+	err = f.Client.Get(context.TODO(), mcName, mcBoth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), mcBoth)
+	log.Printf("MachineConfig %s exists\n", mcName.Name)
+
+	// Revert one remediation. The MC should stay, but its generation should bump
+	log.Printf("reverting remediation %s\n", workersNoEmptyPassRemName)
+	err = f.UnApplyRemediationAndCheck(f.OperatorNamespace, workersNoEmptyPassRemName, framework.TestPoolName)
+	if err != nil {
+		log.Printf("WARNING: Got an error while unapplying remediation '%s': %v\n", workersNoEmptyPassRemName, err)
+	}
+	log.Printf("remediation %s reverted\n", workersNoEmptyPassRemName)
+
+	// When we unapply the second remediation, the MC should be deleted, too
+	log.Printf("reverting remediation %s", workersNoRootLoginsRemName)
+	err = f.UnApplyRemediationAndCheck(f.OperatorNamespace, workersNoRootLoginsRemName, framework.TestPoolName)
+	if err != nil {
+		log.Printf("WARNING: Got an error while unapplying remediation '%s': %v\n", workersNoEmptyPassRemName, err)
+	}
+
+	log.Printf("remediation %s reverted", workersNoEmptyPassRemName)
+
+	log.Printf("no remediation-based MachineConfigs should exist now")
+	mcShouldntExist := &mcfgv1.MachineConfig{}
+	err = f.Client.Get(context.TODO(), mcName, mcShouldntExist)
+	if err == nil {
+		t.Fatalf("found an unexpected MachineConfig: %s", err)
+	}
+}
