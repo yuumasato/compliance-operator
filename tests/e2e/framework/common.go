@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1447,6 +1448,92 @@ func (f *Framework) AssertHasCheck(suiteName, scanName string, check compv1alpha
 
 	if getCheck.Labels[compv1alpha1.ComplianceCheckResultStatusLabel] != string(getCheck.Status) {
 		return fmt.Errorf("did not find expected status name label %s, found %s", suiteName, getCheck.Labels[compv1alpha1.ComplianceCheckResultStatusLabel])
+	}
+
+	return nil
+}
+
+func (f *Framework) AssertHasRemediations(suiteName, scanName, roleLabel string, remNameList []string) error {
+	var scanSuiteMapNames = make(map[string]bool)
+	var scanSuiteRemediations []compv1alpha1.ComplianceRemediation
+
+	// FIXME: This is a temporary hack. At the moment, the ARF parser is too slow
+	// and it might take a bit for the remediations to appear. It would be cleaner
+	// to signify somehow that the remediations were already processed, but in the
+	// meantime, poll for 5 minutes while the remediations are being created
+	err := wait.PollImmediate(RetryInterval, Timeout, func() (bool, error) {
+		var listErr error
+		scanSuiteRemediations, listErr = f.getRemediationsFromScan(suiteName, scanName)
+		if listErr != nil {
+			log.Printf("failed listing remediations, retrying: %s", listErr)
+		}
+		for idx := range scanSuiteRemediations {
+			rem := &scanSuiteRemediations[idx]
+			scanSuiteMapNames[rem.Name] = true
+		}
+
+		for _, expRem := range remNameList {
+			_, ok := scanSuiteMapNames[expRem]
+			if !ok {
+				log.Printf("expected remediation %s not found, retrying...", expRem)
+				return false, nil
+			}
+		}
+		log.Printf("expected remediations found")
+		return true, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed waiting for remediations to appear: %s", err)
+	}
+	return nil
+}
+
+func (f *Framework) getRemediationsFromScan(suiteName, scanName string) ([]compv1alpha1.ComplianceRemediation, error) {
+	var scanSuiteRemediations compv1alpha1.ComplianceRemediationList
+
+	scanSuiteSelector := make(map[string]string)
+	scanSuiteSelector[compv1alpha1.SuiteLabel] = suiteName
+	scanSuiteSelector[compv1alpha1.ComplianceScanLabel] = scanName
+
+	listOpts := dynclient.ListOptions{
+		LabelSelector: labels.SelectorFromSet(scanSuiteSelector),
+	}
+
+	if err := f.Client.List(context.TODO(), &scanSuiteRemediations, &listOpts); err != nil {
+		return nil, err
+	}
+	return scanSuiteRemediations.Items, nil
+}
+
+func (f *Framework) AssertCheckRemediation(name, namespace string, shouldHaveRem bool) error {
+	var getCheck compv1alpha1.ComplianceCheckResult
+
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, &getCheck)
+	if err != nil {
+		return err
+	}
+
+	_, hasRemLabel := getCheck.Labels[compv1alpha1.ComplianceCheckResultHasRemediation]
+	if hasRemLabel != shouldHaveRem {
+		return fmt.Errorf("unexpected label found: %v (expected: %s)", getCheck.Labels, strconv.FormatBool(shouldHaveRem))
+	}
+
+	// Also make sure a remediation with the same name exists (or not)
+	var getRem compv1alpha1.ComplianceRemediation
+	var hasRem bool
+
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, &getRem)
+	if apierrors.IsNotFound(err) {
+		hasRem = false
+	} else if err != nil {
+		return err
+	} else {
+		hasRem = true
+	}
+
+	if hasRemLabel != shouldHaveRem {
+		return fmt.Errorf("unexpected remediation object: expected: %s, found: %s", strconv.FormatBool(shouldHaveRem), strconv.FormatBool(hasRem))
 	}
 
 	return nil

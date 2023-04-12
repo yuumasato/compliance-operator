@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -97,4 +98,144 @@ func TestScanStorageOutOfQuotaRangeFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// NOTE(jaosorior): This was made a serial test because it runs the long-running, resource-taking and
+// big AF moderate profile
+func TestSuiteScan(t *testing.T) {
+	f := framework.Global
+	suiteName := "test-suite-two-scans"
+	workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
+	selectWorkers := map[string]string{
+		"node-role.kubernetes.io/worker": "",
+	}
+
+	masterScanName := fmt.Sprintf("%s-masters-scan", suiteName)
+	selectMasters := map[string]string{
+		"node-role.kubernetes.io/master": "",
+	}
+
+	exampleComplianceSuite := &compv1alpha1.ComplianceSuite{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceSuiteSpec{
+			ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
+				AutoApplyRemediations: false,
+			},
+			Scans: []compv1alpha1.ComplianceScanSpecWrapper{
+				{
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ContentImage: contentImagePath,
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Content:      framework.RhcosContentFile,
+						NodeSelector: selectWorkers,
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							Debug: true,
+						},
+					},
+					Name: workerScanName,
+				},
+				{
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ContentImage: contentImagePath,
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Content:      framework.RhcosContentFile,
+						NodeSelector: selectMasters,
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							Debug: true,
+						},
+					},
+					Name: masterScanName,
+				},
+			},
+		},
+	}
+
+	err := f.Client.Create(context.TODO(), exampleComplianceSuite, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), exampleComplianceSuite)
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// At this point, both scans should be non-compliant given our current content
+	err = f.AssertScanIsNonCompliant(workerScanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.AssertScanIsNonCompliant(masterScanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Each scan should produce two remediations
+	workerRemediations := []string{
+		fmt.Sprintf("%s-no-empty-passwords", workerScanName),
+		fmt.Sprintf("%s-no-direct-root-logins", workerScanName),
+	}
+	err = f.AssertHasRemediations(suiteName, workerScanName, "worker", workerRemediations)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	masterRemediations := []string{
+		fmt.Sprintf("%s-no-empty-passwords", masterScanName),
+		fmt.Sprintf("%s-no-direct-root-logins", masterScanName),
+	}
+	err = f.AssertHasRemediations(suiteName, masterScanName, "master", masterRemediations)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkWifiInBios := compv1alpha1.ComplianceCheckResult{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-wireless-disable-in-bios", workerScanName),
+			Namespace: f.OperatorNamespace,
+		},
+		ID:       "xccdf_org.ssgproject.content_rule_wireless_disable_in_bios",
+		Status:   compv1alpha1.CheckResultManual,
+		Severity: compv1alpha1.CheckResultSeverityUnknown, // yes, it's really uknown in the DS
+	}
+
+	err = f.AssertHasCheck(suiteName, workerScanName, checkWifiInBios)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.AssertCheckRemediation(checkWifiInBios.Name, checkWifiInBios.Namespace, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if runtime.GOARCH == "amd64" {
+		// the purpose of this check is to make sure that also INFO-level checks produce remediations
+		// as of now, the only one we have is the vsyscall check that is x86-specific.
+		checkVsyscall := compv1alpha1.ComplianceCheckResult{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-coreos-vsyscall-kernel-argument", workerScanName),
+				Namespace: f.OperatorNamespace,
+				Labels: map[string]string{
+					compv1alpha1.ComplianceCheckResultHasRemediation: "",
+				},
+			},
+			ID:       "xccdf_org.ssgproject.content_rule_coreos_vsyscall_kernel_argument",
+			Status:   compv1alpha1.CheckResultInfo,
+			Severity: compv1alpha1.CheckResultSeverityMedium,
+		}
+
+		err = f.AssertHasCheck(suiteName, workerScanName, checkVsyscall)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// even INFO checks generate remediations, make sure the check was labeled appropriately
+		// even INFO checks generate remediations, make sure the check was labeled appropriately
+		f.AssertCheckRemediation(checkVsyscall.Name, checkVsyscall.Namespace, true)
+	}
+
 }
