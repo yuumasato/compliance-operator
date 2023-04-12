@@ -1886,3 +1886,139 @@ func (f *Framework) UnApplyRemediationAndCheck(namespace, name, pool string) err
 	log.Printf("machines updated with remediation\n")
 	return nil
 }
+
+func (f *Framework) runPod(namespace string, podToRun *core.Pod) (*core.Pod, error) {
+	pod, err := f.KubeClient.CoreV1().Pods(namespace).Create(context.TODO(), podToRun, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := waitForPod(initContainerCompleted(f.KubeClient, pod.Name, namespace)); err != nil {
+		return nil, err
+	}
+
+	return pod, nil
+}
+
+func waitForPod(podCallback wait.ConditionFunc) error {
+	return wait.PollImmediate(RetryInterval, Timeout, podCallback)
+}
+
+func initContainerCompleted(c kubernetes.Interface, name, namespace string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		if apierrors.IsNotFound(err) {
+			log.Printf("pod %s not found yet\n", name)
+			return false, nil
+		}
+
+		for _, initStatus := range pod.Status.InitContainerStatuses {
+			// the init container must have passed the readiness probe
+			if initStatus.Ready == false {
+				log.Println("init container not ready yet")
+				return false, nil
+			}
+
+			// the init container must have terminated
+			if initStatus.State.Terminated == nil {
+				log.Println("init container terminated")
+				return false, nil
+			}
+
+			if initStatus.State.Terminated.ExitCode != 0 {
+				return true, errors.New("the init container failed")
+			} else {
+				fmt.Printf("init container in pod %s has finished\n", name)
+				return true, nil
+			}
+		}
+
+		fmt.Printf("init container in pod %s not finished yet\n", name)
+		return false, nil
+	}
+}
+
+// createAndRemoveEtcSecurettyOnNode creates a pod that creates the file /etc/securetty on node, returns the pod
+// object for the caller to delete at which point the pod, before exiting, removes the file
+func (f *Framework) CreateAndRemoveEtcSecurettyOnNode(namespace, name, nodeName string) (*core.Pod, error) {
+	return f.runPod(namespace, createAndRemoveEtcSecurettyPod(namespace, name, nodeName))
+}
+
+func createAndRemoveEtcSecurettyPod(namespace, name, nodeName string) *core.Pod {
+	return privCommandTuplePodOnHost(namespace, name, nodeName, "touch /hostroot/etc/securetty", []string{"rm", "-f", "/hostroot/etc/securetty"})
+}
+
+// privCommandTuplePodOnHost returns a pod that calls commandPre in an init container, then sleeps for an hour
+// and registers commandPost to be run in a PreStop handler.
+func privCommandTuplePodOnHost(namespace, name, nodeName, commandPre string, commandPost []string) *core.Pod {
+	runAs := int64(0)
+	priv := true
+
+	return &core.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: core.PodSpec{
+			InitContainers: []core.Container{
+				{
+					Name:    name + "-init",
+					Image:   "busybox",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", commandPre},
+					VolumeMounts: []core.VolumeMount{
+						{
+							Name:      "hostroot",
+							MountPath: "/hostroot",
+						},
+					},
+					SecurityContext: &core.SecurityContext{
+						Privileged: &priv,
+						RunAsUser:  &runAs,
+					},
+				},
+			},
+			Containers: []core.Container{
+				{
+					Name:    name,
+					Image:   "busybox",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "sleep 3600"},
+					VolumeMounts: []core.VolumeMount{
+						{
+							Name:      "hostroot",
+							MountPath: "/hostroot",
+						},
+					},
+					SecurityContext: &core.SecurityContext{
+						Privileged: &priv,
+						RunAsUser:  &runAs,
+					},
+					Lifecycle: &core.Lifecycle{
+						PreStop: &core.LifecycleHandler{
+							Exec: &core.ExecAction{Command: commandPost},
+						},
+					},
+				},
+			},
+			Volumes: []core.Volume{
+				{
+					Name: "hostroot",
+					VolumeSource: core.VolumeSource{
+						HostPath: &core.HostPathVolumeSource{
+							Path: "/",
+						},
+					},
+				},
+			},
+			RestartPolicy: "Never",
+			NodeSelector: map[string]string{
+				core.LabelHostname: nodeName,
+			},
+			ServiceAccountName: "resultscollector",
+		},
+	}
+}

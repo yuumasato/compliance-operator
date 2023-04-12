@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
@@ -315,31 +314,6 @@ func scanResultIsExpected(t *testing.T, f *framework.Framework, namespace, name 
 		}
 	}
 	return nil
-}
-
-// getNodesWithSelector lists nodes according to a specific selector
-func getNodesWithSelector(f *framework.Framework, labelselector map[string]string) ([]corev1.Node, error) {
-	var nodes corev1.NodeList
-	lo := &client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(labelselector),
-	}
-	listErr := backoff.Retry(
-		func() error {
-			return f.Client.List(goctx.TODO(), &nodes, lo)
-		},
-		defaultBackoff)
-	if listErr != nil {
-		return nodes.Items, fmt.Errorf("couldn't list nodes with selector %s: %w", labelselector, listErr)
-	}
-	return nodes.Items, nil
-}
-
-func getNodesWithSelectorOrFail(t *testing.T, f *framework.Framework, labelselector map[string]string) []corev1.Node {
-	nodes, err := getNodesWithSelector(f, labelselector)
-	if err != nil {
-		E2EFatalf(t, "couldn't get nodes with selector %s: %w", labelselector, err)
-	}
-	return nodes
 }
 
 func getPodsForScan(f *framework.Framework, scanName string) ([]corev1.Pod, error) {
@@ -819,146 +793,6 @@ func doesObjectExist(f *framework.Framework, kind, namespace, name string) (erro
 	}
 
 	return err, false
-}
-
-// privCommandTuplePodOnHost returns a pod that calls commandPre in an init container, then sleeps for an hour
-// and registers commandPost to be run in a PreStop handler.
-func privCommandTuplePodOnHost(namespace, name, nodeName, commandPre string, commandPost []string) *corev1.Pod {
-	runAs := int64(0)
-	priv := true
-
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec: corev1.PodSpec{
-			InitContainers: []corev1.Container{
-				{
-					Name:    name + "-init",
-					Image:   "busybox",
-					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", commandPre},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "hostroot",
-							MountPath: "/hostroot",
-						},
-					},
-					SecurityContext: &corev1.SecurityContext{
-						Privileged: &priv,
-						RunAsUser:  &runAs,
-					},
-				},
-			},
-			Containers: []corev1.Container{
-				{
-					Name:    name,
-					Image:   "busybox",
-					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", "sleep 3600"},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "hostroot",
-							MountPath: "/hostroot",
-						},
-					},
-					SecurityContext: &corev1.SecurityContext{
-						Privileged: &priv,
-						RunAsUser:  &runAs,
-					},
-					Lifecycle: &corev1.Lifecycle{
-						PreStop: &corev1.LifecycleHandler{
-							Exec: &corev1.ExecAction{Command: commandPost},
-						},
-					},
-				},
-			},
-			Volumes: []corev1.Volume{
-				{
-					Name: "hostroot",
-					VolumeSource: corev1.VolumeSource{
-						HostPath: &corev1.HostPathVolumeSource{
-							Path: "/",
-						},
-					},
-				},
-			},
-			RestartPolicy: "Never",
-			NodeSelector: map[string]string{
-				corev1.LabelHostname: nodeName,
-			},
-			ServiceAccountName: "resultscollector",
-		},
-	}
-}
-
-// Creates a file /etc/securetty on the pod in an init container, then sleeps. The function returns the pod which
-// the caller can later delete, at that point, the file would be removed
-func createAndRemoveEtcSecurettyPod(namespace, name, nodeName string) *corev1.Pod {
-	return privCommandTuplePodOnHost(namespace, name, nodeName, "touch /hostroot/etc/securetty", []string{"rm", "-f", "/hostroot/etc/securetty"})
-}
-
-func waitForPod(podCallback wait.ConditionFunc) error {
-	return wait.PollImmediate(retryInterval, timeout, podCallback)
-}
-
-// initContainerComplated returns a ConditionFunc that passes if all init containers have succeeded
-func initContainerCompleted(t *testing.T, c kubernetes.Interface, name, namespace string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(goctx.TODO(), name, metav1.GetOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return false, err
-		}
-		if apierrors.IsNotFound(err) {
-			E2ELogf(t, "Pod %s not found yet", name)
-			return false, nil
-		}
-
-		for _, initStatus := range pod.Status.InitContainerStatuses {
-			E2ELog(t, initStatus)
-			// the init container must have passed the readiness probe
-			if initStatus.Ready == false {
-				E2ELog(t, "Init container not ready yet")
-				return false, nil
-			}
-
-			// the init container must have terminated
-			if initStatus.State.Terminated == nil {
-				E2ELog(t, "Init container did not terminate yet")
-				return false, nil
-			}
-
-			if initStatus.State.Terminated.ExitCode != 0 {
-				return true, errors.New("the init container failed")
-			} else {
-				E2ELogf(t, "init container in pod %s has finished", name)
-				return true, nil
-			}
-		}
-
-		E2ELogf(t, "init container in pod %s not finished yet", name)
-		return false, nil
-	}
-}
-
-func runPod(t *testing.T, f *framework.Framework, namespace string, podToRun *corev1.Pod) (*corev1.Pod, error) {
-	pod, err := f.KubeClient.CoreV1().Pods(namespace).Create(goctx.TODO(), podToRun, metav1.CreateOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	if err := waitForPod(initContainerCompleted(t, f.KubeClient, pod.Name, namespace)); err != nil {
-		return nil, err
-	}
-
-	return pod, nil
-}
-
-// createAndRemoveEtcSecurettyOnNode creates a pod that creates the file /etc/securetty on node, returns the pod
-// object for the caller to delete at which point the pod, before exiting, removes the file
-func createAndRemoveEtcSecurettyOnNode(t *testing.T, f *framework.Framework, namespace, name, nodeName string) (*corev1.Pod, error) {
-	return runPod(t, f, namespace, createAndRemoveEtcSecurettyPod(namespace, name, nodeName))
 }
 
 func getReadyProfileBundle(t *testing.T, f *framework.Framework, name, namespace string) (*compv1alpha1.ProfileBundle, error) {

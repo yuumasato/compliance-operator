@@ -580,3 +580,125 @@ func TestUnapplyRemediation(t *testing.T) {
 		t.Fatalf("found an unexpected MachineConfig: %s", err)
 	}
 }
+
+func TestInconsistentResult(t *testing.T) {
+	f := framework.Global
+	suiteName := "test-inconsistent"
+	workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
+	selectWorkers := map[string]string{
+		"node-role.kubernetes.io/worker": "",
+	}
+
+	workersComplianceSuite := &compv1alpha1.ComplianceSuite{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceSuiteSpec{
+			ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
+				AutoApplyRemediations: false,
+			},
+			Scans: []compv1alpha1.ComplianceScanSpecWrapper{
+				{
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ContentImage: contentImagePath,
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Rule:         "xccdf_org.ssgproject.content_rule_no_direct_root_logins",
+						Content:      framework.RhcosContentFile,
+						NodeSelector: selectWorkers,
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							Debug: true,
+						},
+					},
+					Name: workerScanName,
+				},
+			},
+		},
+	}
+
+	workerNodes, err := f.GetNodesWithSelector(selectWorkers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pod, err := f.CreateAndRemoveEtcSecurettyOnNode(f.OperatorNamespace, "create-etc-securetty", workerNodes[0].Labels["kubernetes.io/hostname"])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = f.Client.Create(context.TODO(), workersComplianceSuite, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), workersComplianceSuite)
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultInconsistent)
+	if err != nil {
+		t.Fatalf("got an unexpected status: %s", err)
+	}
+
+	if err := f.KubeClient.CoreV1().Pods(f.OperatorNamespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The check for the no-direct-root-logins rule should be inconsistent
+	var rootLoginCheck compv1alpha1.ComplianceCheckResult
+	rootLoginCheckName := fmt.Sprintf("%s-no-direct-root-logins", workerScanName)
+
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: rootLoginCheckName, Namespace: f.OperatorNamespace}, &rootLoginCheck)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if rootLoginCheck.Status != compv1alpha1.CheckResultInconsistent {
+		t.Fatalf("expected the %s result to be inconsistent, the check result was %s", rootLoginCheckName, rootLoginCheck.Status)
+	}
+
+	var expectedInconsistentSource string
+
+	if len(workerNodes) >= 3 {
+		// The annotations should list the node that had a different result
+		expectedInconsistentSource = workerNodes[0].Name + ":" + string(compv1alpha1.CheckResultPass)
+		inconsistentSources := rootLoginCheck.Annotations[compv1alpha1.ComplianceCheckResultInconsistentSourceAnnotation]
+		if inconsistentSources != expectedInconsistentSource {
+			t.Fatalf("expected that node %s would report %s, instead it reports %s", workerNodes[0].Name, expectedInconsistentSource, inconsistentSources)
+		}
+
+		// Since all the other nodes consistently fail, there should also be a common result
+		mostCommonState := rootLoginCheck.Annotations[compv1alpha1.ComplianceCheckResultMostCommonAnnotation]
+		if mostCommonState != string(compv1alpha1.CheckResultFail) {
+			t.Fatalf("expected that there would be a common FAIL state, instead got %s", mostCommonState)
+		}
+	} else if len(workerNodes) == 2 {
+		// example: ip-10-0-184-135.us-west-1.compute.internal:PASS,ip-10-0-226-48.us-west-1.compute.internal:FAIL
+		var expectedInconsistentSource [2]string
+		expectedInconsistentSource[0] = workerNodes[0].Name + ":" + string(compv1alpha1.CheckResultPass) + "," + workerNodes[1].Name + ":" + string(compv1alpha1.CheckResultFail)
+		expectedInconsistentSource[1] = workerNodes[1].Name + ":" + string(compv1alpha1.CheckResultFail) + "," + workerNodes[0].Name + ":" + string(compv1alpha1.CheckResultPass)
+
+		inconsistentSources := rootLoginCheck.Annotations[compv1alpha1.ComplianceCheckResultInconsistentSourceAnnotation]
+		if inconsistentSources != expectedInconsistentSource[0] && inconsistentSources != expectedInconsistentSource[1] {
+			t.Fatalf(
+				"expected that node %s would report %s or %s, instead it reports %s",
+				workerNodes[0].Name,
+				expectedInconsistentSource[0], expectedInconsistentSource[1],
+				inconsistentSources)
+		}
+
+		// If there are only two worker nodes, we won't be able to find the common status, so both
+		// nodes would be listed as inconsistent -- we can't figure out which of the two results is
+		// consistent and which is not. Therefore this branch skips the check for
+		// compv1alpha1.ComplianceCheckResultMostCommonAnnotation
+	} else {
+		t.Skip("test requires more than one node to generate inconsistent results, skipping")
+	}
+
+	// Since all states were either pass or fail, we still create the remediation
+	workerRemediations := []string{
+		fmt.Sprintf("%s-no-direct-root-logins", workerScanName),
+	}
+	err = f.AssertHasRemediations(suiteName, workerScanName, "worker", workerRemediations)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+}
