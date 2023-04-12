@@ -5,10 +5,10 @@ import "time"
 const (
 	RetryInterval                 = time.Second * 5
 	Timeout                       = time.Minute * 30
+	TestPoolName                  = "e2e"
 	maxRetries                    = 5
 	cleanupTimeout                = time.Minute * 5
 	cleanupRetryInterval          = time.Second * 1
-	testPoolName                  = "e2e"
 	workerPoolName                = "worker"
 	testInvalidPoolName           = "e2e-invalid"
 	machineOperationRetryInterval = time.Second * 10

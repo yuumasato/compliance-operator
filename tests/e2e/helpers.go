@@ -784,59 +784,6 @@ func waitForGenericRemediationToBeAutoApplied(t *testing.T, f *framework.Framewo
 	waitForNodesToBeReady(t, f, "Failed to wait for nodes to come back up after auto-applying remediation")
 }
 
-func waitForRemediationToBeAutoApplied(t *testing.T, f *framework.Framework, remName, remNamespace string, pool *mcfgv1.MachineConfigPool) {
-	rem := &compv1alpha1.ComplianceRemediation{}
-	var lastErr error
-	timeouterr := wait.Poll(retryInterval, timeout, func() (bool, error) {
-		lastErr = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: remName, Namespace: remNamespace}, rem)
-		if apierrors.IsNotFound(lastErr) {
-			E2ELogf(t, "Waiting for availability of %s remediation\n", remName)
-			return false, nil
-		}
-		if lastErr != nil {
-			E2ELogf(t, "Retrying. Got error: %v\n", lastErr)
-			return false, nil
-		}
-		E2ELogf(t, "Found remediation: %s\n", remName)
-		return true, nil
-	})
-	assertNoErrorNorTimeout(t, lastErr, timeouterr, "getting remediation before auto-applying it")
-
-	preNoop := func() error {
-		return nil
-	}
-
-	predicate := func(t *testing.T, pool *mcfgv1.MachineConfigPool) (bool, error) {
-		// When checking if a MC is applied to a pool, we can't check the pool status
-		// when the pool is paused..
-		source := pool.Status.Configuration.Source
-		if pool.Spec.Paused == true {
-			source = pool.Spec.Configuration.Source
-		}
-
-		for _, mc := range source {
-			if mc.Name == rem.GetMcName() {
-				// When applying a remediation, check that the MC *is* in the pool
-				E2ELogf(t, "Remediation %s present in pool %s, returning true", mc.Name, pool.Name)
-				return true, nil
-			}
-		}
-
-		E2ELogf(t, "Remediation %s not present in pool %s, returning false", rem.GetMcName(), pool.Name)
-		return false, nil
-	}
-
-	err := waitForMachinePoolUpdate(t, f, pool.Name, preNoop, predicate, pool)
-	if err != nil {
-		E2EFatalf(t, "Failed to wait for pool to update after applying MC: %v", err)
-	}
-
-	E2ELogf(t, "Machines updated with remediation")
-	waitForNodesToBeReady(t, f, "Failed to wait for nodes to come back up after auto-applying remediation")
-
-	E2ELogf(t, "Remediation applied to machines and machines rebooted")
-}
-
 func unPauseMachinePoolAndWait(t *testing.T, f *framework.Framework, poolName string) {
 	if err := unPauseMachinePool(t, f, poolName); err != nil {
 		E2EFatalf(t, "Could not unpause the MC pool")
@@ -1081,52 +1028,6 @@ func runPod(t *testing.T, f *framework.Framework, namespace string, podToRun *co
 // object for the caller to delete at which point the pod, before exiting, removes the file
 func createAndRemoveEtcSecurettyOnNode(t *testing.T, f *framework.Framework, namespace, name, nodeName string) (*corev1.Pod, error) {
 	return runPod(t, f, namespace, createAndRemoveEtcSecurettyPod(namespace, name, nodeName))
-}
-
-func taintNode(t *testing.T, f *framework.Framework, node *corev1.Node, taint corev1.Taint) error {
-	taintedNode := node.DeepCopy()
-	if taintedNode.Spec.Taints == nil {
-		taintedNode.Spec.Taints = []corev1.Taint{}
-	}
-	taintedNode.Spec.Taints = append(taintedNode.Spec.Taints, taint)
-	E2ELogf(t, "Tainting node: %s", taintedNode.Name)
-	return f.Client.Update(goctx.TODO(), taintedNode)
-}
-
-func removeNodeTaint(t *testing.T, f *framework.Framework, nodeName, taintKey string) error {
-	var lastErr error
-
-	timeoutErr := wait.Poll(retryInterval, timeout, func() (bool, error) {
-		taintedNode := &corev1.Node{}
-		nodeKey := types.NamespacedName{Name: nodeName}
-		if err := f.Client.Get(goctx.TODO(), nodeKey, taintedNode); err != nil {
-			E2ELogf(t, "Couldn't get node: %s", nodeName)
-			return false, nil
-		}
-		untaintedNode := taintedNode.DeepCopy()
-		untaintedNode.Spec.Taints = []corev1.Taint{}
-		for _, taint := range taintedNode.Spec.Taints {
-			if taint.Key != taintKey {
-				untaintedNode.Spec.Taints = append(untaintedNode.Spec.Taints, taint)
-			}
-		}
-
-		E2ELogf(t, "Removing taint from node: %s", nodeName)
-		lastErr = f.Client.Update(goctx.TODO(), untaintedNode)
-		if lastErr != nil {
-			E2ELogf(t, "Got error while trying to remove taint from %s, retrying", nodeName)
-			return false, nil
-		}
-		return true, nil
-	})
-
-	if timeoutErr != nil {
-		return fmt.Errorf("couldn't remove node taint. Timed out: %w", timeoutErr)
-	}
-	if lastErr != nil {
-		return fmt.Errorf("couldn't remove node taint. Errored out: %w", lastErr)
-	}
-	return nil
 }
 
 func getReadyProfileBundle(t *testing.T, f *framework.Framework, name, namespace string) (*compv1alpha1.ProfileBundle, error) {

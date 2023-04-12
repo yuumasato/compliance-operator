@@ -8,9 +8,11 @@ import (
 	"runtime"
 	"testing"
 
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 	"github.com/ComplianceAsCode/compliance-operator/tests/e2e/framework"
@@ -238,4 +240,234 @@ func TestSuiteScan(t *testing.T) {
 		f.AssertCheckRemediation(checkVsyscall.Name, checkVsyscall.Namespace, true)
 	}
 
+}
+
+func TestTolerations(t *testing.T) {
+	f := framework.Global
+	workerNodes, err := f.GetNodesWithSelector(map[string]string{
+		"node-role.kubernetes.io/worker": "",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	taintedNode := &workerNodes[0]
+	taintKey := "co-e2e"
+	taintVal := "val"
+	taint := corev1.Taint{
+		Key:    taintKey,
+		Value:  taintVal,
+		Effect: corev1.TaintEffectNoSchedule,
+	}
+	if err := f.TaintNode(taintedNode, taint); err != nil {
+		t.Fatalf("failed to taint node %s: %s", taintedNode.Name, err)
+	}
+
+	removeTaintClosure := func() {
+		removeTaintErr := f.UntaintNode(taintedNode.Name, taintKey)
+		if removeTaintErr != nil {
+			t.Fatalf("failed to remove taint: %s", removeTaintErr)
+			// not much to do here
+		}
+	}
+	defer removeTaintClosure()
+
+	suiteName := framework.GetObjNameFromTest(t)
+	scanName := suiteName
+	suite := &compv1alpha1.ComplianceSuite{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceSuiteSpec{
+			Scans: []compv1alpha1.ComplianceScanSpecWrapper{
+				{
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ContentImage: contentImagePath,
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Rule:         "xccdf_org.ssgproject.content_rule_no_netrc_files",
+						Content:      framework.RhcosContentFile,
+						NodeSelector: map[string]string{
+							// Schedule scan in this specific host
+							corev1.LabelHostname: taintedNode.Labels[corev1.LabelHostname],
+						},
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							Debug: true,
+							ScanTolerations: []corev1.Toleration{
+								{
+									Key:      taintKey,
+									Operator: corev1.TolerationOpExists,
+									Effect:   corev1.TaintEffectNoSchedule,
+								},
+							},
+						},
+					},
+					Name: scanName,
+				},
+			},
+		},
+	}
+	if err := f.Client.Create(context.TODO(), suite, nil); err != nil {
+		t.Fatalf("failed to create suite %s: %s", suiteName, err)
+	}
+	defer f.Client.Delete(context.TODO(), suite)
+
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAutoRemediate(t *testing.T) {
+	f := framework.Global
+	// FIXME, maybe have a func that returns a struct with suite name and scan names?
+	suiteName := "test-remediate"
+	scanName := fmt.Sprintf("%s-e2e", suiteName)
+
+	tp := &compv1alpha1.TailoredProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+			Annotations: map[string]string{
+				compv1alpha1.ProductTypeAnnotation: "Node",
+			},
+		},
+		Spec: compv1alpha1.TailoredProfileSpec{
+			Title:       "Test Auto Remediate",
+			Description: "A test tailored profile to auto remediate",
+			EnableRules: []compv1alpha1.RuleReferenceSpec{
+				{
+					Name:      "rhcos4-no-direct-root-logins",
+					Rationale: "To be tested",
+				},
+			},
+		},
+	}
+
+	createTPErr := f.Client.Create(context.TODO(), tp, nil)
+	if createTPErr != nil {
+		t.Fatalf("failed to create TailoredProfile %s: %s", tp.Name, createTPErr)
+	}
+	defer f.Client.Delete(context.TODO(), tp)
+
+	ssb := &compv1alpha1.ScanSettingBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Profiles: []compv1alpha1.NamedObjectReference{
+			{
+				APIGroup: "compliance.openshift.io/v1alpha1",
+				Kind:     "TailoredProfile",
+				Name:     suiteName,
+			},
+		},
+		SettingsRef: &compv1alpha1.NamedObjectReference{
+			APIGroup: "compliance.openshift.io/v1alpha1",
+			Kind:     "ScanSetting",
+			Name:     "e2e-default-auto-apply",
+		},
+	}
+	err := f.Client.Create(context.TODO(), ssb, nil)
+	if err != nil {
+		t.Fatalf("failed to create ScanSettingBinding %s: %s", ssb.Name, err)
+	}
+	defer f.Client.Delete(context.TODO(), ssb)
+
+	// Get the MachineConfigPool before a scan or remediation has been applied
+	// This way, we can check that it changed without race-conditions
+	poolBeforeRemediation := &mcfgv1.MachineConfigPool{}
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: framework.TestPoolName}, poolBeforeRemediation)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// We need to check that the remediation is auto-applied and save
+	// the object so we can delete it later
+	remName := fmt.Sprintf("%s-no-direct-root-logins", scanName)
+	err = f.WaitForRemediationToBeAutoApplied(remName, f.OperatorNamespace, poolBeforeRemediation)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// We can re-run the scan at this moment and check that it's now compliant
+	// and it's reflected in a CheckResult
+	err = f.ReRunScan(scanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseRunning, compv1alpha1.ResultNotAvailable)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	log.Printf("waiting for scan %s to finish\n", scanName)
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Printf("scan %s re-run has finished\n", scanName)
+
+	// Now the check should be passing
+	checkNoDirectRootLogins := compv1alpha1.ComplianceCheckResult{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-no-direct-root-logins", scanName),
+			Namespace: f.OperatorNamespace,
+		},
+		ID:       "xccdf_org.ssgproject.content_rule_no_direct_root_logins",
+		Status:   compv1alpha1.CheckResultPass,
+		Severity: compv1alpha1.CheckResultSeverityMedium,
+	}
+	err = f.AssertHasCheck(suiteName, scanName, checkNoDirectRootLogins)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The test should not leave junk around, let's remove the MC and wait for the nodes to stabilize
+	// again
+	log.Printf("Removing applied remediation\n")
+	// Fetch remediation here so it can be deleted
+	rem := &compv1alpha1.ComplianceRemediation{}
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: remName, Namespace: f.OperatorNamespace}, rem)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mcfgToBeDeleted := rem.Spec.Current.Object.DeepCopy()
+	mcfgToBeDeleted.SetName(rem.GetMcName())
+	err = f.Client.Delete(context.TODO(), mcfgToBeDeleted)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log.Printf("successfully deleted MachineConfig deleted, will wait for the machines to come back up")
+
+	dummyAction := func() error {
+		return nil
+	}
+	poolHasNoMc := func(pool *mcfgv1.MachineConfigPool) (bool, error) {
+		for _, mc := range pool.Status.Configuration.Source {
+			if mc.Name == rem.GetMcName() {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	}
+
+	// We need to wait for both the pool to update..
+	err = f.WaitForMachinePoolUpdate(framework.TestPoolName, dummyAction, poolHasNoMc, nil)
+	if err != nil {
+		t.Fatalf("failed waiting for workers to come back up after deleting MachineConfig: %s", err)
+	}
+
+	// ..as well as the nodes
+	f.WaitForNodesToBeReady()
 }
