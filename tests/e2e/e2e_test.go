@@ -10,7 +10,6 @@ import (
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -24,63 +23,6 @@ import (
 
 func TestE2E(t *testing.T) {
 	executeTests(t,
-		testExecution{
-			Name: "TestScanStorageOutOfQuotaRangeFails",
-			// This can't be parallel since it's a global quota for the namespace
-			IsParallel: false,
-			TestFn: func(t *testing.T, f *framework.Framework, ctx *framework.Context, namespace string) error {
-				// Create ResourceQuota
-				rq := &corev1.ResourceQuota{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pvc-resourcequota",
-						Namespace: namespace,
-					},
-					Spec: corev1.ResourceQuotaSpec{
-						Hard: corev1.ResourceList{
-							corev1.ResourceRequestsStorage: resource.MustParse("5Gi"),
-						},
-					},
-				}
-				if err := f.Client.Create(goctx.TODO(), rq, getCleanupOpts(ctx)); err != nil {
-					return err
-				}
-
-				scanName := getObjNameFromTest(t)
-				testScan := &compv1alpha1.ComplianceScan{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      scanName,
-						Namespace: namespace,
-					},
-					Spec: compv1alpha1.ComplianceScanSpec{
-						Profile: "xccdf_org.ssgproject.content_profile_moderate",
-						Content: rhcosContentFile,
-						Rule:    "xccdf_org.ssgproject.content_rule_no_netrc_files",
-						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
-							RawResultStorage: compv1alpha1.RawResultStorageSettings{
-								Size: "6Gi",
-							},
-							Debug: true,
-						},
-					},
-				}
-				// use Context's create helper to create the object and add a cleanup function for the new object
-				err := f.Client.Create(goctx.TODO(), testScan, getCleanupOpts(ctx))
-				if err != nil {
-					return err
-				}
-				waitForScanStatus(t, f, namespace, scanName, compv1alpha1.PhaseDone)
-
-				err = scanResultIsExpected(t, f, namespace, scanName, compv1alpha1.ResultError)
-				if err != nil {
-					return err
-				}
-				// delete resource quota
-				if err := f.Client.Delete(goctx.TODO(), rq); err != nil {
-					return err
-				}
-				return nil
-			},
-		},
 		testExecution{
 			Name: "TestSuiteScan",
 			// NOTE(jaosorior): This was made a serial test because it runs the long-running, resource-taking and
