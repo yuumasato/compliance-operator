@@ -298,24 +298,6 @@ func waitForSuiteScansStatus(t *testing.T, f *framework.Framework, namespace, na
 	return nil
 }
 
-func scanResultIsExpected(t *testing.T, f *framework.Framework, namespace, name string, expectedResult compv1alpha1.ComplianceScanStatusResult) error {
-	cs := &compv1alpha1.ComplianceScan{}
-	defer logContainerOutput(t, f, namespace, name)
-	err := f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, cs)
-	if err != nil {
-		return err
-	}
-	if cs.Status.Result != expectedResult {
-		return fmt.Errorf("The ComplianceScan Result wasn't what we expected. Got '%s', expected '%s'", cs.Status.Result, expectedResult)
-	}
-	if expectedResult == compv1alpha1.ResultError {
-		if cs.Status.ErrorMessage == "" {
-			return fmt.Errorf("The ComplianceScan 'errormsg' wasn't set (it was empty). Even if we expected an error")
-		}
-	}
-	return nil
-}
-
 func getPodsForScan(f *framework.Framework, scanName string) ([]corev1.Pod, error) {
 	selectPods := map[string]string{
 		compv1alpha1.ComplianceScanLabel: scanName,
@@ -367,60 +349,6 @@ func assertHasCheck(f *framework.Framework, suiteName, scanName string, check co
 		return fmt.Errorf("did not find expected status name label %s, found %s", suiteName, getCheck.Labels[compv1alpha1.ComplianceCheckResultStatusLabel])
 	}
 
-	return nil
-}
-
-func getRemediationsFromScan(f *framework.Framework, suiteName, scanName string) ([]compv1alpha1.ComplianceRemediation, error) {
-	var scanSuiteRemediations compv1alpha1.ComplianceRemediationList
-
-	scanSuiteSelector := make(map[string]string)
-	scanSuiteSelector[compv1alpha1.SuiteLabel] = suiteName
-	scanSuiteSelector[compv1alpha1.ComplianceScanLabel] = scanName
-
-	listOpts := client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(scanSuiteSelector),
-	}
-
-	if err := f.Client.List(goctx.TODO(), &scanSuiteRemediations, &listOpts); err != nil {
-		return nil, err
-	}
-	return scanSuiteRemediations.Items, nil
-}
-
-func assertHasRemediations(t *testing.T, f *framework.Framework, suiteName, scanName, roleLabel string, remNameList []string) error {
-	var scanSuiteMapNames = make(map[string]bool)
-	var scanSuiteRemediations []compv1alpha1.ComplianceRemediation
-
-	// FIXME: This is a temporary hack. At the moment, the ARF parser is too slow
-	// and it might take a bit for the remediations to appear. It would be cleaner
-	// to signify somehow that the remediations were already processed, but in the
-	// meantime, poll for 5 minutes while the remediations are being created
-	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
-		var listErr error
-		scanSuiteRemediations, listErr = getRemediationsFromScan(f, suiteName, scanName)
-		if listErr != nil {
-			E2ELogf(t, "Error listing remediations. Retrying: %s", listErr)
-		}
-		for idx := range scanSuiteRemediations {
-			rem := &scanSuiteRemediations[idx]
-			scanSuiteMapNames[rem.Name] = true
-		}
-
-		for _, expRem := range remNameList {
-			_, ok := scanSuiteMapNames[expRem]
-			if !ok {
-				E2ELogf(t, "expected remediation %s not yet found", expRem)
-				return false, nil
-			}
-		}
-		E2ELogf(t, "expected remediations found!")
-		return true, nil
-	})
-
-	if err != nil {
-		E2EErrorf(t, "Error waiting for remediations to appear")
-		return err
-	}
 	return nil
 }
 

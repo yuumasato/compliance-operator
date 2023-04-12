@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"testing"
 
+	configv1 "github.com/openshift/api/config/v1"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -701,4 +702,213 @@ func TestInconsistentResult(t *testing.T) {
 		t.Fatal(err)
 	}
 
+}
+
+func TestPlatformAndNodeSuiteScan(t *testing.T) {
+	f := framework.Global
+	suiteName := "test-suite-two-scans-with-platform"
+
+	workerScanName := fmt.Sprintf("%s-workers-scan", suiteName)
+	selectWorkers := map[string]string{
+		"node-role.kubernetes.io/worker": "",
+	}
+
+	platformScanName := fmt.Sprintf("%s-platform-scan", suiteName)
+
+	exampleComplianceSuite := &compv1alpha1.ComplianceSuite{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceSuiteSpec{
+			ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
+				AutoApplyRemediations: false,
+			},
+			Scans: []compv1alpha1.ComplianceScanSpecWrapper{
+				{
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ContentImage: contentImagePath,
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Content:      framework.RhcosContentFile,
+						NodeSelector: selectWorkers,
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							Debug: true,
+						},
+					},
+					Name: workerScanName,
+				},
+				{
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ScanType:     compv1alpha1.ScanTypePlatform,
+						ContentImage: contentImagePath,
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Rule:         "xccdf_org.ssgproject.content_rule_ocp_idp_no_htpasswd",
+						Content:      framework.OcpContentFile,
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							Debug: true,
+						},
+					},
+					Name: platformScanName,
+				},
+			},
+		},
+	}
+
+	err := f.Client.Create(context.TODO(), exampleComplianceSuite, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), exampleComplianceSuite)
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// At this point, both scans should be non-compliant given our current content
+	err = f.AssertScanIsNonCompliant(workerScanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The profile should find one check for an htpasswd IDP, so we should be compliant.
+	err = f.AssertScanIsCompliant(platformScanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Each scan should produce two remediations
+	workerRemediations := []string{
+		fmt.Sprintf("%s-no-empty-passwords", workerScanName),
+		fmt.Sprintf("%s-no-direct-root-logins", workerScanName),
+	}
+	err = f.AssertHasRemediations(suiteName, workerScanName, "worker", workerRemediations)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// TODO: Add check for future API remediation
+	//platformRemediations := []string{
+	//	fmt.Sprintf("%s-no-empty-passwords", platformScanName),
+	//	fmt.Sprintf("%s-no-direct-root-logins", platformScanName),
+	//}
+	//err = assertHasRemediations(t, f, suiteName, platformScanName, "master", platformRemediations)
+	//if err != nil {
+	//	return err
+	//}
+
+	// Test a fail result from the platform scan. This fails the HTPasswd IDP check.
+	if _, err := f.KubeClient.CoreV1().Secrets("openshift-config").Create(context.TODO(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "htpass",
+			Namespace: "openshift-config",
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"htpasswd": []byte("bob:$2y$05$OyjQO7M2so4hRJW0aS9yie9KJ0wXv80XFWyEsApUZFURqE37aVR/a"),
+		},
+	}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := f.KubeClient.CoreV1().Secrets("openshift-config").Delete(context.TODO(), "htpass", metav1.DeleteOptions{})
+		if err != nil {
+			log.Printf("could not clean up openshift-config/htpass test secret: %v\n", err)
+		}
+	}()
+
+	fetchedOauth := &configv1.OAuth{}
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, fetchedOauth)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	oauthUpdate := fetchedOauth.DeepCopy()
+	oauthUpdate.Spec = configv1.OAuthSpec{
+		IdentityProviders: []configv1.IdentityProvider{
+			{
+				Name:          "my_htpasswd_provider",
+				MappingMethod: "claim",
+				IdentityProviderConfig: configv1.IdentityProviderConfig{
+					Type: "HTPasswd",
+					HTPasswd: &configv1.HTPasswdIdentityProvider{
+						FileData: configv1.SecretNameReference{
+							Name: "htpass",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err = f.Client.Update(context.TODO(), oauthUpdate)
+	if err != nil {
+		t.Fatalf("failed to update IdP: %s", err)
+	}
+
+	defer func() {
+		fetchedOauth := &configv1.OAuth{}
+		err := f.Client.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, fetchedOauth)
+		if err != nil {
+			log.Printf("error restoring idp: %v\n", err)
+		} else {
+			oauth := fetchedOauth.DeepCopy()
+			// Make sure it's cleared out
+			oauth.Spec = configv1.OAuthSpec{
+				IdentityProviders: nil,
+			}
+			err = f.Client.Update(context.TODO(), oauth)
+			if err != nil {
+				log.Printf("error restoring idp: %v\n", err)
+			}
+		}
+	}()
+
+	suiteName = "test-suite-two-scans-with-platform-2"
+	platformScanName = fmt.Sprintf("%s-platform-scan-2", suiteName)
+	exampleComplianceSuite = &compv1alpha1.ComplianceSuite{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceSuiteSpec{
+			ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
+				AutoApplyRemediations: false,
+			},
+			Scans: []compv1alpha1.ComplianceScanSpecWrapper{
+				{
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ScanType:     compv1alpha1.ScanTypePlatform,
+						ContentImage: contentImagePath,
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Rule:         "xccdf_org.ssgproject.content_rule_ocp_idp_no_htpasswd",
+						Content:      framework.OcpContentFile,
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							Debug: true,
+						},
+					},
+					Name: platformScanName,
+				},
+			},
+		},
+	}
+
+	err = f.Client.Create(context.TODO(), exampleComplianceSuite, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), exampleComplianceSuite)
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = f.AssertScanIsNonCompliant(platformScanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
