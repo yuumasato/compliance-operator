@@ -2176,3 +2176,38 @@ func (f *Framework) RemoveObsoleteRemediationAndCheck(namespace, name, renderedM
 	fmt.Printf("machines updated with remediation that is no longer obsolete")
 	return nil
 }
+
+func (f *Framework) WaitForGenericRemediationToBeAutoApplied(remName, remNamespace string) error {
+	rem := &compv1alpha1.ComplianceRemediation{}
+	var lastErr error
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: remName, Namespace: remNamespace}, rem)
+		if apierrors.IsNotFound(lastErr) {
+			log.Printf("waiting for availability of %s remediation\n", remName)
+			return false, nil
+		}
+		if lastErr != nil {
+			log.Printf("retrying. Got error: %v\n", lastErr)
+			return false, nil
+		}
+		log.Printf("found remediation: %s\n", remName)
+		if rem.Status.ApplicationState == compv1alpha1.RemediationNotApplied || rem.Status.ApplicationState == compv1alpha1.RemediationPending {
+			log.Printf("retrying. remediation not yet applied. Remediation Name: %s, ApplicationState: %s\n", remName, rem.Status.ApplicationState)
+		}
+		// wait for the remediation to get applied
+		time.Sleep(5 * time.Second)
+		return true, nil
+	})
+	if lastErr != nil {
+		return fmt.Errorf("failed getting remediation before it was applied: %s", lastErr)
+	}
+	if timeouterr != nil {
+		return fmt.Errorf("timed out waiting for remediation to be applied: %s", timeouterr)
+	}
+	log.Printf("machines updated with remediation")
+	err := f.WaitForNodesToBeReady()
+	if err != nil {
+		return err
+	}
+	return nil
+}

@@ -1106,3 +1106,148 @@ func TestProfileBundleDefaultIsKept(t *testing.T) {
 		t.Fatalf("error getting valid and up-to-date PB: %s", err)
 	}
 }
+
+func TestVariableTemplate(t *testing.T) {
+	f := framework.Global
+	var baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "variabletemplate")
+	const requiredRule = "audit-profile-set"
+	pbName := framework.GetObjNameFromTest(t)
+	prefixName := func(profName, ruleBaseName string) string { return profName + "-" + ruleBaseName }
+
+	ocpPb := &compv1alpha1.ProfileBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pbName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ProfileBundleSpec{
+			ContentImage: baselineImage,
+			ContentFile:  framework.OcpContentFile,
+		},
+	}
+	if err := f.Client.Create(context.TODO(), ocpPb, nil); err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), ocpPb)
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that if the rule we are going to test is there
+	requiredRuleName := prefixName(pbName, requiredRule)
+	err, found := f.DoesRuleExist(f.OperatorNamespace, requiredRuleName)
+	if err != nil {
+		t.Fatal(err)
+	} else if !found {
+		t.Fatalf("expected rule %s not found", requiredRuleName)
+	}
+
+	suiteName := "audit-profile-set-test"
+	scanName := "audit-profile-set-test"
+
+	tp := &compv1alpha1.TailoredProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.TailoredProfileSpec{
+			Title:       "Audit-Profile-Set-Test",
+			Description: "A test tailored profile to auto remediate audit profile set",
+			EnableRules: []compv1alpha1.RuleReferenceSpec{
+				{
+					Name:      prefixName(pbName, requiredRule),
+					Rationale: "To be tested",
+				},
+			},
+			SetValues: []compv1alpha1.VariableValueSpec{
+				{
+					Name:      prefixName(pbName, "var-openshift-audit-profile"),
+					Rationale: "Value to be set",
+					Value:     "WriteRequestBodies",
+				},
+			},
+		},
+	}
+
+	createTPErr := f.Client.Create(context.TODO(), tp, nil)
+	if createTPErr != nil {
+		t.Fatal(createTPErr)
+	}
+	defer f.Client.Delete(context.TODO(), tp)
+
+	ssb := &compv1alpha1.ScanSettingBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      suiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Profiles: []compv1alpha1.NamedObjectReference{
+			{
+				APIGroup: "compliance.openshift.io/v1alpha1",
+				Kind:     "TailoredProfile",
+				Name:     suiteName,
+			},
+		},
+		SettingsRef: &compv1alpha1.NamedObjectReference{
+			APIGroup: "compliance.openshift.io/v1alpha1",
+			Kind:     "ScanSetting",
+			Name:     "default-auto-apply",
+		},
+	}
+	err = f.Client.Create(context.TODO(), ssb, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), ssb)
+
+	apiServerBeforeRemediation := &configv1.APIServer{}
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, apiServerBeforeRemediation)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// We need to check that the remediation is auto-applied
+	remName := "audit-profile-set-test-audit-profile-set"
+	f.WaitForGenericRemediationToBeAutoApplied(remName, f.OperatorNamespace)
+
+	// We can re-run the scan at this moment and check that it's now compliant
+	// and it's reflected in a CheckResult
+	err = f.ReRunScan(scanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Scan has been re-started
+	log.Println("scan phase should be reset")
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseRunning, compv1alpha1.ResultNotAvailable)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	log.Printf("waiting for scan to complete")
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, suiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Printf("scan re-run has finished")
+
+	// Now the check should be passing
+	auditProfileSet := compv1alpha1.ComplianceCheckResult{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-audit-profile-set", scanName),
+			Namespace: f.OperatorNamespace,
+		},
+		ID:       "xccdf_org.ssgproject.content_rule_audit_profile_set",
+		Status:   compv1alpha1.CheckResultPass,
+		Severity: compv1alpha1.CheckResultSeverityMedium,
+	}
+	err = f.AssertHasCheck(suiteName, scanName, auditProfileSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

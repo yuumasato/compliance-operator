@@ -8,8 +8,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"regexp"
-	"strings"
 	"testing"
 	"time"
 
@@ -17,9 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -87,27 +83,6 @@ func E2EFatalf(t *testing.T, format string, args ...interface{}) {
 	t.Fatalf(fmt.Sprintf("E2E-FAILURE: %s: %s", time.Now().Format(time.RFC3339), format), args...)
 }
 
-func getObjNameFromTest(t *testing.T) string {
-	fullTestName := t.Name()
-	regexForCapitals := regexp.MustCompile(`[A-Z]`)
-
-	testNameInitIndex := strings.LastIndex(fullTestName, "/") + 1
-
-	// Remove test prefix
-	testName := fullTestName[testNameInitIndex:]
-
-	// convert capitals to lower case letters with hyphens prepended
-	hyphenedTestName := regexForCapitals.ReplaceAllStringFunc(
-		testName,
-		func(currentMatch string) string {
-			return "-" + strings.ToLower(currentMatch)
-		})
-	// remove double hyphens
-	testNameNoDoubleHyphens := strings.ReplaceAll(hyphenedTestName, "--", "-")
-	// Remove leading and trailing hyphens
-	return strings.Trim(testNameNoDoubleHyphens, "-")
-}
-
 // executeTest sets up everything that a e2e test needs to run, and executes the test.
 func executeTests(t *testing.T, tests ...testExecution) {
 	// get global framework variables
@@ -165,36 +140,6 @@ func getCleanupOpts(ctx *framework.Context) *framework.CleanupOptions {
 		Timeout:       cleanupTimeout,
 		RetryInterval: cleanupRetryInterval,
 	}
-}
-
-// waitForProfileBundleStatus will poll until the compliancescan that we're lookingfor reaches a certain status, or until
-// a timeout is reached.
-func waitForProfileBundleStatus(t *testing.T, f *framework.Framework, namespace, name string, targetStatus compv1alpha1.DataStreamStatusType) error {
-	pb := &compv1alpha1.ProfileBundle{}
-	var lastErr error
-	// retry and ignore errors until timeout
-	timeouterr := wait.Poll(retryInterval, timeout, func() (bool, error) {
-		lastErr = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, pb)
-		if lastErr != nil {
-			if apierrors.IsNotFound(lastErr) {
-				E2ELogf(t, "Waiting for availability of %s ProfileBundle\n", name)
-				return false, nil
-			}
-			E2ELogf(t, "Retrying. Got error: %v\n", lastErr)
-			return false, nil
-		}
-
-		if pb.Status.DataStreamStatus == targetStatus {
-			return true, nil
-		}
-		E2ELogf(t, "Waiting for run of %s ProfileBundle (%s)\n", name, pb.Status.DataStreamStatus)
-		return false, nil
-	})
-	if err := processErrorOrTimeout(lastErr, timeouterr, "waiting for ProfileBundle status"); err != nil {
-		return err
-	}
-	E2ELogf(t, "ProfileBundle ready (%s)\n", pb.Status.DataStreamStatus)
-	return nil
 }
 
 // waitForScanStatus will poll until the compliancescan that we're lookingfor reaches a certain status, or until
@@ -416,29 +361,6 @@ func IsMachineConfigPoolConditionPresentAndEqual(conditions []mcfgv1.MachineConf
 		}
 	}
 	return false
-}
-
-func doesRuleExist(f *framework.Framework, namespace, ruleName string) (error, bool) {
-	return doesObjectExist(f, "Rule", namespace, ruleName)
-}
-
-func doesObjectExist(f *framework.Framework, kind, namespace, name string) (error, bool) {
-	obj := unstructured.Unstructured{}
-	obj.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   compv1alpha1.SchemeGroupVersion.Group,
-		Version: compv1alpha1.SchemeGroupVersion.Version,
-		Kind:    kind,
-	})
-
-	key := types.NamespacedName{Namespace: namespace, Name: name}
-	err := f.Client.Get(goctx.TODO(), key, &obj)
-	if apierrors.IsNotFound(err) {
-		return nil, false
-	} else if err == nil {
-		return nil, true
-	}
-
-	return err, false
 }
 
 func writeToArtifactsDir(dir, scan, pod, container, log string) error {
