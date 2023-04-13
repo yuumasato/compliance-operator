@@ -2022,3 +2022,144 @@ func privCommandTuplePodOnHost(namespace, name, nodeName, commandPre string, com
 		},
 	}
 }
+
+func (f *Framework) UpdateSuiteContentImage(newImg, suiteName, suiteNs string) error {
+	var lastErr error
+	timeoutErr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		suite := &compv1alpha1.ComplianceSuite{}
+		// Now update the suite with a different image that contains different remediations
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: suiteName, Namespace: suiteNs}, suite)
+		if lastErr != nil {
+			log.Printf("got error while trying to get suite %s. Retrying... - %s\n", suiteName, lastErr)
+			return false, nil
+		}
+		modSuite := suite.DeepCopy()
+		modSuite.Spec.Scans[0].ContentImage = newImg
+		lastErr = f.Client.Update(context.TODO(), modSuite)
+		if lastErr != nil {
+			log.Printf("got error while trying to update suite %s. Retrying... - %s\n", suiteName, lastErr)
+			return false, nil
+		}
+		return true, nil
+	})
+
+	if timeoutErr != nil {
+		return fmt.Errorf("couldn't update suite's content image. Timed out: %w", timeoutErr)
+	}
+	if lastErr != nil {
+		return fmt.Errorf("couldn't update suite's content image. Errored out: %w", lastErr)
+	}
+	return nil
+}
+
+func (f *Framework) AssertRemediationIsObsolete(namespace, name string) error {
+	err, isObsolete := f.remediationIsObsolete(namespace, name)
+	if err != nil {
+		return err
+	}
+	if !isObsolete {
+		return fmt.Errorf("expected remediation %s to be obsolete", name)
+	}
+	return nil
+}
+
+func (f *Framework) AssertRemediationIsCurrent(namespace, name string) error {
+	err, isObsolete := f.remediationIsObsolete(namespace, name)
+	if err != nil {
+		return err
+	}
+	if isObsolete {
+		return fmt.Errorf("expected remediation %s to be current", name)
+	}
+	return nil
+}
+
+func (f *Framework) remediationIsObsolete(namespace, name string) (error, bool) {
+	rem := &compv1alpha1.ComplianceRemediation{}
+	var lastErr error
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		lastErr := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
+		if lastErr != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if lastErr != nil {
+		return fmt.Errorf("got error trying to get remediation's obsolescence: %w", lastErr), false
+	}
+	if timeouterr != nil {
+		return fmt.Errorf("timed out trying to get remediation's obsolescence: %w", lastErr), false
+	}
+	log.Printf("remediation %s found\n", name)
+
+	if rem.Status.ApplicationState == compv1alpha1.RemediationOutdated && rem.Spec.Outdated.Object != nil {
+		return nil, true
+	}
+
+	return nil, false
+}
+
+func (f *Framework) RemoveObsoleteRemediationAndCheck(namespace, name, renderedMcName, pool string) error {
+	rem := &compv1alpha1.ComplianceRemediation{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
+	if err != nil {
+		return err
+	}
+	log.Printf("remediation %s found", name)
+
+	removeObsoleteContents := func() error {
+		log.Printf("pre-update %v", rem.Status)
+		remCopy := rem.DeepCopy()
+		remCopy.Spec.Apply = true
+		remCopy.Spec.Outdated.Object = nil
+		err = f.Client.Update(context.TODO(), remCopy)
+		if err != nil {
+			return err
+		}
+		log.Println("obsolete data removed")
+
+		rem2 := &compv1alpha1.ComplianceRemediation{}
+		f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem2)
+		log.Printf("post-update %v", rem2.Status)
+
+		return nil
+	}
+
+	// Get the MachineConfigPool before the remediation has been made current
+	// This way, we can check that it changed without race-conditions
+	poolBeforeRemediation := &mcfgv1.MachineConfigPool{}
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: TestPoolName}, poolBeforeRemediation)
+	if err != nil {
+		return err
+	}
+
+	obsoleteMc := &mcfgv1.MachineConfig{}
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: renderedMcName}, obsoleteMc)
+	if err != nil {
+		return err
+	}
+
+	predicate := func(pool *mcfgv1.MachineConfigPool) (bool, error) {
+		// make sure the composite remediation has been re-rendered
+		currentMc := &mcfgv1.MachineConfig{}
+		err = f.Client.Get(context.TODO(), types.NamespacedName{Name: renderedMcName}, currentMc)
+		if err != nil {
+			return false, err
+		}
+
+		if currentMc.Generation == obsoleteMc.Generation {
+			log.Printf("MachineConfig %s still has generation %d, looping", renderedMcName, currentMc.Generation)
+			return false, nil
+		}
+		log.Printf("MachineConfig has been re-rendered from %d to %d", obsoleteMc.Generation, currentMc.Generation)
+		return true, nil
+	}
+
+	err = f.WaitForMachinePoolUpdate(pool, removeObsoleteContents, predicate, poolBeforeRemediation)
+	if err != nil {
+		return fmt.Errorf("failed to wait for pool to update after applying MC: %v", err)
+	}
+
+	fmt.Printf("machines updated with remediation that is no longer obsolete")
+	return nil
+}

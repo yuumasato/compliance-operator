@@ -25,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
-	"github.com/ComplianceAsCode/compliance-operator/pkg/utils"
 	"github.com/ComplianceAsCode/compliance-operator/tests/e2e/framework"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
@@ -352,78 +351,6 @@ func assertHasCheck(f *framework.Framework, suiteName, scanName string, check co
 	return nil
 }
 
-type machineConfigActionFunc func() error
-type poolPredicate func(t *testing.T, pool *mcfgv1.MachineConfigPool) (bool, error)
-
-// waitForMachinePoolUpdate retrieves the original version of a MCP, then performs an
-// action passed in as a parameter and then waits until a MCP passes a predicate
-// If a pool is already given (poolPre), that will be used to check the previous state of the pool.
-func waitForMachinePoolUpdate(t *testing.T, f *framework.Framework, name string, action machineConfigActionFunc, predicate poolPredicate, poolPre *mcfgv1.MachineConfigPool) error {
-	if poolPre == nil {
-		// initialize empty pool if it wasn't already given
-		poolPre = &mcfgv1.MachineConfigPool{}
-		err := f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name}, poolPre)
-		if err != nil {
-			E2EErrorf(t, "Could not find the pool pre update")
-			return err
-		}
-	}
-	E2ELogf(t, "Pre-update, MC Pool %s has generation %d", poolPre.Name, poolPre.Status.ObservedGeneration)
-
-	err := action()
-	if err != nil {
-		E2EErrorf(t, "Action failed %v", err)
-		return err
-	}
-
-	err = wait.PollImmediate(machineOperationRetryInterval, machineOperationTimeout, func() (bool, error) {
-		pool := &mcfgv1.MachineConfigPool{}
-		err := f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name}, pool)
-		if err != nil {
-			// even not found is a hard error here
-			E2EErrorf(t, "Could not find the pool post update")
-			return false, err
-		}
-
-		ok, err := predicate(t, pool)
-		if err != nil {
-			E2EErrorf(t, "Predicate failed %v", err)
-			return false, err
-		}
-
-		if !ok {
-			E2ELogf(t, "Predicate not true yet, waiting")
-			return false, nil
-		}
-
-		E2ELogf(t, "Will check for update, Gen: %d, previous %d updated %d/%d unavailable %d",
-			pool.Status.ObservedGeneration, poolPre.Status.ObservedGeneration,
-			pool.Status.UpdatedMachineCount, pool.Status.MachineCount,
-			pool.Status.UnavailableMachineCount)
-
-		// Check if the pool has finished updating yet. If the pool was paused, we just check that
-		// the generation was increased and wait for machines to reboot separately
-		if (pool.Status.ObservedGeneration != poolPre.Status.ObservedGeneration) &&
-			pool.Spec.Paused == true || ((pool.Status.UpdatedMachineCount == pool.Status.MachineCount) &&
-			(pool.Status.UnavailableMachineCount == 0)) {
-			E2ELogf(t, "The pool has updated")
-			return true, nil
-		}
-
-		E2ELogf(t, "The pool has not updated yet. Gen: %d, expected %d updated %d/%d unavailable %d",
-			pool.Status.ObservedGeneration, poolPre.Status.ObservedGeneration,
-			pool.Status.UpdatedMachineCount, pool.Status.MachineCount,
-			pool.Status.UnavailableMachineCount)
-		return false, nil
-	})
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // waitForNodesToBeReady waits until all the nodes in the cluster have
 // reached the expected machineConfig.
 func waitForNodesToBeReady(t *testing.T, f *framework.Framework, errorMessage string) {
@@ -453,211 +380,6 @@ func waitForNodesToBeReady(t *testing.T, f *framework.Framework, errorMessage st
 	if err != nil {
 		E2EFatalf(t, "%s: %s", errorMessage, err)
 	}
-}
-
-func applyRemediationAndCheck(t *testing.T, f *framework.Framework, namespace, name, pool string) error {
-	rem := &compv1alpha1.ComplianceRemediation{}
-	err := f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
-	if err != nil {
-		return err
-	}
-	E2ELogf(t, "Remediation %s found", name)
-
-	applyRemediation := func() error {
-		rem.Spec.Apply = true
-		err = f.Client.Update(goctx.TODO(), rem)
-		if err != nil {
-			E2EErrorf(t, "Cannot apply remediation")
-			return err
-		}
-		E2ELogf(t, "Remediation applied")
-		return nil
-	}
-
-	predicate := func(t *testing.T, pool *mcfgv1.MachineConfigPool) (bool, error) {
-		// When checking if a MC is applied to a pool, we can't check the pool status
-		// when the pool is paused..
-		source := pool.Status.Configuration.Source
-		if pool.Spec.Paused == true {
-			source = pool.Spec.Configuration.Source
-		}
-
-		for _, mc := range source {
-			if mc.Name == rem.GetMcName() {
-				// When applying a remediation, check that the MC *is* in the pool
-				E2ELogf(t, "Remediation %s present in pool %s, returning true", mc.Name, pool.Name)
-				return true, nil
-			}
-		}
-
-		E2ELogf(t, "Remediation %s not present in pool %s, returning false", rem.GetMcName(), pool.Name)
-		return false, nil
-	}
-
-	err = waitForMachinePoolUpdate(t, f, pool, applyRemediation, predicate, nil)
-	if err != nil {
-		E2EErrorf(t, "Failed to wait for pool to update after applying MC: %v", err)
-		return err
-	}
-
-	E2ELogf(t, "Machines updated with remediation")
-	return nil
-}
-
-func removeObsoleteRemediationAndCheck(t *testing.T, f *framework.Framework, namespace, name, renderedMcName, pool string) error {
-	rem := &compv1alpha1.ComplianceRemediation{}
-	err := f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
-	if err != nil {
-		return err
-	}
-	E2ELogf(t, "Remediation %s found", name)
-
-	removeObsoleteContents := func() error {
-		E2ELogf(t, "pre-update %v", rem.Status)
-		remCopy := rem.DeepCopy()
-		remCopy.Spec.Apply = true
-		remCopy.Spec.Outdated.Object = nil
-		err = f.Client.Update(goctx.TODO(), remCopy)
-		if err != nil {
-			E2EErrorf(t, "Cannot update remediation")
-			return err
-		}
-		E2ELogf(t, "Obsolete data removed")
-
-		rem2 := &compv1alpha1.ComplianceRemediation{}
-		f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem2)
-		E2ELogf(t, "post-update %v", rem2.Status)
-
-		return nil
-	}
-
-	// Get the MachineConfigPool before the remediation has been made current
-	// This way, we can check that it changed without race-conditions
-	poolBeforeRemediation := &mcfgv1.MachineConfigPool{}
-	err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: testPoolName}, poolBeforeRemediation)
-	if err != nil {
-		return err
-	}
-
-	obsoleteMc := &mcfgv1.MachineConfig{}
-	err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: renderedMcName}, obsoleteMc)
-	if err != nil {
-		return err
-	}
-
-	predicate := func(t *testing.T, pool *mcfgv1.MachineConfigPool) (bool, error) {
-		// make sure the composite remediation has been re-rendered
-		currentMc := &mcfgv1.MachineConfig{}
-		err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: renderedMcName}, currentMc)
-		if err != nil {
-			return false, err
-		}
-
-		if currentMc.Generation == obsoleteMc.Generation {
-			E2ELogf(t, "MC %s still has generation %d, looping", renderedMcName, currentMc.Generation)
-			return false, nil
-		}
-		E2ELogf(t, "MC has been re-rendered from %d to %d", obsoleteMc.Generation, currentMc.Generation)
-		return true, nil
-	}
-
-	err = waitForMachinePoolUpdate(t, f, pool, removeObsoleteContents, predicate, poolBeforeRemediation)
-	if err != nil {
-		E2EErrorf(t, "Failed to wait for pool to update after applying MC: %v", err)
-		return err
-	}
-
-	E2ELogf(t, "Machines updated with remediation that is no longer obsolete")
-	return nil
-}
-
-func assertRemediationIsObsolete(t *testing.T, f *framework.Framework, namespace, name string) {
-	err, isObsolete := remediationIsObsolete(t, f, namespace, name)
-	if err != nil {
-		E2EFatalf(t, "%s", err)
-	}
-	if !isObsolete {
-		E2EFatalf(t, "expected that the remediation is obsolete")
-	}
-}
-
-func assertRemediationIsCurrent(t *testing.T, f *framework.Framework, namespace, name string) {
-	err, isObsolete := remediationIsObsolete(t, f, namespace, name)
-	if err != nil {
-		E2EFatalf(t, "%s", err)
-	}
-	if isObsolete {
-		E2EFatalf(t, "expected that the remediation is not obsolete")
-	}
-}
-
-func remediationIsObsolete(t *testing.T, f *framework.Framework, namespace, name string) (error, bool) {
-	rem := &compv1alpha1.ComplianceRemediation{}
-	var lastErr error
-	timeouterr := wait.Poll(retryInterval, timeout, func() (bool, error) {
-		lastErr := f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
-		if lastErr != nil {
-			return false, nil
-		}
-		return true, nil
-	})
-	if lastErr != nil {
-		return fmt.Errorf("Got error trying to get remediation's obsolescence: %w", lastErr), false
-	}
-	if timeouterr != nil {
-		return fmt.Errorf("Timed out trying to get remediation's obsolescence: %w", lastErr), false
-	}
-	E2ELogf(t, "Remediation %s found", name)
-
-	if rem.Status.ApplicationState == compv1alpha1.RemediationOutdated &&
-		rem.Spec.Outdated.Object != nil {
-		return nil, true
-	}
-
-	return nil, false
-}
-
-func unApplyRemediationAndCheck(t *testing.T, f *framework.Framework, namespace, name, pool string) error {
-	rem := &compv1alpha1.ComplianceRemediation{}
-	err := f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
-	if err != nil {
-		return err
-	}
-	E2ELogf(t, "Remediation found")
-
-	applyRemediation := func() error {
-		rem.Spec.Apply = false
-		err = f.Client.Update(goctx.TODO(), rem)
-		if err != nil {
-			E2EErrorf(t, "Cannot apply remediation")
-			return err
-		}
-		E2ELogf(t, "Remediation applied")
-		return nil
-	}
-
-	predicate := func(t *testing.T, pool *mcfgv1.MachineConfigPool) (bool, error) {
-		// We want to check that the MC created by the operator went away. Let's
-		// poll the pool until we no longer see the remediation in the status
-		for _, mc := range pool.Status.Configuration.Source {
-			if mc.Name == rem.GetMcName() {
-				E2ELogf(t, "Remediation %s present in pool %s, returning false", mc.Name, pool.Name)
-				return false, nil
-			}
-		}
-
-		E2ELogf(t, "Remediation %s not present in pool %s, returning true", rem.GetMcName(), pool.Name)
-		return true, nil
-	}
-
-	err = waitForMachinePoolUpdate(t, f, pool, applyRemediation, predicate, nil)
-	if err != nil {
-		E2EErrorf(t, "Failed to wait for pool to update after applying MC: %v", err)
-		return err
-	}
-
-	E2ELogf(t, "Machines updated with remediation")
-	return nil
 }
 
 func waitForGenericRemediationToBeAutoApplied(t *testing.T, f *framework.Framework, remName, remNamespace string) {
@@ -694,10 +416,6 @@ func IsMachineConfigPoolConditionPresentAndEqual(conditions []mcfgv1.MachineConf
 		}
 	}
 	return false
-}
-
-func getPoolNodeRoleSelector() map[string]string {
-	return utils.GetNodeRoleSelector(testPoolName)
 }
 
 func doesRuleExist(f *framework.Framework, namespace, ruleName string) (error, bool) {
@@ -826,35 +544,6 @@ func reRunScan(t *testing.T, f *framework.Framework, scanName, namespace string)
 	}
 
 	E2ELogf(t, "Scan re-launched")
-	return nil
-}
-
-func updateSuiteContentImage(t *testing.T, f *framework.Framework, newImg, suiteName, suiteNs string) error {
-	var lastErr error
-	timeoutErr := wait.Poll(retryInterval, timeout, func() (bool, error) {
-		suite := &compv1alpha1.ComplianceSuite{}
-		// Now update the suite with a different image that contains different remediations
-		lastErr = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: suiteName, Namespace: suiteNs}, suite)
-		if lastErr != nil {
-			E2ELogf(t, "Got error while trying to get suite %s. Retrying... - %s", suiteName, lastErr)
-			return false, nil
-		}
-		modSuite := suite.DeepCopy()
-		modSuite.Spec.Scans[0].ContentImage = newImg
-		lastErr = f.Client.Update(goctx.TODO(), modSuite)
-		if lastErr != nil {
-			E2ELogf(t, "Got error while trying to update suite %s. Retrying... - %s", suiteName, lastErr)
-			return false, nil
-		}
-		return true, nil
-	})
-
-	if timeoutErr != nil {
-		return fmt.Errorf("couldn't update suite's content image. Timed out: %w", timeoutErr)
-	}
-	if lastErr != nil {
-		return fmt.Errorf("couldn't update suite's content image. Errored out: %w", lastErr)
-	}
 	return nil
 }
 

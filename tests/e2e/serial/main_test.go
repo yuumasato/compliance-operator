@@ -912,3 +912,116 @@ func TestPlatformAndNodeSuiteScan(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestUpdateRemediation(t *testing.T) {
+	f := framework.Global
+	origSuiteName := "test-update-remediation"
+	workerScanName := fmt.Sprintf("%s-e2e-scan", origSuiteName)
+
+	var (
+		origImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "rem_mod_base")
+		modImage  = fmt.Sprintf("%s:%s", brokenContentImagePath, "rem_mod_change")
+	)
+
+	origSuite := &compv1alpha1.ComplianceSuite{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      origSuiteName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ComplianceSuiteSpec{
+			ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
+				AutoApplyRemediations: false,
+			},
+			Scans: []compv1alpha1.ComplianceScanSpecWrapper{
+				{
+					ComplianceScanSpec: compv1alpha1.ComplianceScanSpec{
+						ContentImage: origImage,
+						Profile:      "xccdf_org.ssgproject.content_profile_moderate",
+						Rule:         "xccdf_org.ssgproject.content_rule_no_empty_passwords",
+						Content:      framework.RhcosContentFile,
+						NodeSelector: framework.GetPoolNodeRoleSelector(),
+						ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+							Debug: true,
+						},
+					},
+					Name: workerScanName,
+				},
+			},
+		},
+	}
+
+	err := f.Client.Create(context.TODO(), origSuite, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), origSuite)
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, origSuiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	workersNoEmptyPassRemName := fmt.Sprintf("%s-no-empty-passwords", workerScanName)
+	err = f.ApplyRemediationAndCheck(f.OperatorNamespace, workersNoEmptyPassRemName, framework.TestPoolName)
+	if err != nil {
+		log.Printf("WARNING: Got an error while applying remediation '%s': %v", workersNoEmptyPassRemName, err)
+	}
+	log.Printf("remediation %s applied\n", workersNoEmptyPassRemName)
+
+	err = f.WaitForNodesToBeReady()
+	if err != nil {
+		t.Fatalf("failed waiting for nodes to reboot after applying remedation: %s", err)
+	}
+
+	// Now update the suite with a different image that contains different remediations
+	if err := f.UpdateSuiteContentImage(modImage, origSuiteName, f.OperatorNamespace); err != nil {
+		t.Fatal(err)
+	}
+	log.Printf("suite %s updated with a new image\n", origSuiteName)
+
+	err = f.ReRunScan(workerScanName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure that all the scans in the suite have finished and are marked as Done
+	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, origSuiteName, compv1alpha1.PhaseDone, compv1alpha1.ResultCompliant)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = f.AssertRemediationIsObsolete(f.OperatorNamespace, workersNoEmptyPassRemName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log.Printf("will remove obsolete data from remediation\n")
+	renderedMcName := fmt.Sprintf("75-%s", workersNoEmptyPassRemName)
+	err = f.RemoveObsoleteRemediationAndCheck(f.OperatorNamespace, workersNoEmptyPassRemName, renderedMcName, framework.TestPoolName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = f.WaitForNodesToBeReady()
+	if err != nil {
+		t.Fatalf("failed waiting for nodes to reboot after applying MachineConfig: %s", err)
+	}
+
+	// Now the remediation is no longer obsolete
+	err = f.AssertRemediationIsCurrent(f.OperatorNamespace, workersNoEmptyPassRemName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Finally clean up by removing the remediation and waiting for the nodes to reboot one more time
+	err = f.UnApplyRemediationAndCheck(f.OperatorNamespace, workersNoEmptyPassRemName, framework.TestPoolName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = f.WaitForNodesToBeReady()
+	if err != nil {
+		t.Fatalf("failed waiting for nodes to reboot after unapplying MachineConfig: %s", err)
+	}
+}
