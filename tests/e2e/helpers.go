@@ -441,19 +441,6 @@ func doesObjectExist(f *framework.Framework, kind, namespace, name string) (erro
 	return err, false
 }
 
-func getReadyProfileBundle(t *testing.T, f *framework.Framework, name, namespace string) (*compv1alpha1.ProfileBundle, error) {
-	if err := waitForProfileBundleStatus(t, f, namespace, name, compv1alpha1.DataStreamValid); err != nil {
-		return nil, err
-	}
-
-	pb := &compv1alpha1.ProfileBundle{}
-	if err := f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, pb); err != nil {
-		return nil, err
-	}
-
-	return pb, nil
-}
-
 func writeToArtifactsDir(dir, scan, pod, container, log string) error {
 	logPath := path.Join(dir, fmt.Sprintf("%s_%s_%s.log", scan, pod, container))
 	logFile, err := os.Create(logPath)

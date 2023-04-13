@@ -128,7 +128,7 @@ func (f *Framework) SetUp() error {
 
 	retryInterval := time.Second * 5
 	timeout := time.Minute * 30
-	err = f.waitForDeployment("compliance-operator", 1, retryInterval, timeout)
+	err = f.WaitForDeployment("compliance-operator", 1, retryInterval, timeout)
 	if err != nil {
 		return fmt.Errorf("timed out waiting for deployment to become available: %w", err)
 	}

@@ -313,7 +313,7 @@ func (f *Framework) replaceNamespaceFromManifest() error {
 	return nil
 }
 
-func (f *Framework) waitForDeployment(name string, replicas int, retryInterval, timeout time.Duration) error {
+func (f *Framework) WaitForDeployment(name string, replicas int, retryInterval, timeout time.Duration) error {
 	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
 		deployment, err := f.KubeClient.AppsV1().Deployments(f.OperatorNamespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
@@ -397,6 +397,19 @@ func (f *Framework) WaitForProfileBundleStatus(name string, status compv1alpha1.
 	}
 	log.Printf("ProfileBundle ready (%s)\n", pb.Status.DataStreamStatus)
 	return nil
+}
+
+func (f *Framework) GetReadyProfileBundle(name, namespace string) (*compv1alpha1.ProfileBundle, error) {
+	if err := f.WaitForProfileBundleStatus(name, compv1alpha1.DataStreamValid); err != nil {
+		return nil, err
+	}
+
+	pb := &compv1alpha1.ProfileBundle{}
+	if err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, pb); err != nil {
+		return nil, err
+	}
+
+	return pb, nil
 }
 
 func (f *Framework) updateScanSettingsForDebug() error {
