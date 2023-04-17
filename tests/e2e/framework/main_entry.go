@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"testing"
 	"time"
 
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
@@ -38,53 +37,6 @@ func NewFramework() *Framework {
 
 func (f *Framework) CleanUpOnError() bool {
 	return f.cleanupOnError
-}
-
-func MainEntry(m *testing.M) {
-	fopts := &frameworkOpts{}
-	fopts.addToFlagSet(flag.CommandLine)
-	// controller-runtime registers the --kubeconfig flag in client config
-	// package:
-	// https://github.com/kubernetes-sigs/controller-runtime/blob/v0.5.2/pkg/client/config/config.go#L39
-	//
-	// If this flag is not registered, do so. Otherwise retrieve its value.
-	kcFlag := flag.Lookup(KubeConfigFlag)
-	if kcFlag == nil {
-		flag.StringVar(&fopts.kubeconfigPath, KubeConfigFlag, "", "path to kubeconfig")
-	}
-
-	flag.Parse()
-
-	if kcFlag != nil {
-		fopts.kubeconfigPath = kcFlag.Value.String()
-	}
-
-	f, err := newFramework(fopts)
-	if err != nil {
-		log.Fatalf("Failed to create framework: %v", err)
-	}
-
-	Global = f
-
-	// Do suite setup
-	if err := f.SetUp(); err != nil {
-		log.Fatal(err)
-	}
-
-	// Run the tests
-	exitCode, err := f.runM(m)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Do suite teardown only if we have a successful test run or if we don't care
-	// about removing the test resources if the test failed.
-	if exitCode == 0 || (exitCode > 0 && f.cleanupOnError) {
-		if err = f.TearDown(); err != nil {
-			log.Fatal(err)
-		}
-	}
-	os.Exit(exitCode)
 }
 
 func (f *Framework) SetUp() error {
@@ -128,7 +80,7 @@ func (f *Framework) SetUp() error {
 
 	retryInterval := time.Second * 5
 	timeout := time.Minute * 30
-	err = f.waitForDeployment("compliance-operator", 1, retryInterval, timeout)
+	err = f.WaitForDeployment("compliance-operator", 1, retryInterval, timeout)
 	if err != nil {
 		return fmt.Errorf("timed out waiting for deployment to become available: %w", err)
 	}

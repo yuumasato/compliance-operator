@@ -575,16 +575,19 @@ test-benchmark: ## Run the benchmark tests -- Note that this can only be ran for
 	@echo "The pprof files generated are: cpu.prof and mem.prof"
 
 .PHONY: e2e
-e2e: e2e-set-image prep-e2e ## Run full end-to-end tests that exercise content on an operational cluster.
-	@CONTENT_IMAGE=$(E2E_CONTENT_IMAGE_PATH) BROKEN_CONTENT_IMAGE=$(E2E_BROKEN_CONTENT_IMAGE_PATH) $(GO) test ./tests/e2e $(E2E_GO_TEST_FLAGS) -args $(E2E_ARGS) | tee tests/e2e-test.log
+e2e: e2e-set-image prep-e2e e2e-parallel e2e-test-wait e2e-serial ## Run full end-to-end tests that exercise content on an operational cluster.
+
+.PHONY: e2e
+e2e-test-wait:
+	./utils/e2e-test-wait.sh
 
 .PHONY: e2e-parallel
 e2e-parallel: e2e-set-image prep-e2e ## Run non-destructive end-to-end tests concurrently.
 	@CONTENT_IMAGE=$(E2E_CONTENT_IMAGE_PATH) BROKEN_CONTENT_IMAGE=$(E2E_BROKEN_CONTENT_IMAGE_PATH) $(GO) test ./tests/e2e/parallel $(E2E_GO_TEST_FLAGS) -args $(E2E_ARGS) | tee tests/e2e-test.log
 
 .PHONY: e2e-serial
-e2e-serial: ## Run destructive end-to-end tests serially.
-	E2E_TEST_TYPE=serial $(MAKE) e2e
+e2e-serial: e2e-set-image prep-e2e ## Run destructive end-to-end tests serially.
+	@CONTENT_IMAGE=$(E2E_CONTENT_IMAGE_PATH) BROKEN_CONTENT_IMAGE=$(E2E_BROKEN_CONTENT_IMAGE_PATH) $(GO) test ./tests/e2e/serial $(E2E_GO_TEST_FLAGS) -args $(E2E_ARGS) | tee tests/e2e-test.log
 
 .PHONY: prep-e2e
 prep-e2e: kustomize

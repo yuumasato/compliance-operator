@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -312,7 +313,7 @@ func (f *Framework) replaceNamespaceFromManifest() error {
 	return nil
 }
 
-func (f *Framework) waitForDeployment(name string, replicas int, retryInterval, timeout time.Duration) error {
+func (f *Framework) WaitForDeployment(name string, replicas int, retryInterval, timeout time.Duration) error {
 	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
 		deployment, err := f.KubeClient.AppsV1().Deployments(f.OperatorNamespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
@@ -398,6 +399,19 @@ func (f *Framework) WaitForProfileBundleStatus(name string, status compv1alpha1.
 	return nil
 }
 
+func (f *Framework) GetReadyProfileBundle(name, namespace string) (*compv1alpha1.ProfileBundle, error) {
+	if err := f.WaitForProfileBundleStatus(name, compv1alpha1.DataStreamValid); err != nil {
+		return nil, err
+	}
+
+	pb := &compv1alpha1.ProfileBundle{}
+	if err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, pb); err != nil {
+		return nil, err
+	}
+
+	return pb, nil
+}
+
 func (f *Framework) updateScanSettingsForDebug() error {
 	for _, ssName := range []string{"default", "default-auto-apply"} {
 		ss := &compv1alpha1.ScanSetting{}
@@ -430,7 +444,7 @@ func (f *Framework) ensureE2EScanSettings() error {
 			Namespace: f.OperatorNamespace,
 		}
 		ssCopy.Roles = []string{
-			testPoolName,
+			TestPoolName,
 		}
 		ssCopy.Debug = true
 
@@ -1449,5 +1463,751 @@ func (f *Framework) AssertHasCheck(suiteName, scanName string, check compv1alpha
 		return fmt.Errorf("did not find expected status name label %s, found %s", suiteName, getCheck.Labels[compv1alpha1.ComplianceCheckResultStatusLabel])
 	}
 
+	return nil
+}
+
+func (f *Framework) AssertHasRemediations(suiteName, scanName, roleLabel string, remNameList []string) error {
+	var scanSuiteMapNames = make(map[string]bool)
+	var scanSuiteRemediations []compv1alpha1.ComplianceRemediation
+
+	// FIXME: This is a temporary hack. At the moment, the ARF parser is too slow
+	// and it might take a bit for the remediations to appear. It would be cleaner
+	// to signify somehow that the remediations were already processed, but in the
+	// meantime, poll for 5 minutes while the remediations are being created
+	err := wait.PollImmediate(RetryInterval, Timeout, func() (bool, error) {
+		var listErr error
+		scanSuiteRemediations, listErr = f.getRemediationsFromScan(suiteName, scanName)
+		if listErr != nil {
+			log.Printf("failed listing remediations, retrying: %s", listErr)
+		}
+		for idx := range scanSuiteRemediations {
+			rem := &scanSuiteRemediations[idx]
+			scanSuiteMapNames[rem.Name] = true
+		}
+
+		for _, expRem := range remNameList {
+			_, ok := scanSuiteMapNames[expRem]
+			if !ok {
+				log.Printf("expected remediation %s not found, retrying...", expRem)
+				return false, nil
+			}
+		}
+		log.Printf("expected remediations found")
+		return true, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed waiting for remediations to appear: %s", err)
+	}
+	return nil
+}
+
+func (f *Framework) getRemediationsFromScan(suiteName, scanName string) ([]compv1alpha1.ComplianceRemediation, error) {
+	var scanSuiteRemediations compv1alpha1.ComplianceRemediationList
+
+	scanSuiteSelector := make(map[string]string)
+	scanSuiteSelector[compv1alpha1.SuiteLabel] = suiteName
+	scanSuiteSelector[compv1alpha1.ComplianceScanLabel] = scanName
+
+	listOpts := dynclient.ListOptions{
+		LabelSelector: labels.SelectorFromSet(scanSuiteSelector),
+	}
+
+	if err := f.Client.List(context.TODO(), &scanSuiteRemediations, &listOpts); err != nil {
+		return nil, err
+	}
+	return scanSuiteRemediations.Items, nil
+}
+
+func (f *Framework) AssertCheckRemediation(name, namespace string, shouldHaveRem bool) error {
+	var getCheck compv1alpha1.ComplianceCheckResult
+
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, &getCheck)
+	if err != nil {
+		return err
+	}
+
+	_, hasRemLabel := getCheck.Labels[compv1alpha1.ComplianceCheckResultHasRemediation]
+	if hasRemLabel != shouldHaveRem {
+		return fmt.Errorf("unexpected label found: %v (expected: %s)", getCheck.Labels, strconv.FormatBool(shouldHaveRem))
+	}
+
+	// Also make sure a remediation with the same name exists (or not)
+	var getRem compv1alpha1.ComplianceRemediation
+	var hasRem bool
+
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, &getRem)
+	if apierrors.IsNotFound(err) {
+		hasRem = false
+	} else if err != nil {
+		return err
+	} else {
+		hasRem = true
+	}
+
+	if hasRemLabel != shouldHaveRem {
+		return fmt.Errorf("unexpected remediation object: expected: %s, found: %s", strconv.FormatBool(shouldHaveRem), strconv.FormatBool(hasRem))
+	}
+
+	return nil
+}
+
+func (f *Framework) TaintNode(node *core.Node, taint core.Taint) error {
+	taintedNode := node.DeepCopy()
+	if taintedNode.Spec.Taints == nil {
+		taintedNode.Spec.Taints = []core.Taint{}
+	}
+	taintedNode.Spec.Taints = append(taintedNode.Spec.Taints, taint)
+	log.Printf("tainting node: %s", taintedNode.Name)
+	return f.Client.Update(context.TODO(), taintedNode)
+}
+
+func (f *Framework) UntaintNode(nodeName, taintKey string) error {
+	var lastErr error
+
+	timeoutErr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		taintedNode := &core.Node{}
+		nodeKey := types.NamespacedName{Name: nodeName}
+		if err := f.Client.Get(context.TODO(), nodeKey, taintedNode); err != nil {
+			log.Printf("failed to get node: %s", nodeName)
+			return false, nil
+		}
+		untaintedNode := taintedNode.DeepCopy()
+		untaintedNode.Spec.Taints = []core.Taint{}
+		for _, taint := range taintedNode.Spec.Taints {
+			if taint.Key != taintKey {
+				untaintedNode.Spec.Taints = append(untaintedNode.Spec.Taints, taint)
+			}
+		}
+
+		log.Printf("removing taint from node: %s", nodeName)
+		lastErr = f.Client.Update(context.TODO(), untaintedNode)
+		if lastErr != nil {
+			log.Printf("failed to remove taint from node %s... retrying", nodeName)
+			return false, nil
+		}
+		return true, nil
+	})
+
+	if timeoutErr != nil {
+		return fmt.Errorf("couldn't remove node taint. Timed out: %w", timeoutErr)
+	}
+	if lastErr != nil {
+		return fmt.Errorf("couldn't remove node taint. Errored out: %w", lastErr)
+	}
+	return nil
+}
+
+func (f *Framework) WaitForRemediationToBeAutoApplied(remName, remNamespace string, pool *mcfgv1.MachineConfigPool) error {
+	rem := &compv1alpha1.ComplianceRemediation{}
+	var lastErr error
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: remName, Namespace: remNamespace}, rem)
+		if apierrors.IsNotFound(lastErr) {
+			log.Printf("waiting for remediation %s to become available", remName)
+			return false, nil
+		}
+		if lastErr != nil {
+			log.Printf("failed to get remediation, retrying: %s\n", lastErr)
+			return false, nil
+		}
+		log.Printf("found remediation: %s", remName)
+		return true, nil
+	})
+	if lastErr != nil {
+		return fmt.Errorf("failed to get remediation %s: %s", remName, lastErr)
+	}
+	if timeouterr != nil {
+		return fmt.Errorf("timed out getting remediation %s: %s", remName, timeouterr)
+	}
+
+	preNoop := func() error {
+		return nil
+	}
+
+	predicate := func(pool *mcfgv1.MachineConfigPool) (bool, error) {
+		// When checking if a MC is applied to a pool, we can't check the pool status
+		// when the pool is paused..
+		source := pool.Status.Configuration.Source
+		if pool.Spec.Paused == true {
+			source = pool.Spec.Configuration.Source
+		}
+
+		for _, mc := range source {
+			if mc.Name == rem.GetMcName() {
+				// When applying a remediation, check that the MC *is* in the pool
+				log.Printf("Remediation %s present in pool %s, returning true", mc.Name, pool.Name)
+				return true, nil
+			}
+		}
+
+		log.Printf("Remediation %s not present in pool %s, returning false", rem.GetMcName(), pool.Name)
+		return false, nil
+	}
+
+	err := f.WaitForMachinePoolUpdate(pool.Name, preNoop, predicate, pool)
+	if err != nil {
+		return fmt.Errorf("failed waiting for pool to update after applying MC: %v", err)
+	}
+
+	log.Printf("machines updated with remediation")
+	err = f.WaitForNodesToBeReady()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Remediation applied to machines and machines rebooted\n")
+	return nil
+}
+
+type machineConfigActionFunc func() error
+type poolPredicate func(pool *mcfgv1.MachineConfigPool) (bool, error)
+
+// waitForMachinePoolUpdate retrieves the original version of a MCP, then performs an
+// action passed in as a parameter and then waits until a MCP passes a predicate
+// If a pool is already given (poolPre), that will be used to check the previous state of the pool.
+func (f *Framework) WaitForMachinePoolUpdate(name string, action machineConfigActionFunc, predicate poolPredicate, poolPre *mcfgv1.MachineConfigPool) error {
+	if poolPre == nil {
+		// initialize empty pool if it wasn't already given
+		poolPre = &mcfgv1.MachineConfigPool{}
+		err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name}, poolPre)
+		if err != nil {
+			return fmt.Errorf("could not find pool before update: %s", err)
+		}
+	}
+	log.Printf("Pre-update, MC Pool %s has generation %d\n", poolPre.Name, poolPre.Status.ObservedGeneration)
+
+	err := action()
+	if err != nil {
+		return fmt.Errorf("action failed: %s", err)
+	}
+
+	err = wait.PollImmediate(machineOperationRetryInterval, machineOperationTimeout, func() (bool, error) {
+		pool := &mcfgv1.MachineConfigPool{}
+		err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name}, pool)
+		if err != nil {
+			// even not found is a hard error here
+			log.Printf("could not find the pool after update: %s\n", err)
+			return false, err
+		}
+
+		ok, err := predicate(pool)
+		if err != nil {
+			log.Printf("predicate failed %s", err)
+			return false, err
+		}
+
+		if !ok {
+			log.Printf("predicate not true yet, waiting")
+			return false, nil
+		}
+
+		log.Printf("will check for update, Gen: %d, previous %d updated %d/%d unavailable %d",
+			pool.Status.ObservedGeneration, poolPre.Status.ObservedGeneration,
+			pool.Status.UpdatedMachineCount, pool.Status.MachineCount,
+			pool.Status.UnavailableMachineCount)
+
+		// Check if the pool has finished updating yet. If the pool was paused, we just check that
+		// the generation was increased and wait for machines to reboot separately
+		if (pool.Status.ObservedGeneration != poolPre.Status.ObservedGeneration) &&
+			pool.Spec.Paused == true || ((pool.Status.UpdatedMachineCount == pool.Status.MachineCount) &&
+			(pool.Status.UnavailableMachineCount == 0)) {
+			log.Printf("pool updated successfully")
+			return true, nil
+		}
+
+		log.Printf("pool has not updated yet. Gen: %d, expected %d updated %d/%d unavailable %d",
+			pool.Status.ObservedGeneration, poolPre.Status.ObservedGeneration,
+			pool.Status.UpdatedMachineCount, pool.Status.MachineCount,
+			pool.Status.UnavailableMachineCount)
+		return false, nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// waitForNodesToBeReady waits until all the nodes in the cluster have
+// reached the expected machineConfig.
+func (f *Framework) WaitForNodesToBeReady() error {
+	err := wait.PollImmediate(machineOperationRetryInterval, machineOperationTimeout, func() (bool, error) {
+		var nodes core.NodeList
+
+		f.Client.List(context.TODO(), &nodes, &dynclient.ListOptions{})
+		for _, node := range nodes.Items {
+			log.Printf("node %s has config %s, desired config %s state %s\n",
+				node.Name,
+				node.Annotations["machineconfiguration.openshift.io/currentConfig"],
+				node.Annotations["machineconfiguration.openshift.io/desiredConfig"],
+				node.Annotations["machineconfiguration.openshift.io/state"])
+
+			if (node.Annotations["machineconfiguration.openshift.io/currentConfig"] != node.Annotations["machineconfiguration.openshift.io/desiredConfig"]) ||
+				(node.Annotations["machineconfiguration.openshift.io/state"] != "Done") {
+				log.Printf("node %s still updating", node.Name)
+				return false, nil
+			}
+			log.Printf("node %s was updated", node.Name)
+		}
+
+		log.Printf("all machines updated")
+		return true, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed waiting for nodes to be ready: %s", err)
+	}
+	return nil
+}
+
+func (f *Framework) ReRunScan(scanName, namespace string) error {
+	scanKey := types.NamespacedName{Name: scanName, Namespace: namespace}
+	err := backoff.Retry(func() error {
+		foundScan := &compv1alpha1.ComplianceScan{}
+		geterr := f.Client.Get(context.TODO(), scanKey, foundScan)
+		if geterr != nil {
+			return geterr
+		}
+
+		scapCopy := foundScan.DeepCopy()
+		if scapCopy.Annotations == nil {
+			scapCopy.Annotations = make(map[string]string)
+		}
+		scapCopy.Annotations[compv1alpha1.ComplianceScanRescanAnnotation] = ""
+		return f.Client.Update(context.TODO(), scapCopy)
+	}, defaultBackoff)
+
+	if err != nil {
+		return fmt.Errorf("failed to annotate scan %s for rerun: %w", scanName, err)
+	}
+
+	log.Printf("rerunning scan %s", scanName)
+	return nil
+}
+
+func (f *Framework) PauseMachinePool(poolName string) error {
+	return f.modMachinePoolPause(poolName, true)
+}
+
+func (f *Framework) ResumeMachinePool(poolName string) error {
+	return f.modMachinePoolPause(poolName, false)
+}
+
+func (f *Framework) modMachinePoolPause(poolName string, pause bool) error {
+	pool := &mcfgv1.MachineConfigPool{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: poolName}, pool)
+	if err != nil {
+		return fmt.Errorf("could not find pool to modify: %s", err)
+	}
+
+	poolCopy := pool.DeepCopy()
+	poolCopy.Spec.Paused = pause
+	err = f.Client.Update(context.TODO(), poolCopy)
+	if err != nil {
+		return fmt.Errorf("failed to update pool: %s", err)
+	}
+
+	return nil
+}
+
+func (f *Framework) ApplyRemediationAndCheck(namespace, name, pool string) error {
+	rem := &compv1alpha1.ComplianceRemediation{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
+	if err != nil {
+		return err
+	}
+	log.Printf("remediation %s found\n", name)
+
+	applyRemediation := func() error {
+		rem.Spec.Apply = true
+		err = f.Client.Update(context.TODO(), rem)
+		if err != nil {
+			return fmt.Errorf("failed to apply remediation: %s", err)
+		}
+		log.Printf("applied remediation %s\n", name)
+		return nil
+	}
+
+	predicate := func(pool *mcfgv1.MachineConfigPool) (bool, error) {
+		// When checking if a MC is applied to a pool, we can't check the pool status
+		// when the pool is paused..
+		source := pool.Status.Configuration.Source
+		if pool.Spec.Paused == true {
+			source = pool.Spec.Configuration.Source
+		}
+
+		for _, mc := range source {
+			if mc.Name == rem.GetMcName() {
+				// When applying a remediation, check that the MC *is* in the pool
+				log.Printf("remediation %s present in pool %s, returning true\n", mc.Name, pool.Name)
+				return true, nil
+			}
+		}
+
+		log.Printf("remediation %s not present in pool %s, returning false\n", rem.GetMcName(), pool.Name)
+		return false, nil
+	}
+
+	err = f.WaitForMachinePoolUpdate(pool, applyRemediation, predicate, nil)
+	if err != nil {
+		return fmt.Errorf("failed to wait for pool to update after applying MC: %v", err)
+	}
+
+	log.Printf("machines updated with remediation")
+	return nil
+}
+
+func (f *Framework) UnApplyRemediationAndCheck(namespace, name, pool string) error {
+	rem := &compv1alpha1.ComplianceRemediation{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
+	if err != nil {
+		return err
+	}
+	log.Printf("remediation found\n")
+
+	applyRemediation := func() error {
+		rem.Spec.Apply = false
+		err = f.Client.Update(context.TODO(), rem)
+		if err != nil {
+			return fmt.Errorf("cannot apply remediation: %s", err)
+		}
+		log.Printf("remediation applied\n")
+		return nil
+	}
+
+	predicate := func(pool *mcfgv1.MachineConfigPool) (bool, error) {
+		// We want to check that the MC created by the operator went away. Let's
+		// poll the pool until we no longer see the remediation in the status
+		for _, mc := range pool.Status.Configuration.Source {
+			if mc.Name == rem.GetMcName() {
+				log.Printf("remediation %s present in pool %s, returning false\n", mc.Name, pool.Name)
+				return false, nil
+			}
+		}
+
+		log.Printf("Remediation %s not present in pool %s, returning true\n", rem.GetMcName(), pool.Name)
+		return true, nil
+	}
+
+	err = f.WaitForMachinePoolUpdate(pool, applyRemediation, predicate, nil)
+	if err != nil {
+		return fmt.Errorf("failed to wait for pool to update after applying MachineConfig: %v", err)
+	}
+
+	log.Printf("machines updated with remediation\n")
+	return nil
+}
+
+func (f *Framework) runPod(namespace string, podToRun *core.Pod) (*core.Pod, error) {
+	pod, err := f.KubeClient.CoreV1().Pods(namespace).Create(context.TODO(), podToRun, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := waitForPod(initContainerCompleted(f.KubeClient, pod.Name, namespace)); err != nil {
+		return nil, err
+	}
+
+	return pod, nil
+}
+
+func waitForPod(podCallback wait.ConditionFunc) error {
+	return wait.PollImmediate(RetryInterval, Timeout, podCallback)
+}
+
+func initContainerCompleted(c kubernetes.Interface, name, namespace string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		if apierrors.IsNotFound(err) {
+			log.Printf("pod %s not found yet\n", name)
+			return false, nil
+		}
+
+		for _, initStatus := range pod.Status.InitContainerStatuses {
+			// the init container must have passed the readiness probe
+			if initStatus.Ready == false {
+				log.Println("init container not ready yet")
+				return false, nil
+			}
+
+			// the init container must have terminated
+			if initStatus.State.Terminated == nil {
+				log.Println("init container terminated")
+				return false, nil
+			}
+
+			if initStatus.State.Terminated.ExitCode != 0 {
+				return true, errors.New("the init container failed")
+			} else {
+				fmt.Printf("init container in pod %s has finished\n", name)
+				return true, nil
+			}
+		}
+
+		fmt.Printf("init container in pod %s not finished yet\n", name)
+		return false, nil
+	}
+}
+
+// createAndRemoveEtcSecurettyOnNode creates a pod that creates the file /etc/securetty on node, returns the pod
+// object for the caller to delete at which point the pod, before exiting, removes the file
+func (f *Framework) CreateAndRemoveEtcSecurettyOnNode(namespace, name, nodeName string) (*core.Pod, error) {
+	return f.runPod(namespace, createAndRemoveEtcSecurettyPod(namespace, name, nodeName))
+}
+
+func createAndRemoveEtcSecurettyPod(namespace, name, nodeName string) *core.Pod {
+	return privCommandTuplePodOnHost(namespace, name, nodeName, "touch /hostroot/etc/securetty", []string{"rm", "-f", "/hostroot/etc/securetty"})
+}
+
+// privCommandTuplePodOnHost returns a pod that calls commandPre in an init container, then sleeps for an hour
+// and registers commandPost to be run in a PreStop handler.
+func privCommandTuplePodOnHost(namespace, name, nodeName, commandPre string, commandPost []string) *core.Pod {
+	runAs := int64(0)
+	priv := true
+
+	return &core.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: core.PodSpec{
+			InitContainers: []core.Container{
+				{
+					Name:    name + "-init",
+					Image:   "busybox",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", commandPre},
+					VolumeMounts: []core.VolumeMount{
+						{
+							Name:      "hostroot",
+							MountPath: "/hostroot",
+						},
+					},
+					SecurityContext: &core.SecurityContext{
+						Privileged: &priv,
+						RunAsUser:  &runAs,
+					},
+				},
+			},
+			Containers: []core.Container{
+				{
+					Name:    name,
+					Image:   "busybox",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "sleep 3600"},
+					VolumeMounts: []core.VolumeMount{
+						{
+							Name:      "hostroot",
+							MountPath: "/hostroot",
+						},
+					},
+					SecurityContext: &core.SecurityContext{
+						Privileged: &priv,
+						RunAsUser:  &runAs,
+					},
+					Lifecycle: &core.Lifecycle{
+						PreStop: &core.LifecycleHandler{
+							Exec: &core.ExecAction{Command: commandPost},
+						},
+					},
+				},
+			},
+			Volumes: []core.Volume{
+				{
+					Name: "hostroot",
+					VolumeSource: core.VolumeSource{
+						HostPath: &core.HostPathVolumeSource{
+							Path: "/",
+						},
+					},
+				},
+			},
+			RestartPolicy: "Never",
+			NodeSelector: map[string]string{
+				core.LabelHostname: nodeName,
+			},
+			ServiceAccountName: "resultscollector",
+		},
+	}
+}
+
+func (f *Framework) UpdateSuiteContentImage(newImg, suiteName, suiteNs string) error {
+	var lastErr error
+	timeoutErr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		suite := &compv1alpha1.ComplianceSuite{}
+		// Now update the suite with a different image that contains different remediations
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: suiteName, Namespace: suiteNs}, suite)
+		if lastErr != nil {
+			log.Printf("got error while trying to get suite %s. Retrying... - %s\n", suiteName, lastErr)
+			return false, nil
+		}
+		modSuite := suite.DeepCopy()
+		modSuite.Spec.Scans[0].ContentImage = newImg
+		lastErr = f.Client.Update(context.TODO(), modSuite)
+		if lastErr != nil {
+			log.Printf("got error while trying to update suite %s. Retrying... - %s\n", suiteName, lastErr)
+			return false, nil
+		}
+		return true, nil
+	})
+
+	if timeoutErr != nil {
+		return fmt.Errorf("couldn't update suite's content image. Timed out: %w", timeoutErr)
+	}
+	if lastErr != nil {
+		return fmt.Errorf("couldn't update suite's content image. Errored out: %w", lastErr)
+	}
+	return nil
+}
+
+func (f *Framework) AssertRemediationIsObsolete(namespace, name string) error {
+	err, isObsolete := f.remediationIsObsolete(namespace, name)
+	if err != nil {
+		return err
+	}
+	if !isObsolete {
+		return fmt.Errorf("expected remediation %s to be obsolete", name)
+	}
+	return nil
+}
+
+func (f *Framework) AssertRemediationIsCurrent(namespace, name string) error {
+	err, isObsolete := f.remediationIsObsolete(namespace, name)
+	if err != nil {
+		return err
+	}
+	if isObsolete {
+		return fmt.Errorf("expected remediation %s to be current", name)
+	}
+	return nil
+}
+
+func (f *Framework) remediationIsObsolete(namespace, name string) (error, bool) {
+	rem := &compv1alpha1.ComplianceRemediation{}
+	var lastErr error
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		lastErr := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
+		if lastErr != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if lastErr != nil {
+		return fmt.Errorf("got error trying to get remediation's obsolescence: %w", lastErr), false
+	}
+	if timeouterr != nil {
+		return fmt.Errorf("timed out trying to get remediation's obsolescence: %w", lastErr), false
+	}
+	log.Printf("remediation %s found\n", name)
+
+	if rem.Status.ApplicationState == compv1alpha1.RemediationOutdated && rem.Spec.Outdated.Object != nil {
+		return nil, true
+	}
+
+	return nil, false
+}
+
+func (f *Framework) RemoveObsoleteRemediationAndCheck(namespace, name, renderedMcName, pool string) error {
+	rem := &compv1alpha1.ComplianceRemediation{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem)
+	if err != nil {
+		return err
+	}
+	log.Printf("remediation %s found", name)
+
+	removeObsoleteContents := func() error {
+		log.Printf("pre-update %v", rem.Status)
+		remCopy := rem.DeepCopy()
+		remCopy.Spec.Apply = true
+		remCopy.Spec.Outdated.Object = nil
+		err = f.Client.Update(context.TODO(), remCopy)
+		if err != nil {
+			return err
+		}
+		log.Println("obsolete data removed")
+
+		rem2 := &compv1alpha1.ComplianceRemediation{}
+		f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, rem2)
+		log.Printf("post-update %v", rem2.Status)
+
+		return nil
+	}
+
+	// Get the MachineConfigPool before the remediation has been made current
+	// This way, we can check that it changed without race-conditions
+	poolBeforeRemediation := &mcfgv1.MachineConfigPool{}
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: TestPoolName}, poolBeforeRemediation)
+	if err != nil {
+		return err
+	}
+
+	obsoleteMc := &mcfgv1.MachineConfig{}
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: renderedMcName}, obsoleteMc)
+	if err != nil {
+		return err
+	}
+
+	predicate := func(pool *mcfgv1.MachineConfigPool) (bool, error) {
+		// make sure the composite remediation has been re-rendered
+		currentMc := &mcfgv1.MachineConfig{}
+		err = f.Client.Get(context.TODO(), types.NamespacedName{Name: renderedMcName}, currentMc)
+		if err != nil {
+			return false, err
+		}
+
+		if currentMc.Generation == obsoleteMc.Generation {
+			log.Printf("MachineConfig %s still has generation %d, looping", renderedMcName, currentMc.Generation)
+			return false, nil
+		}
+		log.Printf("MachineConfig has been re-rendered from %d to %d", obsoleteMc.Generation, currentMc.Generation)
+		return true, nil
+	}
+
+	err = f.WaitForMachinePoolUpdate(pool, removeObsoleteContents, predicate, poolBeforeRemediation)
+	if err != nil {
+		return fmt.Errorf("failed to wait for pool to update after applying MC: %v", err)
+	}
+
+	fmt.Printf("machines updated with remediation that is no longer obsolete")
+	return nil
+}
+
+func (f *Framework) WaitForGenericRemediationToBeAutoApplied(remName, remNamespace string) error {
+	rem := &compv1alpha1.ComplianceRemediation{}
+	var lastErr error
+	timeouterr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: remName, Namespace: remNamespace}, rem)
+		if apierrors.IsNotFound(lastErr) {
+			log.Printf("waiting for availability of %s remediation\n", remName)
+			return false, nil
+		}
+		if lastErr != nil {
+			log.Printf("retrying. Got error: %v\n", lastErr)
+			return false, nil
+		}
+		log.Printf("found remediation: %s\n", remName)
+		if rem.Status.ApplicationState == compv1alpha1.RemediationNotApplied || rem.Status.ApplicationState == compv1alpha1.RemediationPending {
+			log.Printf("retrying. remediation not yet applied. Remediation Name: %s, ApplicationState: %s\n", remName, rem.Status.ApplicationState)
+		}
+		// wait for the remediation to get applied
+		time.Sleep(5 * time.Second)
+		return true, nil
+	})
+	if lastErr != nil {
+		return fmt.Errorf("failed getting remediation before it was applied: %s", lastErr)
+	}
+	if timeouterr != nil {
+		return fmt.Errorf("timed out waiting for remediation to be applied: %s", timeouterr)
+	}
+	log.Printf("machines updated with remediation")
+	err := f.WaitForNodesToBeReady()
+	if err != nil {
+		return err
+	}
 	return nil
 }

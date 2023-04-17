@@ -1,23 +1,18 @@
 package framework
 
 import (
-	"bytes"
 	goctx "context"
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/pborman/uuid"
-	log "github.com/sirupsen/logrus"
 	extscheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -26,7 +21,6 @@ import (
 	cgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
-	"k8s.io/client-go/tools/clientcmd"
 	dynclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -230,69 +224,4 @@ func (f *Framework) addToScheme(addToScheme addToSchemeFunc, obj dynclient.Objec
 	return nil
 }
 
-func (f *Framework) runM(m *testing.M) (int, error) {
-	if !f.LocalOperator {
-		return m.Run(), nil
-	}
 
-	// start local operator before running tests
-	outBuf := &bytes.Buffer{}
-	localCmd, err := f.setupLocalCommand()
-	if err != nil {
-		return 0, fmt.Errorf("failed to setup local command: %w", err)
-	}
-	localCmd.Stdout = outBuf
-	localCmd.Stderr = outBuf
-
-	err = localCmd.Start()
-	if err != nil {
-		return 0, fmt.Errorf("failed to run operator locally: %w", err)
-	}
-	log.Info("Started local operator")
-
-	// run the tests
-	exitCode := m.Run()
-
-	// kill the local operator and print its logs
-	err = localCmd.Process.Kill()
-	if err != nil {
-		log.Warn("Failed to stop local operator process")
-	}
-	fmt.Printf("\n------ Local operator output ------\n%s\n", outBuf.String())
-	return exitCode, nil
-}
-
-func (f *Framework) setupLocalCommand() (*exec.Cmd, error) {
-	projectName := filepath.Base(MustGetwd())
-	outputBinName := filepath.Join(BuildBinDir, projectName+"-local")
-	opts := GoCmdOptions{
-		BinName:     outputBinName,
-		PackagePath: filepath.Join(GetGoPkg(), filepath.ToSlash(ManagerDir)),
-	}
-	if err := GoBuild(opts); err != nil {
-		return nil, fmt.Errorf("failed to build local operator binary: %w", err)
-	}
-
-	args := []string{}
-	if f.localOperatorArgs != "" {
-		args = append(args, strings.Split(f.localOperatorArgs, " ")...)
-	}
-
-	localCmd := exec.Command(outputBinName, args...)
-
-	if f.kubeconfigPath != "" {
-		localCmd.Env = append(os.Environ(), fmt.Sprintf("%v=%v", KubeConfigEnvVar, f.kubeconfigPath))
-	} else {
-		// we can hardcode index 0 as that is the highest priority kubeconfig to be loaded and will always
-		// be populated by NewDefaultClientConfigLoadingRules()
-		localCmd.Env = append(os.Environ(), fmt.Sprintf("%v=%v", KubeConfigEnvVar,
-			clientcmd.NewDefaultClientConfigLoadingRules().Precedence[0]))
-	}
-	watchNamespace := f.OperatorNamespace
-	ns, ok := os.LookupEnv(TestWatchNamespaceEnv)
-	if ok {
-		watchNamespace = ns
-	}
-	localCmd.Env = append(localCmd.Env, fmt.Sprintf("%v=%v", WatchNamespaceEnvVar, watchNamespace))
-	return localCmd, nil
-}

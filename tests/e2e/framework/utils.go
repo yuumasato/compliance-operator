@@ -365,3 +365,7 @@ func getTestMetricsCMD(namespace string) string {
 	var curlCMD = "curl -ks -H \"Authorization: Bearer `cat /var/run/secrets/kubernetes.io/serviceaccount/token`\" "
 	return curlCMD + fmt.Sprintf("https://metrics.%s.svc:8585/metrics-co", namespace)
 }
+
+func GetPoolNodeRoleSelector() map[string]string {
+	return utils.GetNodeRoleSelector(TestPoolName)
+}
