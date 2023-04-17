@@ -13,7 +13,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
--
+- The operator now parses links from the compliance content and renders it in
+  custom resources accordingly.
 
 ### Internal Changes
 
