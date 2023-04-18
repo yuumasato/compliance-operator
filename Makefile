@@ -427,6 +427,10 @@ build: generate fmt vet test-unit ## Build the operator binary.
 .PHONY: manager
 manager: build  ## Alias for make build.
 
+.PHONY: verify-bundle
+verify-bundle: bundle ## Verify the bundle doesn't alter the state of the tree
+	hack/tree-status
+
 .PHONY: bundle
 bundle: check-operator-version operator-sdk manifests update-skip-range kustomize ## Generate bundle manifests and metadata, then validate generated files.
 	$(SDK_BIN) generate kustomize manifests --apis-dir=./pkg/apis -q
