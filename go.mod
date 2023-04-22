@@ -18,7 +18,7 @@ require (
 	github.com/antchfx/xmlquery v1.3.15
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0
-	github.com/cenkalti/backoff/v4 v4.2.0
+	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/clarketm/json v1.17.1
 	github.com/coreos/ignition/v2 v2.15.0
