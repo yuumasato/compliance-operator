@@ -21,7 +21,7 @@ jobs:
       name: compliance-operator-bundle
       registry_org: complianceascode
       tag: latest
-      dockerfile_path: bundle-latest.Dockerfile
+      dockerfile_path: bundle.Dockerfile
       vendor: 'Compliance Operator Authors'
   
   openscap-container-push-latest:

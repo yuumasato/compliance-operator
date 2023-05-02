@@ -1224,12 +1224,12 @@ spec:
                     fieldRef:
                       fieldPath: metadata.name
                 - name: RELATED_IMAGE_OPENSCAP
-                  value: quay.io/compliance-operator/openscap-ocp:latest
+                  value: ghcr.io/complianceascode/openscap-ocp:latest
                 - name: RELATED_IMAGE_OPERATOR
-                  value: quay.io/compliance-operator/compliance-operator:0.1.53
+                  value: ghcr.io/complianceascode/compliance-operator:latest
                 - name: RELATED_IMAGE_PROFILE
                   value: ghcr.io/complianceascode/k8scontent:latest
-                image: quay.io/compliance-operator/compliance-operator:0.1.53
+                image: ghcr.io/complianceascode/compliance-operator:latest
                 imagePullPolicy: Always
                 name: compliance-operator
                 resources:
