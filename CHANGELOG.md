@@ -13,7 +13,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
--
+- Optimize how we check the KubeletConfig rule, we now store the runtime KubeletConfig
+  in a ConfigMap per node when a node scan is launched. Then, we mount the ConfigMap to
+  the scanner pod to scan for it. Hold on to applying remediation until all scans are 
+  done in the suite.
+  This fixes issues when comparing the KubeletConfig for each node.
+  This also fixes "/api/v1/nodes/NODE_NAME/proxy/configz" warning message in the log.
+  [OCPBUGS-11037](https://issues.redhat.com/browse/OCPBUGS-11037)
 
 ### Internal Changes
 
@@ -25,7 +31,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removals
 
--
+- We have reverted commit 9cbf874, which is a fix for OCPBUGS-3864, the fix
+  is not needed anymore since the issue is fixed when we switched back to
+  the old way remediate the KubeletConfig.
 
 ### Security
 

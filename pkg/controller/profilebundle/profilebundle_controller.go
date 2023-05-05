@@ -2,8 +2,9 @@ package profilebundle
 
 import (
 	"context"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"time"
+
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/metrics"
 
@@ -27,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -45,7 +47,7 @@ func (r *ReconcileProfileBundle) SetupWithManager(mgr ctrl.Manager) error {
 
 // Add creates a new ProfileBundle Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager, met *metrics.Metrics, si utils.CtlplaneSchedulingInfo) error {
+func Add(mgr manager.Manager, met *metrics.Metrics, si utils.CtlplaneSchedulingInfo, _ *kubernetes.Clientset) error {
 	return add(mgr, newReconciler(mgr, met, si))
 }
 

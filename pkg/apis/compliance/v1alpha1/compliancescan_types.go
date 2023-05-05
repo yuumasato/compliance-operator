@@ -29,6 +29,9 @@ const ComplianceScanLabel = "compliance.openshift.io/scan-name"
 // ScriptLabel defines that the object is a script for a scan object
 const ScriptLabel = "complianceoperator.openshift.io/scan-script"
 
+// KubeletConfigLabel defines that the object is a fetched KubeletConfig for a scan object
+const KubeletConfigLabel = "complianceoperator.openshift.io/scan-kubeletconfig"
+
 // ResultLabel defines that the object is a result of a scan
 const ResultLabel = "complianceoperator.openshift.io/scan-result"
 
