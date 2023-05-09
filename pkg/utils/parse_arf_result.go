@@ -77,9 +77,10 @@ type ParseResult struct {
 }
 
 type ResourcePath struct {
-	ObjPath  string
-	DumpPath string
-	Filter   string
+	ObjPath         string
+	DumpPath        string
+	Filter          string
+	SuppressWarning bool
 }
 
 // getPathsFromRuleWarning finds the API endpoint from in. The expected structure is:
@@ -117,7 +118,7 @@ func GetPathFromWarningXML(in *xmlquery.Node, valuesList map[string]string) ([]R
 					dumpPath, _, err = RenderValues(XmlNodeAsMarkdown(dumpNode), valuesList)
 				}
 			}
-			apiPaths = append(apiPaths, ResourcePath{ObjPath: path, DumpPath: dumpPath, Filter: filter})
+			apiPaths = append(apiPaths, ResourcePath{ObjPath: path, DumpPath: dumpPath, Filter: filter, SuppressWarning: warningHasSuppressTag(in)})
 		}
 	}
 	if len(errMsgs) > 0 {
@@ -144,6 +145,18 @@ func warningHasHideTag(in *xmlquery.Node) bool {
 
 	for _, codeNode := range codeNodes {
 		if codeNode.SelectAttr("class") == hideTag {
+			return true
+		}
+	}
+
+	return false
+}
+
+func warningHasSuppressTag(in *xmlquery.Node) bool {
+	codeNodes := in.SelectElements("//html:code")
+
+	for _, codeNode := range codeNodes {
+		if codeNode.SelectAttr("class") == "ocp-suppress-warning" {
 			return true
 		}
 	}
