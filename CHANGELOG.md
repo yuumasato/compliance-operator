@@ -16,6 +16,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - The operator now parses links from the compliance content and renders it in
   custom resources accordingly.
 
+- The operator have the ability to hide warnings for certain failed to fetched
+  resources, this is useful when the user does not want to see the warnings
+  for certain resources, for example, the user does not want to see the
+  warnings for rules that used to detect HyperShift.
+
 ### Internal Changes
 
 -

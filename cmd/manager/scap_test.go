@@ -168,6 +168,37 @@ var _ = Describe("Testing SCAP parsing and storage", func() {
 
 			dataStreamFile.Close()
 		})
+
+		Context("Parsing SCAP Content with suppressed warning", func() {
+			var dataStreamFile *os.File
+			var contentDS *xmlquery.Node
+
+			BeforeEach(func() {
+				var err error
+				dataStreamFile, err = os.Open("../../tests/data/ssg-ocp4-ds-suppressed.xml")
+				Expect(err).To(BeNil())
+			})
+			AfterEach(func() {
+				dataStreamFile.Close()
+			})
+
+			It("Gets the appropriate resource URIs", func() {
+				By("parsing content without errors")
+				var err error
+				contentDS, err = parseContent(dataStreamFile)
+				Expect(err).To(BeNil())
+
+				By("parsing content for warnings")
+				expectedItem := utils.ResourcePath{
+					ObjPath:         "/apis/hypershift.openshift.io/v1beta1/namespaces/clusters/hostedclusters/None",
+					DumpPath:        "/hypershift/version",
+					Filter:          "[.status.version.history[].version]",
+					SuppressWarning: true,
+				}
+				got, _ := getResourcePaths(contentDS, contentDS, "xccdf_org.ssgproject.content_profile_cis", nil)
+				Expect(got).To(ContainElement(expectedItem))
+			})
+		})
 	})
 
 	Context("Parses the save path appropriately", func() {
@@ -325,6 +356,24 @@ var _ = Describe("Testing fetching", func() {
 			Expect(string(files["key"])).To(Equal("# kube-api-error=NotFound"))
 			Expect(warnings).To(HaveLen(1))
 			Expect(warnings[0]).To(Equal("could not fetch : some resource.some group \"some name\" not found"))
+		})
+	})
+
+	Context("handle fetch failures with suppressed warning", func() {
+		It("fetches and discard 404s", func() {
+			fakeDispatcher := func(uri string) resourceStreamer {
+				return &notFoundFetcher{}
+			}
+
+			files, warnings, err := fetch(context.TODO(),
+				fakeDispatcher,
+				resourceFetcherClients{},
+				[]utils.ResourcePath{{DumpPath: "key", SuppressWarning: true}})
+
+			Expect(err).To(BeNil())
+			Expect(files).To(HaveLen(1))
+			Expect(string(files["key"])).To(Equal("# kube-api-error=NotFound"))
+			Expect(warnings).To(HaveLen(0))
 		})
 	})
 	Context("handle Machine Config fetching", func() {

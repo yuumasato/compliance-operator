@@ -553,7 +553,9 @@ func fetch(ctx context.Context, streamDispatcher streamerDispatcherFn, rfClients
 			if meta.IsNoMatchError(err) || kerrors.IsForbidden(err) || kerrors.IsNotFound(err) {
 				DBG("Encountered non-fatal error to be persisted in the scan: %s", err)
 				objerr := fmt.Errorf("could not fetch %s: %w", uri, err)
-				warnings = append(warnings, objerr.Error())
+				if !rpath.SuppressWarning {
+					warnings = append(warnings, objerr.Error())
+				}
 				// for 404s we'll add a warning comment in the object so openSCAP can read and process it
 				if kerrors.IsNotFound(err) {
 					results[rpath.DumpPath] = []byte("# kube-api-error=" + kerrors.ReasonForError(err))
