@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -215,6 +216,7 @@ func (r *ReconcileComplianceScan) validate(instance *compv1alpha1.ComplianceScan
 			instanceCopy.Status.RemainingRetries = instance.Spec.MaxRetryOnTimeout
 		}
 		instanceCopy.Status.Phase = compv1alpha1.PhasePending
+		instanceCopy.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 		instanceCopy.Status.SetConditionPending()
 		updateErr := r.Client.Status().Update(context.TODO(), instanceCopy)
 		if updateErr != nil {
@@ -240,6 +242,7 @@ func (r *ReconcileComplianceScan) validate(instance *compv1alpha1.ComplianceScan
 		instanceCopy.Status.Result = compv1alpha1.ResultError
 		instanceCopy.Status.ErrorMessage = fmt.Sprintf("Scan type '%s' is not valid", instance.Spec.ScanType)
 		instanceCopy.Status.Phase = compv1alpha1.PhaseDone
+		instanceCopy.Status.EndTimestamp = &metav1.Time{Time: time.Now()}
 		instanceCopy.Status.SetConditionInvalid()
 		updateErr := r.Client.Status().Update(context.TODO(), instanceCopy)
 		if updateErr != nil {
@@ -270,6 +273,7 @@ func (r *ReconcileComplianceScan) validate(instance *compv1alpha1.ComplianceScan
 		instanceCopy.Status.ErrorMessage = fmt.Sprintf("Error parsing RawResultsStorageSize: %s", err)
 		instanceCopy.Status.Result = compv1alpha1.ResultError
 		instanceCopy.Status.Phase = compv1alpha1.PhaseDone
+		instanceCopy.Status.EndTimestamp = &metav1.Time{Time: time.Now()}
 		instanceCopy.Status.SetConditionInvalid()
 		err := r.Client.Status().Update(context.TODO(), instanceCopy)
 		if err != nil {
@@ -289,12 +293,14 @@ func (r *ReconcileComplianceScan) phasePendingHandler(instance *compv1alpha1.Com
 	if instance.NeedsRescan() {
 		instanceCopy := instance.DeepCopy()
 		delete(instanceCopy.Annotations, compv1alpha1.ComplianceScanRescanAnnotation)
+		delete(instanceCopy.Annotations, compv1alpha1.ComplianceScanTimeoutAnnotation)
 		err := r.Client.Update(context.TODO(), instanceCopy)
 		return reconcile.Result{}, err
 	}
 
 	if instance.NeedsTimeoutRescan() {
 		instanceCopy := instance.DeepCopy()
+		delete(instanceCopy.Annotations, compv1alpha1.ComplianceScanTimeoutAnnotation)
 		delete(instanceCopy.Annotations, compv1alpha1.ComplianceScanTimeoutAnnotation)
 		err := r.Client.Update(context.TODO(), instanceCopy)
 		return reconcile.Result{}, err
@@ -303,6 +309,8 @@ func (r *ReconcileComplianceScan) phasePendingHandler(instance *compv1alpha1.Com
 	// Update the scan instance, the next phase is running
 	instance.Status.Phase = compv1alpha1.PhaseLaunching
 	instance.Status.Result = compv1alpha1.ResultNotAvailable
+	instance.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
+	instance.Status.EndTimestamp = nil
 	err := r.Client.Status().Update(context.TODO(), instance)
 	if err != nil {
 		logger.Error(err, "Cannot update the status")
@@ -363,6 +371,7 @@ func (r *ReconcileComplianceScan) phaseLaunchingHandler(h scanTypeHandler, logge
 			scanCopy.Status.ErrorMessage = err.Error()
 			scanCopy.Status.Result = compv1alpha1.ResultError
 			scanCopy.Status.Phase = compv1alpha1.PhaseDone
+			scanCopy.Status.EndTimestamp = &metav1.Time{Time: time.Now()}
 			scanCopy.Status.SetConditionInvalid()
 			if updateerr := r.Client.Status().Update(context.TODO(), scanCopy); updateerr != nil {
 				logger.Error(updateerr, "Failed to update a scan")
@@ -398,8 +407,10 @@ func (r *ReconcileComplianceScan) phaseRunningHandler(h scanTypeHandler, logger 
 		scan = scan.DeepCopy()
 
 		if scan.NeedsTimeoutRescan() {
+			// If we already have rescan annotation, we need to update the scan status
 			return r.updateScanStatusOnTimeout(scan, timeoutNodes, logger)
 		} else {
+			// If we don't have rescan annotation, we need to add them
 			return r.setAnnotationOnTimeout(scan, timeoutNodes, logger)
 		}
 	}
@@ -426,6 +437,7 @@ func (r *ReconcileComplianceScan) updateScanStatusOnTimeout(scan *compv1alpha1.C
 	var err error
 	// If we have retries left, let's retry the scan
 	scan.Status.Phase = compv1alpha1.PhaseDone
+	scan.Status.EndTimestamp = &metav1.Time{Time: time.Now()}
 	scan.Status.Result = compv1alpha1.ResultError
 	scan.Status.ErrorMessage = "Timeout while waiting for the scan pod to be finished."
 	scan.Status.SetConditionTimeout()
@@ -482,6 +494,7 @@ func (r *ReconcileComplianceScan) phaseAggregatingHandler(h scanTypeHandler, log
 
 	if err != nil {
 		instance.Status.Phase = compv1alpha1.PhaseDone
+		instance.Status.EndTimestamp = &metav1.Time{Time: time.Now()}
 		instance.Status.Result = compv1alpha1.ResultError
 		instance.Status.SetConditionInvalid()
 		instance.Status.ErrorMessage = err.Error()
@@ -543,6 +556,7 @@ func (r *ReconcileComplianceScan) phaseAggregatingHandler(h scanTypeHandler, log
 	}
 
 	instance.Status.Phase = compv1alpha1.PhaseDone
+	instance.Status.EndTimestamp = &metav1.Time{Time: time.Now()}
 	instance.Status.SetConditionReady()
 	err = r.updateStatusWithEvent(instance, logger)
 	if err != nil {
@@ -615,6 +629,7 @@ func (r *ReconcileComplianceScan) phaseDoneHandler(h scanTypeHandler, instance *
 			instanceCopy := instance.DeepCopy()
 			instanceCopy.Status.Phase = compv1alpha1.PhasePending
 			instanceCopy.Status.Result = compv1alpha1.ResultNotAvailable
+			instanceCopy.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 			if instance.Status.CurrentIndex == math.MaxInt64 {
 				instanceCopy.Status.CurrentIndex = 0
 			} else {

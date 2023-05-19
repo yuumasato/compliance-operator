@@ -3,6 +3,7 @@ package compliancescan
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/metrics"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/metrics/metricsfakes"
@@ -205,6 +206,7 @@ var _ = Describe("Testing compliancescan controller phases", func() {
 		BeforeEach(func() {
 			// Set state to RUNNING
 			compliancescaninstance.Status.Phase = compv1alpha1.PhaseLaunching
+			compliancescaninstance.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 			err := reconciler.Client.Status().Update(context.TODO(), compliancescaninstance)
 			Expect(err).To(BeNil())
 		})

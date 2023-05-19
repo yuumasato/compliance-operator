@@ -9,7 +9,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Enhancements
 
--
+- Added start and end timestamp to the ComplianceScan CRD status.
 
 ### Fixes
 

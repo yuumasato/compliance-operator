@@ -279,6 +279,10 @@ type ComplianceScanStatus struct {
 	Conditions Conditions `json:"conditions,omitempty"`
 	//Is the number of retries left for the scan on timeout
 	RemainingRetries int `json:"remainingRetries,omitempty"`
+	// Is the time when the scan was started
+	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
+	// Is the time when the scan was finished
+	EndTimestamp *metav1.Time `json:"endTimestamp,omitempty"`
 }
 
 // StorageReference stores a reference to where certain objects are being stored
