@@ -5,15 +5,16 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
+	"reflect"
+	goruntime "runtime"
+	"strings"
+
 	"github.com/go-logr/logr"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/zap/zapcore"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"os"
-	"reflect"
-	goruntime "runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -73,10 +74,11 @@ func init() {
 type PlatformType string
 
 const (
-	PlatformOpenShift PlatformType = "OpenShift"
-	PlatformEKS       PlatformType = "EKS"
-	PlatformGeneric   PlatformType = "Generic"
-	PlatformUnknown   PlatformType = "Unknown"
+	PlatformOpenShift  PlatformType = "OpenShift"
+	PlatformEKS        PlatformType = "EKS"
+	PlatformGeneric    PlatformType = "Generic"
+	PlatformHyperShift PlatformType = "HyperShift"
+	PlatformUnknown    PlatformType = "Unknown"
 )
 
 // Change below variables to serve metrics on different host or port.
@@ -96,6 +98,10 @@ var (
 		PlatformEKS: {
 			"eks",
 		},
+		PlatformHyperShift: {
+			"rhcos4",
+			"ocp4",
+		},
 	}
 	defaultRolesPerPlatform = map[PlatformType][]string{
 		PlatformOpenShift: {
@@ -104,6 +110,9 @@ var (
 		},
 		PlatformGeneric: {
 			compv1alpha1.AllRoles,
+		},
+		PlatformHyperShift: {
+			"worker",
 		},
 	}
 	serviceMonitorBearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
@@ -319,6 +328,11 @@ func getValidPlatform(p string) PlatformType {
 		return PlatformOpenShift
 	case strings.EqualFold(p, string(PlatformEKS)):
 		return PlatformEKS
+	case strings.EqualFold(p, string(PlatformHyperShift)):
+		return PlatformHyperShift
+	case strings.EqualFold(p, string(PlatformGeneric)):
+		return PlatformGeneric
+
 	default:
 		return PlatformUnknown
 	}
