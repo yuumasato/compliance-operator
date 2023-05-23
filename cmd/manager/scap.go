@@ -163,6 +163,8 @@ func openNonEmptyFile(filename string) (*os.File, error) {
 
 func (c *scapContentDataStream) FigureResources(profile string) error {
 	// Always stage the clusteroperators/openshift-apiserver object for version detection.
+	namespace := os.Getenv("POD_NAMESPACE")
+	podName := os.Getenv("POD_NAME")
 	found := []utils.ResourcePath{
 		{
 			ObjPath:  "/version",
@@ -183,6 +185,10 @@ func (c *scapContentDataStream) FigureResources(profile string) error {
 		{
 			ObjPath:  "/api/v1/nodes",
 			DumpPath: "/api/v1/nodes",
+		},
+		{
+			ObjPath:  fmt.Sprintf("/api/v1/namespaces/%s/pods/%s", namespace, podName),
+			DumpPath: "/api/v1/namespaces/openshift-compliance/pods/api-checks-pod",
 		},
 	}
 
