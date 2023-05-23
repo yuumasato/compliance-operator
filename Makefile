@@ -213,7 +213,10 @@ CATALOG_DIR=config/catalog
 CATALOG_SRC_FILE=$(CATALOG_DIR)/catalog-source.yaml
 CATALOG_GROUP_FILE=$(CATALOG_DIR)/operator-group.yaml
 CATALOG_SUB_FILE=$(CATALOG_DIR)/subscription.yaml
-
+# If plafform is set to hypershift, we will use a different subscription file
+ifeq ($(PLATFORM), hypershift)
+	CATALOG_SUB_FILE=$(CATALOG_DIR)/subscription-hypershift.yaml
+endif
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
