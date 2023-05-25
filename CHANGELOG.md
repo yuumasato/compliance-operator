@@ -14,6 +14,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   This can be used to deploy from both downstream and upstream source. See
   `doc/usage.md` for more details.
 
+- The `SCAP_DEBUG_LEVEL` variable can now be used to set a custom OpenScap debug level
+  including the highest level `DEVEL`. This can be useful when debugging failed scans or issues
+  in the OpenScap scanner itself. Setting the variable takes precedence over the
+  `debug` attribute of the `ComplianceScan` CR. See `doc/usage.md` for more details.
+
 ### Fixes
 
 - The operator now parses links from the compliance content and renders it in
