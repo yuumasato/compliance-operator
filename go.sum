@@ -1469,6 +1469,8 @@ k8s.io/pod-security-admission v0.26.2 h1:R41JH34lRsqThGUCi1XdDFhG+UoRK4ZFzQ89Fxg
 k8s.io/pod-security-admission v0.26.2/go.mod h1:tb7Huh4QpEZZets79N8QQOtbvRBARSU0b8YqGTpTA7I=
 k8s.io/pod-security-admission v0.26.3 h1:MvPlB/cZW4x64VgZ3WbgnfPWpgtZY4w6ZllIMWmEy9Y=
 k8s.io/pod-security-admission v0.26.3/go.mod h1:9I+AV3O26WYsn4jpCD8WvdJy3xvqBWYz43kz0jwco1k=
+k8s.io/pod-security-admission v0.27.2 h1:dSGK0ftJwJNHSp5fMAwVuFIMMY1MlzW4k82mjar6G8I=
+k8s.io/pod-security-admission v0.27.2/go.mod h1:jWVYAoR3AwJxwJ6tTQSVBZBBe4u0tvmFhyhpAWcOlYY=
 k8s.io/utils v0.0.0-20210802155522-efc7438f0176/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
 k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
