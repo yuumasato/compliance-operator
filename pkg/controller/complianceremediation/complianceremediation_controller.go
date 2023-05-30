@@ -10,6 +10,10 @@ import (
 
 	"github.com/go-logr/logr"
 
+	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
+	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/common"
+	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/metrics"
+	"github.com/ComplianceAsCode/compliance-operator/pkg/utils"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -20,17 +24,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
-	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/common"
-	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/metrics"
-	"github.com/ComplianceAsCode/compliance-operator/pkg/utils"
 )
 
 const ctrlName = "remediationctrl"
@@ -65,19 +61,10 @@ func newReconciler(mgr manager.Manager, met *metrics.Metrics) reconcile.Reconcil
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
-	// Create a new controller
-	c, err := controller.New("complianceremediation-controller", mgr, controller.Options{Reconciler: r})
-	if err != nil {
-		return err
-	}
-
 	// Watch for changes to primary resource ComplianceRemediation
-	err = c.Watch(&source.Kind{Type: &compv1alpha1.ComplianceRemediation{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return ctrl.NewControllerManagedBy(mgr).
+		Named("complianceremediation-controller").
+		For(&compv1alpha1.ComplianceRemediation{}).Complete(r)
 }
 
 // blank assignment to verify that ReconcileComplianceRemediation implements reconcile.Reconciler

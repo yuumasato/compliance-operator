@@ -12,11 +12,11 @@ type tailoredProfileMapper struct {
 	client.Client
 }
 
-func (s *tailoredProfileMapper) Map(obj client.Object) []reconcile.Request {
+func (s *tailoredProfileMapper) Map(ctx context.Context, obj client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 
 	ssbList := v1alpha1.ScanSettingBindingList{}
-	err := s.List(context.TODO(), &ssbList, &client.ListOptions{})
+	err := s.List(ctx, &ssbList, &client.ListOptions{})
 	if err != nil {
 		return requests
 	}

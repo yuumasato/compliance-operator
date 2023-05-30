@@ -142,7 +142,12 @@ var _ = Describe("Aggregator Tests", func() {
 				},
 			}
 
-			client := fake.NewFakeClientWithScheme(scheme, scan, rem)
+			client := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithStatusSubresource(scan, rem, &ocpcfgv1.ClusterOperator{}).
+				WithRuntimeObjects(scan, rem).
+				Build()
+
 			fakerecorder = fakerec.NewFakeRecorder(1)
 			crClient = &aggregatorCrClientFake{
 				scheme:      scheme,

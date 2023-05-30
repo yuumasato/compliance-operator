@@ -117,7 +117,13 @@ var _ = Describe("Testing complianceremediation controller", func() {
 		Expect(err).To(BeNil())
 		err = mcfgapi.Install(cscheme)
 		Expect(err).To(BeNil())
-		client := fake.NewFakeClientWithScheme(cscheme, objs...)
+
+		client := fake.NewClientBuilder().
+			WithScheme(cscheme).
+			WithStatusSubresource(remediationinstance).
+			WithRuntimeObjects(objs...).
+			Build()
+
 		mockMetrics := metrics.NewMetrics(&metricsfakes.FakeImpl{})
 		err = mockMetrics.Register()
 		Expect(err).To(BeNil())

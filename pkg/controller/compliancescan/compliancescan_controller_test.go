@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
@@ -111,7 +112,15 @@ var _ = Describe("Testing compliancescan controller phases", func() {
 		scheme := scheme.Scheme
 		scheme.AddKnownTypes(compv1alpha1.SchemeGroupVersion, compliancescaninstance)
 
-		client := fake.NewFakeClientWithScheme(scheme, objs...)
+		statusObjs := []runtimeclient.Object{}
+		statusObjs = append(statusObjs, compliancescaninstance)
+
+		client := fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithStatusSubresource(statusObjs...).
+			WithRuntimeObjects(objs...).
+			Build()
+
 		var err error
 		mockMetrics := metrics.NewMetrics(&metricsfakes.FakeImpl{})
 		err = mockMetrics.Register()

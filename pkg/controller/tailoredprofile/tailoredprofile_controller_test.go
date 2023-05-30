@@ -115,7 +115,12 @@ var _ = Describe("TailoredprofileController", func() {
 			objs = append(objs, r.DeepCopy(), v.DeepCopy())
 		}
 
-		client := fake.NewFakeClientWithScheme(cscheme, objs...)
+		client := fake.NewClientBuilder().
+			WithScheme(cscheme).
+			WithStatusSubresource(&compv1alpha1.TailoredProfile{}).
+			WithRuntimeObjects(objs...).
+			Build()
+
 		mockMetrics := metrics.NewMetrics(&metricsfakes.FakeImpl{})
 		err = mockMetrics.Register()
 		Expect(err).To(BeNil())
