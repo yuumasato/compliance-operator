@@ -9,7 +9,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Enhancements
 
--
+- The operator can now be deployed on HyperShift HostedCluster using OLM with 
+  a special subscription file in `config/catalog/subscriptions-hypershift.yaml`.
+  This can be used to deploy from both downstream and upstream source. See
+  `doc/usage.md` for more details.
 
 ### Fixes
 
@@ -58,7 +61,7 @@ allow for smoother upgrades.
   are not available in json format, and we need to convert it to json format so that
   it can be read by OpenSCAP.
 
-- Added documentation on how to run platform scan on HyperShift Management
+- Added documentation on how to run a platform scan on HyperShift Management
   Cluster in `doc/usage.md`.
 
 ### Removals
