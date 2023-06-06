@@ -11,6 +11,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Added start and end timestamp to the ComplianceScan CRD status.
 
+- The operator can now be deployed on HyperShift HostedCluster using OLM with 
+  a special subscription file in `config/catalog/subscriptions-hypershift.yaml`.
+  This can be used to deploy from both downstream and upstream source. See
+  `doc/usage.md` for more details.
+
 ### Fixes
 
 - The operator now parses links from the compliance content and renders it in
@@ -21,9 +26,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   for certain resources, for example, the user does not want to see the
   warnings for rules that used to detect HyperShift.
 
+- Fix values used rendering issues for some rules that reference variables in
+  the rule's instruction.
+  [OCPBUGS-7456](https://issues.redhat.com/browse/OCPBUGS-7456)
+
 ### Internal Changes
 
--
+- Update Kustomize and make target to be able to deploy on generic Kubernetes cluster.
 
 ### Deprecations
 
@@ -58,7 +67,7 @@ allow for smoother upgrades.
   are not available in json format, and we need to convert it to json format so that
   it can be read by OpenSCAP.
 
-- Added documentation on how to run platform scan on HyperShift Management
+- Added documentation on how to run a platform scan on HyperShift Management
   Cluster in `doc/usage.md`.
 
 ### Removals

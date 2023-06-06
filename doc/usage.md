@@ -573,7 +573,7 @@ error result.
 
 ## How to Use Compliance Operator with HyperShift Management Cluster
 
-Compliance Operator is able to run platform scan on the HyperShift Managment cluster
+Compliance Operator is able to run a platform scan on the HyperShift Managment cluster
 for the Hosted Cluster with a tailoredProfile.
 
 Currently, we only support CIS profile and PCI-DSS profile, in order to scan Hosted
@@ -617,3 +617,38 @@ settingsRef:
  kind: ScanSetting
  apiGroup: compliance.openshift.io/v1alpha1
  ```
+
+## How to Use Compliance Operator with HyperShift Hosted Cluster
+
+Compliance Operator is able to run a platform scan on the HyperShift Hosted cluster
+without any tailoredProfile. Any unsupport rules will be hidden from the `ComplianceCheckResult`.
+
+However, you need to use a special subscription file to install Compliance Operator on the
+Hosted Cluster from the OperatorHub. You can either add `spec.config` section from the following
+example to the existing subscription object, or use the following subscription file directly:
+
+```yaml
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: compliance-operator-
+  namespace: openshift-compliance
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: compliance-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  startingCSV: compliance-operator.v1.0.0
+  config:
+    nodeSelector:
+      node-role.kubernetes.io/worker: ""
+    env: 
+    - name: PLATFORM
+      value: "HyperShift"
+```
+
+To install Compliance Operator on the Hosted Cluster from upstream using OLM, you can run the following command:
+
+`make catalog-deploy PLATFORM=HyperShift`
+
