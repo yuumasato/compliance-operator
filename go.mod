@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/ginkgo/v2 v2.9.5
+	github.com/onsi/ginkgo/v2 v2.10.0
 	github.com/onsi/gomega v1.27.7
 	github.com/wI2L/jsondiff v0.3.0
 	k8s.io/apimachinery v0.26.3
@@ -135,7 +135,7 @@ require (
 	github.com/vincent-petithory/dataurl v1.0.0 // indirect
 	github.com/xo/terminfo v0.0.0-20210125001918-ca9a967f8778 // indirect
 	go4.org v0.0.0-20200104003542-c7e774b10ea0 // indirect
-	golang.org/x/tools v0.9.1 // indirect
+	golang.org/x/tools v0.9.3 // indirect
 )
 
 replace (
