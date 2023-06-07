@@ -32,6 +32,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Update Kustomize and make target to be able to deploy on generic Kubernetes cluster.
 
+- Added an ability to identify which platform we are on using a CPE. We always
+  fetch api-checks-pod pod object, and save it to a dump file
+  when api-resource collector is running, CPE can use the dump file to
+  check the command line arguments to see if we are running on a specific
+  platform.
+
 ### Deprecations
 
 -
@@ -105,7 +111,6 @@ allow for smoother upgrades.
   e.g. `1h30m`. If the scan is not completed within the timeout, the
   corresponding scan will either fail or retry.
   See [To use timeout option for scan](https://github.com/ComplianceAsCode/compliance-operator/blob/master/doc/usage.md#to-use-timeout-option-for-scan) in `doc/usage.md` for details usage.
-
 
 ### Fixes
 

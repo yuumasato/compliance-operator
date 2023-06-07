@@ -293,7 +293,12 @@ func RunOperator(cmd *cobra.Command, args []string) {
 		setupLog.Error(err, "")
 		os.Exit(1)
 	}
-	pflag, _ := flags.GetString("platform")
+	// We need to set PLATFORM env var if the PLATFORM flag is set
+	pflag := os.Getenv("PLATFORM")
+	if pflag == "" {
+		pflag, _ = flags.GetString("platform")
+		os.Setenv("PLATFORM", pflag)
+	}
 	platform := getValidPlatform(pflag)
 
 	skipMetrics, _ := flags.GetBool("skip-metrics")
