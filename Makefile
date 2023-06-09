@@ -432,7 +432,11 @@ bundle: check-operator-version operator-sdk manifests update-skip-range kustomiz
 	$(SDK_BIN) generate kustomize manifests --apis-dir=./pkg/apis -q
 	@echo "kustomize using deployment image $(IMG)"
 	cd config/manager && $(KUSTOMIZE) edit set image $(APP_NAME)=$(IMG)
+	if [ $(PLATFORM) = "openshift" ]; then \
+		sed -i 's%../default-bundle%../openshift-bundle%' config/manifests/kustomization.yaml; \
+	fi
 	$(KUSTOMIZE) build config/manifests | $(SDK_BIN) generate bundle -q $(BUNDLE_SA_OPTS) --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	git restore config/manifests/kustomization.yaml
 	@echo "Replacing RELATED_IMAGE_OPERATOR env reference in $(BUNDLE_CSV_FILE)"
 	@sed -i 's%$(DEFAULT_OPERATOR_IMAGE)%$(OPERATOR_IMAGE)%' $(BUNDLE_CSV_FILE)
 	$(SDK_BIN) bundle validate ./bundle
