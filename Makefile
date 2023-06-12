@@ -677,9 +677,9 @@ push-release: package-version-to-tag ## Create a commit for the release change, 
 	git tag "v$(TAG)"
 	git push $(GIT_REMOTE) "v$(TAG)"
 	git push $(GIT_REMOTE) "release-v$(TAG)"
-	git checkout ocp-0.1
+	git checkout ocp-1.0
 	git merge "release-v$(TAG)"
-	git push $(GIT_REMOTE) ocp-0.1
+	git push $(GIT_REMOTE) ocp-1.0
 
 .PHONY: release-images
 release-images: package-version-to-tag push catalog ## Build container images, bundle images, and catalog images and push them to an image registry (default: ghcr.io/complianceascode).
