@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"strings"
 	"unsafe"
-
-	"github.com/tidwall/gjson"
 )
 
 // JSON Patch operation types.
@@ -26,16 +24,25 @@ const (
 	opBaseLen     = len(`{"op":"","path":""}`)
 )
 
+// null represents a JSON null value.
+type null struct{}
+
 // Patch represents a series of JSON Patch operations.
 type Patch []Operation
 
-// Operation represents a single RFC6902 JSON Patch operation.
+// Operation represents a single JSON Patch (RFC6902) operation.
 type Operation struct {
-	Type     string      `json:"op"`
-	From     pointer     `json:"from,omitempty"`
-	Path     pointer     `json:"path"`
-	OldValue interface{} `json:"-"`
 	Value    interface{} `json:"value,omitempty"`
+	OldValue interface{} `json:"-"`
+	Type     string      `json:"op"`
+	From     string      `json:"from,omitempty"`
+	Path     string      `json:"path"`
+	valueLen int
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (null) MarshalJSON() ([]byte, error) {
+	return []byte("null"), nil
 }
 
 // String implements the fmt.Stringer interface.
@@ -47,13 +54,6 @@ func (o Operation) String() string {
 	return string(b)
 }
 
-type jsonNull struct{}
-
-// MarshalJSON implements the json.Marshaler interface.
-func (jn jsonNull) MarshalJSON() ([]byte, error) {
-	return []byte("null"), nil
-}
-
 // MarshalJSON implements the json.Marshaler interface.
 func (o Operation) MarshalJSON() ([]byte, error) {
 	type op Operation
@@ -61,29 +61,25 @@ func (o Operation) MarshalJSON() ([]byte, error) {
 	if !o.marshalWithValue() {
 		o.Value = nil
 	} else {
-		// Generic check that passes for nil and type nil interface values.
+		// Generic check that works for nil
+		// and typed nil interface values.
 		if (*[2]uintptr)(unsafe.Pointer(&o.Value))[1] == 0 {
-			o.Value = jsonNull{}
+			o.Value = null{}
 		}
 	}
 	if !o.hasFrom() {
-		o.From = emptyPtr
+		o.From = emptyPointer
 	}
 	return json.Marshal(op(o))
 }
 
 // jsonLength returns the length in bytes that the
-// operation would occupy when marshaled as JSON.
-func (o Operation) jsonLength(targetBytes []byte) int {
+// operation would occupy when marshaled to JSON.
+func (o Operation) jsonLength() int {
 	l := opBaseLen + len(o.Type) + len(o.Path)
 
 	if o.marshalWithValue() {
-		valueLen := len(targetBytes)
-		if !o.Path.isRoot() {
-			r := gjson.GetBytes(targetBytes, o.Path.toJSONPath())
-			valueLen = len(r.Raw)
-		}
-		l += valueFieldLen + valueLen
+		l += valueFieldLen + o.valueLen
 	}
 	if o.hasFrom() {
 		l += fromFieldLen + len(o.From)
@@ -93,20 +89,51 @@ func (o Operation) jsonLength(targetBytes []byte) int {
 
 func (o Operation) hasFrom() bool {
 	switch o.Type {
-	case OperationAdd, OperationReplace, OperationTest:
-		return false
-	default:
+	case OperationCopy, OperationMove:
 		return true
+	default:
+		return false
 	}
 }
 
 func (o Operation) marshalWithValue() bool {
 	switch o.Type {
-	case OperationCopy, OperationMove, OperationRemove:
-		return false
-	default:
+	case OperationAdd, OperationReplace, OperationTest:
 		return true
+	default:
+		return false
 	}
+}
+
+func (p *Patch) remove(idx int) Patch {
+	return (*p)[:idx+copy((*p)[idx:], (*p)[idx+1:])]
+}
+
+func (p *Patch) append(typ string, from, path string, src, tgt interface{}, vl int) Patch {
+	return append(*p, Operation{
+		Type:     typ,
+		From:     from,
+		Path:     path,
+		OldValue: src,
+		Value:    tgt,
+		valueLen: vl,
+	})
+}
+
+func (p *Patch) jsonLength() int {
+	if p == nil {
+		return 0
+	}
+	var length int
+	for _, op := range *p {
+		length += op.jsonLength()
+	}
+	// Count comma-separators if the patch
+	// has more than one operation.
+	if len(*p) > 1 {
+		length += len(*p) - 1
+	}
+	return length
 }
 
 // String implements the fmt.Stringer interface.
@@ -115,7 +142,6 @@ func (p *Patch) String() string {
 		return ""
 	}
 	sb := strings.Builder{}
-
 	for i, op := range *p {
 		if i != 0 {
 			sb.WriteByte('\n')
@@ -123,34 +149,4 @@ func (p *Patch) String() string {
 		sb.WriteString(op.String())
 	}
 	return sb.String()
-}
-
-func (p *Patch) remove(idx int) Patch {
-	return (*p)[:idx+copy((*p)[idx:], (*p)[idx+1:])]
-}
-
-func (p *Patch) append(typ string, from, path pointer, src, tgt interface{}) Patch {
-	return append(*p, Operation{
-		Type:     typ,
-		From:     from,
-		Path:     path,
-		OldValue: src,
-		Value:    tgt,
-	})
-}
-
-func (p *Patch) jsonLength(targetBytes []byte) int {
-	length := 0
-	if p == nil {
-		return length
-	}
-	for _, op := range *p {
-		length += op.jsonLength(targetBytes)
-	}
-	// Count comma-separators if the patch
-	// has more than one operation.
-	if len(*p) > 1 {
-		length += len(*p) - 1
-	}
-	return length
 }

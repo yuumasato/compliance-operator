@@ -6,7 +6,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/ginkgo/v2 v2.10.0
 	github.com/onsi/gomega v1.27.7
-	github.com/wI2L/jsondiff v0.3.0
+	github.com/wI2L/jsondiff v0.4.0
 	k8s.io/apimachinery v0.26.3
 	k8s.io/client-go v0.26.3
 	sigs.k8s.io/controller-runtime v0.14.6

@@ -22,7 +22,7 @@ First, get the latest version of the library using the following command:
 $ go get github.com/wI2L/jsondiff@latest
 ```
 
-:warning: Requires Go1.14+, due to the usage of the package [`hash/maphash`](https://golang.org/pkg/hash/maphash/).
+:warning: Requires Go1.18+, due to the usage of the package [`hash/maphash`](https://golang.org/pkg/hash/maphash/), and the `any` keyword (predeclared type alias for the empty interface).
 
 ### Example use cases
 
@@ -150,7 +150,7 @@ For instance, given the following document:
 
 ```json
 {
-    "a": [1, 2, 3],
+    "a": [ 1, 2, 3 ],
     "b": { "foo": "bar" }
 }
 ```
@@ -159,8 +159,8 @@ In order to obtain this updated version:
 
 ```json
 {
-    "a": [1, 2, 3],
-    "c": [1, 2, 3],
+    "a": [ 1, 2, 3 ],
+    "c": [ 1, 2, 3 ],
     "d": { "foo": "bar" }
 }
 ```
@@ -170,7 +170,7 @@ The package generates the following patch:
 ```json
 [
     { "op": "remove", "path": "/b" },
-    { "op": "add", "path": "/c", "value": [1, 2, 3] },
+    { "op": "add", "path": "/c", "value": [ 1, 2, 3 ] },
     { "op": "add", "path": "/d", "value": { "foo": "bar" } }
 ]
 ```
@@ -186,7 +186,7 @@ If we take the previous example and generate the patch with factorization enable
 
 #### Operations rationalization
 
-The default method used to compare two JSON documents is a recursive comparison. This produce one or more operations for each difference found. On the other hand, in certain situations, it might be beneficial to replace a set of operations representing several changes inside a JSON node by a single replace operation targeting the parent node.
+The default method used to compare two JSON documents is a recursive comparison. This produce one or more operations for each difference found. On the other hand, in certain situations, it might be beneficial to replace a set of operations representing several changes inside a JSON node by a single replace operation targeting the parent node, in order to reduce the "size" of the patch (the length in bytes of the JSON representation of the patch).
 
 For that purpose, you can use the `Rationalize()` option. It uses a simple weight function to decide which patch is best (it marshals both sets of operations to JSON and looks at the length of bytes to keep the smaller footprint).
 
@@ -237,11 +237,23 @@ And finally, with rationalization enabled, those operations are replaced with a 
 ]
 ```
 
+##### Input compaction
+
+Reducing the size of a JSON Patch is usually beneficial when it needs to be sent on the wire (HTTP request with the `application/json-patch+json` media type for example). As such, the package assumes that the desired JSON representation of a patch is a compact ("minified") JSON document.
+
+When the `Rationalize()` option is enabled, the package pre-process the JSON input given to the `CompareJSON*` functions. If your inputs are already compact JSON documents, you **should** also use the `SkipCompact()` option to instruct the package to skip the compaction step, resulting in a *nice and free* performance improvement.
+
+##### In-place compaction
+
+By default, the package will not modify the JSON documents given to the `CompareJSON` and `CompareJSONOpts` functions. Instead, a copy of the `target` byte slice argument is created and then compacted to remove insignificant spaces.
+
+To avoid an extra allocation, you can use the `InPlaceCompaction()` option to allow the package to *take ownership* of the `target` byte slice and modify it directly. **Note that you should not update it concurrently with a call to the `CompareJSON*` functions.**
+
 #### Invertible patch
 
 Using the functional option `Invertible()`, it is possible to instruct the diff generator to precede each `remove` and `replace` operation with a `test` operation. Such patches can be inverted to return a patched document to its original form.
 
-However, note that it comes with one limitation. `copy` operations cannot be inverted, as they are ambiguous (the reverse of a `copy` is a `remove`, which could then become either an `add` or a `copy`). As such, using this option disable the generation of `copy` operations (if option `Factorize()` is used) and replace them with `add`, albeit potentially at the cost of increased patch size.
+However, note that it comes with one limitation. `copy` operations cannot be inverted, as they are ambiguous (the reverse of a `copy` is a `remove`, which could then become either an `add` or a `copy`). As such, using this option disable the generation of `copy` operations (if option `Factorize()` is used) and replace them with `add` operations, albeit potentially at the cost of increased patch size.
 
 For example, let's generate the diff between those two JSON documents:
 
@@ -271,6 +283,8 @@ The patch is similar to the following:
 ```
 
 As you can see, the `remove` and `replace` operations are preceded with a `test` operation which assert/verify the `value` of the previous `path`. On the other hand, the `add` operation can be reverted to a remove operation directly and doesn't need to be preceded by a `test`.
+
+[Run this example](https://pkg.go.dev/github.com/wI2L/jsondiff#example-Invertible).
 
 Finally, as a side example, if we were to use the `Rationalize()` option in the context of the previous example, the output would be shorter, but the generated patch would still remain invertible:
 
@@ -303,11 +317,83 @@ The root arrays of each document are not equal because the values differ at each
 
 For such situations, you can use the `Equivalent()` option to instruct the diff generator to skip the generation of operations that would otherwise be added to the patch to represent the differences between the two arrays.
 
+#### Ignores
+
+:construction: *This option is experimental and might be revised in the future.*
+<br/>
+<br/>
+
+The `Ignores()` option allows to exclude one or more JSON fields/values from the *generated diff*. The fields must be identified using the JSON Pointer (RFC6901) string syntax.
+
+The option accepts a variadic list of JSON Pointers, which all individually represent a value in the source document. However, if the value does not exist in the source document, the value will be considered to be in the target document, which allows to *ignore* `add` operations.
+
+For example, let's generate the diff between those two JSON documents:
+
+```json
+{
+    "A": "bar",
+    "B": "baz",
+    "C": "foo"
+}
+```
+
+```json
+{
+    "A": "rab",
+    "B": "baz",
+    "D": "foo"
+}
+```
+
+Without the `Ignores()` option, the output patch is the following:
+
+```json
+[
+    { "op": "replace", "path": "/A", "value": "rab" },
+    { "op": "remove", "path": "/C" },
+    { "op": "add", "path": "/D", "value": "foo" }
+]
+```
+
+Using the option with the following pointers list, we can ignore some of the fields that were updated, added or removed:
+
+```go
+jsondiff.Ignores("/A", "/B", "/C")
+```
+
+The resulting patch is empty, because all changes and ignored.
+
+[Run this example](https://pkg.go.dev/github.com/wI2L/jsondiff#example-Ignores).
+
+> See the actual [testcases](testdata/tests/options/ignore.json) for more examples.
+
+#### MarshalFunc / UnmarshalFunc
+
+By default, the package uses the `json.Marshal` and `json.Unmarshal` functions from the standard library's `encoding` package, to marshal and unmarshal objects to/from JSON.  If you wish to use another package for performance reasons, or simply to customize the encoding/decoding behavior, you can use the `MarshalFunc` and `UnmarshalFunc` options to configure it.
+
+The prototype of the function argument accepted by these options is the same as the official `json.Marshal` and `json.Unmarshal` functions.
+
+##### Custom decoder
+
+In the following example, the `UnmarshalFunc` option is used to set up a custom JSON [`Decoder`](https://pkg.go.dev/encoding/json#Decoder) with the [`UserNumber`](https://pkg.go.dev/encoding/json#Decoder.UseNumber) flag enabled, to decode JSON numbers as [`json.Number`](https://pkg.go.dev/encoding/json#Decoder.UseNumber) instead of `float64`:
+
+```go
+patch, err := jsondiff.CompareJSONOpts(
+    source,
+    target,
+    jsondiff.UnmarshalFunc(func(b []byte, v any) error {
+        dec := json.NewDecoder(bytes.NewReader(b))
+        dec.UseNumber()
+        return dec.Decode(v)
+    }),
+)
+```
+
 ## Benchmarks
 
-Performance is not the primary target of the package, instead it strives for correctness. A simple benchmark that compare the performance of available options is provided to give a rough estimate of the cost of each option. You can find the JSON documents used by this benchmark in the directory [testdata/benchs](testdata/benchs).
+A couple of benchmarks that compare the performance for different JSON document sizes are provided to give a rough estimate of the cost of each option. You can find the JSON documents used by those benchmarks in the directory [testdata/benchs](testdata/benchs).
 
-If you'd like to run the benchmark yourself, use the following command:
+If you'd like to run the benchmarks yourself, use the following command:
 
 ```shell
 go get github.com/cespare/prettybench
@@ -316,34 +402,139 @@ go test -bench=. | prettybench
 
 ### Results
 
-The benchmark was run 10x (statistics computed with [benchstat](https://godoc.org/golang.org/x/perf/cmd/benchstat)) on a MacBook Pro 15", with the following specs:
+The benchmarks were run 10x (statistics computed with [benchstat](https://godoc.org/golang.org/x/perf/cmd/benchstat)) on a MacBook Pro 15", with the following specs:
+
 ```
-OS : macOS Catalina (10.15.7)
+OS : macOS Big Sur (11.7.6)
 CPU: 2.6 GHz Intel Core i7
 Mem: 16GB 1600 MHz
-Go : go version go1.18 darwin/amd64
+Go : go version go1.20.4 darwin/amd64
 ```
 
-<details open><summary>Output</summary><br><pre>
-name                                time/op
-Compare/Compare/default-8           32.7µs ± 1%
-Compare/CompareJSON/default-8       24.2µs ± 0%
-Compare/differ_diff/default-8       5.22µs ± 0%
-Compare/Compare/invertible-8        33.5µs ± 0%
-Compare/CompareJSON/invertible-8    25.0µs ± 0%
-Compare/differ_diff/invertible-8    6.05µs ± 0%
-Compare/Compare/factorize-8         35.4µs ± 1%
-Compare/CompareJSON/factorize-8     26.7µs ± 0%
-Compare/differ_diff/factorize-8     7.55µs ± 1%
-Compare/Compare/rationalize-8       43.3µs ± 1%
-Compare/CompareJSON/rationalize-8   51.0µs ± 1%
-Compare/differ_diff/rationalize-8   30.6µs ± 0%
-Compare/Compare/factor+ratio-8      45.5µs ± 0%
-Compare/CompareJSON/factor+ratio-8  50.8µs ± 0%
-Compare/differ_diff/factor+ratio-8  29.9µs ± 0%
-Compare/Compare/all-options-8       53.2µs ± 1%
-Compare/CompareJSON/all-options-8   58.6µs ± 1%
-Compare/differ_diff/all-options-8   37.4µs ± 1%
+<details><summary>Output</summary><br><pre>
+name                                       time/op
+Small/DifferReset/default-8                2.15µs ± 0%
+Small/Differ/default-8                     2.57µs ± 1%
+Small/DifferReset/default-unordered-8      2.31µs ± 1%
+Small/Differ/default-unordered-8           2.95µs ± 0%
+Small/DifferReset/invertible-8             2.18µs ± 1%
+Small/Differ/invertible-8                  2.82µs ± 1%
+Small/DifferReset/factorize-8              3.53µs ± 0%
+Small/Differ/factorize-8                   4.11µs ± 0%
+Small/DifferReset/rationalize-8            2.29µs ± 0%
+Small/Differ/rationalize-8                 2.73µs ± 1%
+Small/DifferReset/equivalent-8             2.14µs ± 1%
+Small/Differ/equivalent-8                  2.57µs ± 1%
+Small/DifferReset/equivalent-unordered-8   2.32µs ± 1%
+Small/Differ/equivalent-unordered-8        2.76µs ± 1%
+Small/DifferReset/factor+ratio-8           3.67µs ± 1%
+Small/Differ/factor+ratio-8                4.26µs ± 1%
+Small/DifferReset/all-8                    3.77µs ± 0%
+Small/Differ/all-8                         4.59µs ± 0%
+Small/DifferReset/all-unordered-8          3.99µs ± 1%
+Small/Differ/all-unordered-8               4.82µs ± 0%
+Medium/DifferReset/default-8               6.23µs ± 0%
+Medium/Differ/default-8                    7.30µs ± 1%
+Medium/DifferReset/default-unordered-8     6.81µs ± 1%
+Medium/Differ/default-unordered-8          8.52µs ± 1%
+Medium/DifferReset/invertible-8            6.32µs ± 1%
+Medium/Differ/invertible-8                 8.09µs ± 0%
+Medium/DifferReset/factorize-8             11.3µs ± 1%
+Medium/Differ/factorize-8                  13.0µs ± 1%
+Medium/DifferReset/rationalize-8           6.91µs ± 1%
+Medium/Differ/rationalize-8                7.66µs ± 1%
+Medium/DifferReset/equivalent-8            10.0µs ± 1%
+Medium/Differ/equivalent-8                 11.1µs ± 1%
+Medium/DifferReset/equivalent-unordered-8  11.0µs ± 1%
+Medium/Differ/equivalent-unordered-8       12.1µs ± 0%
+Medium/DifferReset/factor+ratio-8          11.8µs ± 0%
+Medium/Differ/factor+ratio-8               13.1µs ± 0%
+Medium/DifferReset/all-8                   16.1µs ± 1%
+Medium/Differ/all-8                        17.9µs ± 1%
+Medium/DifferReset/all-unordered-8         17.7µs ± 1%
+Medium/Differ/all-unordered-8              19.5µs ± 0%
+<br>name                                       alloc/op
+Small/DifferReset/default-8                  216B ± 0%
+Small/Differ/default-8                     1.19kB ± 0%
+Small/DifferReset/default-unordered-8        312B ± 0%
+Small/Differ/default-unordered-8           1.99kB ± 0%
+Small/DifferReset/invertible-8               216B ± 0%
+Small/Differ/invertible-8                  1.90kB ± 0%
+Small/DifferReset/factorize-8                400B ± 0%
+Small/Differ/factorize-8                   1.78kB ± 0%
+Small/DifferReset/rationalize-8              224B ± 0%
+Small/Differ/rationalize-8                 1.20kB ± 0%
+Small/DifferReset/equivalent-8               216B ± 0%
+Small/Differ/equivalent-8                  1.19kB ± 0%
+Small/DifferReset/equivalent-unordered-8     216B ± 0%
+Small/Differ/equivalent-unordered-8        1.19kB ± 0%
+Small/DifferReset/factor+ratio-8             408B ± 0%
+Small/Differ/factor+ratio-8                1.78kB ± 0%
+Small/DifferReset/all-8                      408B ± 0%
+Small/Differ/all-8                         2.49kB ± 0%
+Small/DifferReset/all-unordered-8            520B ± 0%
+Small/Differ/all-unordered-8               2.60kB ± 0%
+Medium/DifferReset/default-8                 624B ± 0%
+Medium/Differ/default-8                    3.71kB ± 0%
+Medium/DifferReset/default-unordered-8       848B ± 0%
+Medium/Differ/default-unordered-8          7.01kB ± 0%
+Medium/DifferReset/invertible-8              624B ± 0%
+Medium/Differ/invertible-8                 6.78kB ± 0%
+Medium/DifferReset/factorize-8             1.41kB ± 0%
+Medium/Differ/factorize-8                  5.60kB ± 0%
+Medium/DifferReset/rationalize-8             672B ± 0%
+Medium/Differ/rationalize-8                2.35kB ± 0%
+Medium/DifferReset/equivalent-8            1.39kB ± 0%
+Medium/Differ/equivalent-8                 4.48kB ± 0%
+Medium/DifferReset/equivalent-unordered-8  1.49kB ± 0%
+Medium/Differ/equivalent-unordered-8       4.58kB ± 0%
+Medium/DifferReset/factor+ratio-8          1.45kB ± 0%
+Medium/Differ/factor+ratio-8               4.24kB ± 0%
+Medium/DifferReset/all-8                   2.22kB ± 0%
+Medium/Differ/all-8                        6.41kB ± 0%
+Medium/DifferReset/all-unordered-8         2.36kB ± 0%
+Medium/Differ/all-unordered-8              6.55kB ± 0%
+<br>name                                       allocs/op
+Small/DifferReset/default-8                  9.00 ± 0%
+Small/Differ/default-8                       13.0 ± 0%
+Small/DifferReset/default-unordered-8        13.0 ± 0%
+Small/Differ/default-unordered-8             18.0 ± 0%
+Small/DifferReset/invertible-8               9.00 ± 0%
+Small/Differ/invertible-8                    14.0 ± 0%
+Small/DifferReset/factorize-8                21.0 ± 0%
+Small/Differ/factorize-8                     27.0 ± 0%
+Small/DifferReset/rationalize-8              10.0 ± 0%
+Small/Differ/rationalize-8                   14.0 ± 0%
+Small/DifferReset/equivalent-8               9.00 ± 0%
+Small/Differ/equivalent-8                    13.0 ± 0%
+Small/DifferReset/equivalent-unordered-8     9.00 ± 0%
+Small/Differ/equivalent-unordered-8          13.0 ± 0%
+Small/DifferReset/factor+ratio-8             22.0 ± 0%
+Small/Differ/factor+ratio-8                  28.0 ± 0%
+Small/DifferReset/all-8                      22.0 ± 0%
+Small/Differ/all-8                           29.0 ± 0%
+Small/DifferReset/all-unordered-8            25.0 ± 0%
+Small/Differ/all-unordered-8                 32.0 ± 0%
+Medium/DifferReset/default-8                 18.0 ± 0%
+Medium/Differ/default-8                      24.0 ± 0%
+Medium/DifferReset/default-unordered-8       26.0 ± 0%
+Medium/Differ/default-unordered-8            33.0 ± 0%
+Medium/DifferReset/invertible-8              18.0 ± 0%
+Medium/Differ/invertible-8                   25.0 ± 0%
+Medium/DifferReset/factorize-8               55.0 ± 0%
+Medium/Differ/factorize-8                    64.0 ± 0%
+Medium/DifferReset/rationalize-8             22.0 ± 0%
+Medium/Differ/rationalize-8                  27.0 ± 0%
+Medium/DifferReset/equivalent-8              26.0 ± 0%
+Medium/Differ/equivalent-8                   32.0 ± 0%
+Medium/DifferReset/equivalent-unordered-8    30.0 ± 0%
+Medium/Differ/equivalent-unordered-8         36.0 ± 0%
+Medium/DifferReset/factor+ratio-8            59.0 ± 0%
+Medium/Differ/factor+ratio-8                 67.0 ± 0%
+Medium/DifferReset/all-8                     67.0 ± 0%
+Medium/Differ/all-8                          76.0 ± 0%
+Medium/DifferReset/all-unordered-8           74.0 ± 0%
+Medium/Differ/all-unordered-8                83.0 ± 0%
 </pre></details>
 
 ## Credits
