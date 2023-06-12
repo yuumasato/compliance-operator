@@ -9,6 +9,32 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Enhancements
 
+-
+
+### Fixes
+
+-
+
+### Internal Changes
+
+-
+
+### Deprecations
+
+-
+
+### Removals
+
+-
+
+### Security
+
+-
+
+
+## [1.1.0] - 2023-06-12
+
+### Enhancements
 - Added start and end timestamp to the ComplianceScan CRD status.
 
 - The operator can now be deployed on HyperShift HostedCluster using OLM with 
