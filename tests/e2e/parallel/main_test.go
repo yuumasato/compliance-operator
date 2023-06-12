@@ -1547,10 +1547,10 @@ func TestPatchGenericRemediation(t *testing.T) {
 	}
 }
 
-func TestGenericRemediationFailsWithUnkownType(t *testing.T) {
+func TestGenericRemediationFailsWithUnknownType(t *testing.T) {
 	t.Parallel()
 	f := framework.Global
-	remName := "test-generic-remediation-fails-unkown"
+	remName := "test-generic-remediation-fails-unknown"
 	genericRem := &compv1alpha1.ComplianceRemediation{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      remName,
@@ -1566,7 +1566,7 @@ func TestGenericRemediationFailsWithUnkownType(t *testing.T) {
 						"kind":       "OopsyDoodle",
 						"apiVersion": "foo.bar/v1",
 						"metadata": map[string]interface{}{
-							"name":      "unkown-remediation",
+							"name":      "unknown-remediation",
 							"namespace": f.OperatorNamespace,
 						},
 						"data": map[string]interface{}{
