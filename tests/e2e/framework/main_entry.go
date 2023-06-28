@@ -8,6 +8,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-logr/logr"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -32,6 +35,15 @@ func NewFramework() *Framework {
 		log.Fatalf("Failed to create framework: %v", err)
 	}
 	Global = f
+
+	// This is required because controller-runtime expects its consumers to
+	// set a logger through log.SetLogger within 30 seconds of the program's
+	// initalization. If not set, the entire debug stack is printed as an
+	// error, see: https://github.com/kubernetes-sigs/controller-runtime/blob/ed8be90/pkg/log/log.go#L59
+	// Since we have our own logging and don't care about controller-runtime's
+	// logger, we configure it's logger to do nothing.
+	ctrllog.SetLogger(logr.New(ctrllog.NullLogSink{}))
+
 	return f
 }
 
