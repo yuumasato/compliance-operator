@@ -21,7 +21,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/clarketm/json v1.17.1
-	github.com/coreos/ignition/v2 v2.15.0
+	github.com/coreos/ignition/v2 v2.16.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dsnet/compress v0.0.1
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
@@ -65,7 +65,7 @@ require (
 	go.uber.org/zap v1.24.0
 	golang.org/x/mod v0.11.0
 	golang.org/x/net v0.11.0
-	golang.org/x/oauth2 v0.5.0 // indirect
+	golang.org/x/oauth2 v0.9.0 // indirect
 	golang.org/x/sys v0.9.0 // indirect
 	golang.org/x/term v0.9.0 // indirect
 	golang.org/x/text v0.10.0 // indirect
