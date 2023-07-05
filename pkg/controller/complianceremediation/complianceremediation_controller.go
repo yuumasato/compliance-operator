@@ -219,7 +219,7 @@ func (r *ReconcileComplianceRemediation) reconcileRemediation(instance *compv1al
 		return common.NewNonRetriableCtrlError(
 			"Unable to get fix object from ComplianceRemediation. "+
 				"Please update the compliance-operator's permissions: %w", err)
-	} else if runtime.IsNotRegisteredError(err) || meta.IsNoMatchError(err) {
+	} else if runtime.IsNotRegisteredError(err) || meta.IsNoMatchError(err) || (err != nil && strings.Contains(err.Error(), "the server could not find the requested resource")) {
 		// If the kind is not available in the cluster, we can't retry
 		return common.NewNonRetriableCtrlError(
 			"Unable to get fix object for ComplianceRemediation. "+
