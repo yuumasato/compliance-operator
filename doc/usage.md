@@ -652,3 +652,33 @@ To install Compliance Operator on the Hosted Cluster from upstream using OLM, yo
 
 `make catalog-deploy PLATFORM=HyperShift`
 
+## Verbose OpenScap debugging information
+
+Compliance Operator uses OpenScap under the hood to perform the scans. In order to
+enable verbose debugging information from OpenScap, you can set the `OSCAP_DEBUG_LEVEL`
+environment variable.
+
+Setting the variable depends on your deployment method: if you installed the operator
+directly from upstream manifests, just add the variable to the main operator deployment
+(`.spec.template.spec.containers[0].env`), and then wait for restart of the operator pod.
+
+If the operator was installed through OLM, you can set the variable in the Subscription
+object, e.g.:
+
+```yaml
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+  name: compliance-operator-sub
+  namespace: openshift-compliance
+spec:
+  channel: alpha
+  name: compliance-operator
+  source: compliance-operator
+  sourceNamespace: openshift-marketplace
+  config:
+    nodeSelector:
+      node-role.kubernetes.io/worker: ""
+    env:
+      - name: OSCAP_DEBUG_LEVEL
+        value: DEVEL
+ ```

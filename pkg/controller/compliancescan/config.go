@@ -237,9 +237,11 @@ func commonOpenScapEnvCm(name string, scan *compv1alpha1.ComplianceScan) *corev1
 		cm.Data[OpenScapRuleEnvName] = scan.Spec.Rule
 	}
 
-	if scan.Spec.Debug {
-		// info seems like a good compromise in terms of verbosity
-		cm.Data[OpenScapVerbosityeEnvName] = "INFO"
+	cm.Data[OpenScapVerbosityeEnvName] = getLogLevel(scan)
+
+	// the env var takes precedence
+	if debugEnvVar := getOscapDebugLevel(); debugEnvVar != "" {
+		cm.Data[OpenScapVerbosityeEnvName] = debugEnvVar
 	}
 
 	if scan.Spec.TailoringConfigMap != nil {
@@ -256,6 +258,34 @@ func commonOpenScapEnvCm(name string, scan *compv1alpha1.ComplianceScan) *corev1
 	}
 
 	return cm
+}
+
+func getOscapDebugLevel() string {
+	switch envVar := os.Getenv("OSCAP_DEBUG_LEVEL"); envVar {
+	case "DEVEL", "INFO", "WARNING", "ERROR":
+		return envVar
+	}
+
+	return ""
+}
+
+func getLogLevel(scan *compv1alpha1.ComplianceScan) string {
+	envVar, ok := os.LookupEnv("OSCAP_DEBUG_LEVEL")
+	if ok {
+		switch envVar {
+		case "DEVEL", "INFO", "WARNING", "ERROR":
+			return envVar
+		default:
+			// invalid value, assume warning which is the default in openscap
+			return "WARNING"
+		}
+	}
+
+	if scan.Spec.Debug {
+		return "INFO"
+	}
+
+	return "WARNING"
 }
 
 func getHttpsProxy(scan *compv1alpha1.ComplianceScan) string {
