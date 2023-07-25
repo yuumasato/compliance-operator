@@ -11,6 +11,7 @@ import (
 
 	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/metrics"
 
+	compliancev1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/common"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/utils"
 	"github.com/go-logr/logr"
@@ -22,15 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	compliancev1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 )
 
 const (
@@ -67,44 +64,16 @@ func newReconciler(mgr manager.Manager, met *metrics.Metrics) reconcile.Reconcil
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
-	// Create a new controller
-	c, err := controller.New("scansettingbinding-controller", mgr, controller.Options{Reconciler: r})
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to primary resource ScanSettingBinding
-	err = c.Watch(&source.Kind{Type: &compliancev1alpha1.ScanSettingBinding{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to secondary resource ScanSetting. Since Setting does not link directly to a Binding,
-	// but the other way around, we use a mapper to enqueue requests for Binding(s) used by a Setting
 	ssMapper := &scanSettingMapper{mgr.GetClient()}
-	err = c.Watch(&source.Kind{Type: &compliancev1alpha1.ScanSetting{}}, handler.EnqueueRequestsFromMapFunc(ssMapper.Map))
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to secondary resource TailoredProfile. Since TailoredProfile does not link directly to a Binding,
-	// but the other way around, we use a mapper to enqueue requests for TailoredProfiles(s) used by a Setting
 	tpMapper := &tailoredProfileMapper{mgr.GetClient()}
-	err = c.Watch(&source.Kind{Type: &compliancev1alpha1.TailoredProfile{}}, handler.EnqueueRequestsFromMapFunc(tpMapper.Map))
-	if err != nil {
-		return err
-	}
 
-	// Watch for changes to secondary resource ComplianceScans and requeue the owner ComplianceSuite
-	err = c.Watch(&source.Kind{Type: &compliancev1alpha1.ComplianceSuite{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &compliancev1alpha1.ScanSettingBinding{},
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return ctrl.NewControllerManagedBy(mgr).
+		Named("scansettingbinding-controller").
+		For(&compliancev1alpha1.ScanSettingBinding{}).
+		Owns(&compliancev1alpha1.ComplianceSuite{}).
+		Watches(&compliancev1alpha1.ScanSetting{}, handler.EnqueueRequestsFromMapFunc(ssMapper.Map)).
+		Watches(&compliancev1alpha1.TailoredProfile{}, handler.EnqueueRequestsFromMapFunc(tpMapper.Map)).
+		Complete(r)
 }
 
 // blank assignment to verify that ReconcileScanSettingBinding implements reconcile.Reconciler

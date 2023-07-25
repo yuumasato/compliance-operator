@@ -3,6 +3,7 @@ package scansettingbinding
 import (
 	"context"
 	"regexp"
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 
 	"github.com/go-logr/zapr"
@@ -233,7 +234,14 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 		scheme := scheme.Scheme
 		scheme.AddKnownTypes(compv1alpha1.SchemeGroupVersion, objs...)
 
-		client := fake.NewFakeClientWithScheme(scheme, pBundleRhcos, pBundleOcp, setting)
+		statusObjs := []runtimeclient.Object{}
+		statusObjs = append(statusObjs, ssb, scratchTP)
+
+		client := fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithStatusSubresource(statusObjs...).
+			WithRuntimeObjects(objs...).
+			Build()
 
 		err := client.Get(context.TODO(), types.NamespacedName{
 			Namespace: pBundleRhcos.Namespace,
@@ -252,7 +260,7 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 				Name:       pBundleRhcos.Name,
 				Kind:       pBundleRhcos.Kind,
 				APIVersion: pBundleRhcos.APIVersion})
-		err = client.Create(context.TODO(), profRhcosE8)
+		err = client.Update(context.TODO(), profRhcosE8)
 		Expect(err).To(BeNil())
 
 		err = client.Get(context.TODO(), types.NamespacedName{
@@ -266,7 +274,7 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 				Name:       pBundleOcp.Name,
 				Kind:       pBundleOcp.Kind,
 				APIVersion: pBundleOcp.APIVersion})
-		err = client.Create(context.TODO(), profOcpCis)
+		err = client.Update(context.TODO(), profOcpCis)
 		Expect(err).To(BeNil())
 
 		err = client.Get(context.TODO(), types.NamespacedName{
@@ -280,7 +288,7 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 				Name:       profRhcosE8.Name,
 				Kind:       profRhcosE8.Kind,
 				APIVersion: profRhcosE8.APIVersion})
-		err = client.Create(context.TODO(), tpRhcosE8)
+		err = client.Update(context.TODO(), tpRhcosE8)
 		Expect(err).To(BeNil())
 
 		err = client.Get(context.TODO(), types.NamespacedName{
@@ -294,7 +302,7 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 				Name:       profOcpCis.Name,
 				Kind:       profOcpCis.Kind,
 				APIVersion: profOcpCis.APIVersion})
-		err = client.Create(context.TODO(), tpOcpCis)
+		err = client.Update(context.TODO(), tpOcpCis)
 		Expect(err).To(BeNil())
 
 		err = client.Get(context.TODO(), types.NamespacedName{
@@ -308,7 +316,7 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 				Name:       pBundleRhcos.Name,
 				Kind:       pBundleRhcos.Kind,
 				APIVersion: pBundleRhcos.APIVersion})
-		err = client.Create(context.TODO(), scratchTP)
+		err = client.Update(context.TODO(), scratchTP)
 		Expect(err).To(BeNil())
 
 		err = client.Get(context.TODO(), types.NamespacedName{

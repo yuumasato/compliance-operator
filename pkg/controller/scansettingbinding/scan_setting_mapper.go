@@ -12,11 +12,11 @@ type scanSettingMapper struct {
 	client.Client
 }
 
-func (s *scanSettingMapper) Map(obj client.Object) []reconcile.Request {
+func (s *scanSettingMapper) Map(ctx context.Context, obj client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 
 	ssbList := v1alpha1.ScanSettingBindingList{}
-	err := s.List(context.TODO(), &ssbList, &client.ListOptions{})
+	err := s.List(ctx, &ssbList, &client.ListOptions{})
 	if err != nil {
 		return requests
 	}

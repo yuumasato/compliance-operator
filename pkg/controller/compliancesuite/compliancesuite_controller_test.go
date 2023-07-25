@@ -93,7 +93,12 @@ var _ = Describe("ComplianceSuiteController", func() {
 		err = mcfgapi.Install(cscheme)
 		Expect(err).To(BeNil())
 
-		client := fake.NewFakeClientWithScheme(cscheme, nodeScan.DeepCopy(), suite.DeepCopy())
+		client := fake.NewClientBuilder().
+			WithScheme(cscheme).
+			WithStatusSubresource(nodeScan, suite, &compv1alpha1.ComplianceRemediation{}).
+			WithRuntimeObjects(nodeScan, suite, &compv1alpha1.ComplianceRemediation{}).
+			Build()
+
 		mockMetrics := metrics.NewMetrics(&metricsfakes.FakeImpl{})
 		err = mockMetrics.Register()
 		Expect(err).To(BeNil())

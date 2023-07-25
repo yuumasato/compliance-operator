@@ -62,7 +62,7 @@ func TestRegisterMetrics(t *testing.T) {
 	}
 }
 
-func TestFileIntegrityMetrics(t *testing.T) {
+func TestComplianceOperatorMetrics(t *testing.T) {
 	t.Parallel()
 
 	getMetricValue := func(col prometheus.Collector) int {

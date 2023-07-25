@@ -223,5 +223,3 @@ func (f *Framework) addToScheme(addToScheme addToSchemeFunc, obj dynclient.Objec
 	}
 	return nil
 }
-
-
