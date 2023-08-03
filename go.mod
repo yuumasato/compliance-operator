@@ -6,8 +6,8 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.27.8
 	github.com/wI2L/jsondiff v0.4.0
-	k8s.io/apimachinery v0.27.2
-	k8s.io/client-go v0.27.2
+	k8s.io/apimachinery v0.27.4
+	k8s.io/client-go v0.27.4
 	sigs.k8s.io/controller-runtime v0.15.0
 )
 
@@ -42,8 +42,8 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
-	github.com/openshift/api v0.0.0-20230503133300-8bbcb7ca7183
-	github.com/openshift/library-go v0.0.0-20230523150659-ab179469ba38
+	github.com/openshift/api v0.0.0-20230613151523-ba04973d3ed1
+	github.com/openshift/library-go v0.0.0-20230803043003-e1dfb9bf12bb
 	github.com/openshift/machine-config-operator v0.0.1-0.20230124070108-2d92b8d47e80
 	github.com/pborman/uuid v1.2.1
 	github.com/pkg/errors v0.9.1
@@ -76,10 +76,10 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.27.2
-	k8s.io/apiextensions-apiserver v0.27.2
-	k8s.io/apiserver v0.27.2
-	k8s.io/component-base v0.27.2 // indirect
+	k8s.io/api v0.27.4
+	k8s.io/apiextensions-apiserver v0.27.4
+	k8s.io/apiserver v0.27.4
+	k8s.io/component-base v0.27.4 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f // indirect
 	k8s.io/pod-security-admission v0.27.2
