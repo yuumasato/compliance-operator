@@ -80,6 +80,7 @@ func newScanPodForNode(scanInstance *compv1alpha1.ComplianceScan, node *corev1.N
 	}
 	falseP := false
 	trueP := true
+	hostToContainer := corev1.MountPropagationHostToContainer
 
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -234,9 +235,10 @@ func newScanPodForNode(scanInstance *compv1alpha1.ComplianceScan, node *corev1.N
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{
-							Name:      "host",
-							MountPath: "/host",
-							ReadOnly:  true,
+							Name:             "host",
+							MountPath:        "/host",
+							MountPropagation: &hostToContainer,
+							ReadOnly:         true,
 						},
 						{
 							Name:      "report-dir",
