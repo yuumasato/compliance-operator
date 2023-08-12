@@ -42,8 +42,8 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
-	github.com/openshift/api v0.0.0-20230613151523-ba04973d3ed1
-	github.com/openshift/library-go v0.0.0-20230803043003-e1dfb9bf12bb
+	github.com/openshift/api v0.0.0-20230807132801-600991d550ac
+	github.com/openshift/library-go v0.0.0-20230809121909-d7e7beca5bae
 	github.com/openshift/machine-config-operator v0.0.1-0.20230124070108-2d92b8d47e80
 	github.com/pborman/uuid v1.2.1
 	github.com/pkg/errors v0.9.1
