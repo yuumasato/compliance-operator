@@ -60,8 +60,8 @@ require (
 	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace // indirect
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.6.0 // indirect
-	go.uber.org/zap v1.24.0
+	go.uber.org/multierr v1.10.0 // indirect
+	go.uber.org/zap v1.25.0
 	golang.org/x/mod v0.12.0
 	golang.org/x/net v0.13.0
 	golang.org/x/oauth2 v0.10.0 // indirect
