@@ -576,10 +576,14 @@ error result.
 Compliance Operator is able to run a platform scan on the HyperShift Managment cluster
 for the Hosted Cluster with a tailoredProfile.
 
-Currently, we only support CIS profile and PCI-DSS profile, in order to scan Hosted
-Cluster, you need to create a tailoredProfile and then set the value of
-`ocp4-hypershift-cluster` to the name of the Hosted Cluster you want to scan,
+Currently, we only support CIS profile and PCI-DSS profile,
 you can either extend `ocp4-cis` or `ocp4-pci-dss`.
+
+In order to scan a Hosted Cluster, you need to create a tailoredProfile to define the
+name and namespace of the Hosted cluster that you want to scan.
+Set the value of `ocp4-hypershift-cluster` to the name of the target Hosted Cluster,
+and set the value of `ocp4-hypershift-namespace-prefix` to the namespace where the
+Hosted Cluster resides, e.g.: `local-cluster`, or `clusters`.
 
 ```yaml
 apiVersion: compliance.openshift.io/v1alpha1
@@ -597,6 +601,9 @@ spec:
    - name: ocp4-hypershift-cluster
      value: "<hypershift-hosted-cluster-name>"
      rationale: This value is used for HyperShift version detection
+   - name: ocp4-hypershift-namespace-prefix
+     value: "<hypershift-hosted-namespace-prefix>"
+     rationale: This value is used for HyperShift controlplane namespace detection
 ```
 
 And after you save the edit, you can then apply the edited `tailoredProfile`,
