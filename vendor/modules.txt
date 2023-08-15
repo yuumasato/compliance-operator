@@ -293,8 +293,8 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20230807132801-600991d550ac => github.com/openshift/api v0.0.0-20220826140015-b21e86c742e7
-## explicit; go 1.18
+# github.com/openshift/api v0.0.0-20230815081605-d7f5a4c98505 => github.com/openshift/api v0.0.0-20230815081605-d7f5a4c98505
+## explicit; go 1.20
 github.com/openshift/api
 github.com/openshift/api/apiserver
 github.com/openshift/api/apiserver/v1
@@ -308,6 +308,10 @@ github.com/openshift/api/cloudnetwork
 github.com/openshift/api/cloudnetwork/v1
 github.com/openshift/api/config
 github.com/openshift/api/config/v1
+github.com/openshift/api/config/v1alpha1
+github.com/openshift/api/console
+github.com/openshift/api/console/v1
+github.com/openshift/api/console/v1alpha1
 github.com/openshift/api/helm
 github.com/openshift/api/helm/v1beta1
 github.com/openshift/api/image
@@ -1147,5 +1151,5 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
-# github.com/openshift/api => github.com/openshift/api v0.0.0-20220826140015-b21e86c742e7
+# github.com/openshift/api => github.com/openshift/api v0.0.0-20230815081605-d7f5a4c98505
 # github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20220504114320-6aec01bb0754
