@@ -397,12 +397,12 @@ func (r *ReconcileComplianceScan) getRuntimeKubeletConfig(nodeName string) (stri
 	// get the runtime kubeletconfig
 	kubeletConfigIO, err := r.ClientSet.CoreV1().RESTClient().Get().RequestURI("/api/v1/nodes/" + nodeName + "/proxy/configz").Stream(context.TODO())
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot get the runtime kubelet config for node %s: %v", nodeName, err)
 	}
 	defer kubeletConfigIO.Close()
 	kubeletConfig, err := ioutil.ReadAll(kubeletConfigIO)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot read the runtime kubelet config for node %s: %v", nodeName, err)
 	}
 	// kubeletConfig is a byte array, we need to convert it to string
 	kubeletConfigStr := string(kubeletConfig)
