@@ -404,10 +404,10 @@ including advanced topics such as content building.
 ## Must-gather support
 
 An `oc adm must-gather` image for collecting operator information for debugging
-or support is available at `ghcr.io/complianceascode/compliance-operator-must-gather:latest`:
+or support is available at `ghcr.io/complianceascode/must-gather-ocp:latest`:
 
 ```
-$ oc adm must-gather --image=ghcr.io/complianceascode/compliance-operator-must-gather:latest
+$ oc adm must-gather --image=ghcr.io/complianceascode/must-gather-ocp:latest
 ```
 
 ## Metrics
