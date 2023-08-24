@@ -20,6 +20,15 @@ const (
 	// This is how the script would be mounted
 	OpenScapScriptPath = "/scripts/openscap-container-entrypoint"
 
+	// configMap that contains the runtime kubeletconfig
+	KubeletConfigMapName = "openscap-kubeletconfig"
+	// This is how the kubeletconfig would be mounted
+	KubeletConfigMapPath = "/kubeletconfig"
+	// This is how the kubeletconfig would be linked in the host
+	KubeletConfigLinkPath = "/host/etc/kubernetes/compliance-operator/kubeletconfig"
+	// This is the folder where the kubeletconfig would be linked in the host
+	KubeletConfigLinkFolder = "/host/etc/kubernetes/compliance-operator"
+
 	// a configMap with env vars for the script
 	OpenScapEnvConfigMapName = "openscap-env-map"
 	// A configMap same as above but minus hostroot

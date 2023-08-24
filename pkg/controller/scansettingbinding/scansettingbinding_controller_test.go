@@ -3,8 +3,9 @@ package scansettingbinding
 import (
 	"context"
 	"regexp"
-	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
+
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/go-logr/zapr"
 	. "github.com/onsi/ginkgo"
@@ -30,11 +31,8 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 		reconciler ReconcileScanSettingBinding
 
 		pBundleRhcos *compv1alpha1.ProfileBundle
-		pBundleOcp   *compv1alpha1.ProfileBundle
 		profRhcosE8  *compv1alpha1.Profile
-		profOcpCis   *compv1alpha1.Profile
 		tpRhcosE8    *compv1alpha1.TailoredProfile
-		tpOcpCis     *compv1alpha1.TailoredProfile
 		scratchTP    *compv1alpha1.TailoredProfile
 
 		setting *compv1alpha1.ScanSetting
@@ -56,14 +54,9 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 		ssb = &compv1alpha1.ScanSettingBinding{}
 		suite = &compv1alpha1.ComplianceSuite{}
 
-		nodeProfileAnnotations := map[string]string{
+		platformProfileAnnotations := map[string]string{
 			compv1alpha1.ProductTypeAnnotation: string(compv1alpha1.ScanTypeNode),
 			compv1alpha1.ProductAnnotation:     "rhcos4",
-		}
-
-		platformProfileAnnotation := map[string]string{
-			compv1alpha1.ProductTypeAnnotation: string(compv1alpha1.ScanTypePlatform),
-			compv1alpha1.ProductAnnotation:     "ocp4",
 		}
 
 		pBundleRhcos = &compv1alpha1.ProfileBundle{
@@ -80,25 +73,11 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 			},
 		}
 
-		pBundleOcp = &compv1alpha1.ProfileBundle{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      "ocp4",
-				Namespace: common.GetComplianceOperatorNamespace(),
-			},
-			Spec: compv1alpha1.ProfileBundleSpec{
-				ContentImage: "ghcr.io/complianceascode/k8scontent:latest",
-				ContentFile:  "ssg-ocp4-ds.xml",
-			},
-			Status: compv1alpha1.ProfileBundleStatus{
-				DataStreamStatus: compv1alpha1.DataStreamValid,
-			},
-		}
-
 		profRhcosE8 = &compv1alpha1.Profile{
 			ObjectMeta: v1.ObjectMeta{
 				Name:        "rhcos4-e8",
 				Namespace:   common.GetComplianceOperatorNamespace(),
-				Annotations: nodeProfileAnnotations,
+				Annotations: platformProfileAnnotations,
 			},
 			ProfilePayload: compv1alpha1.ProfilePayload{
 				Title:       "rhcos4 profile",
@@ -107,24 +86,11 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 			},
 		}
 
-		profOcpCis = &compv1alpha1.Profile{
-			ObjectMeta: v1.ObjectMeta{
-				Name:        "ocp4-cis",
-				Namespace:   common.GetComplianceOperatorNamespace(),
-				Annotations: platformProfileAnnotation,
-			},
-			ProfilePayload: compv1alpha1.ProfilePayload{
-				Title:       "ocp4 profile",
-				Description: "ocp4 profile description",
-				ID:          "xccdf_org.ssgproject.content_profile_ocp4",
-			},
-		}
-
 		tpRhcosE8 = &compv1alpha1.TailoredProfile{
 			ObjectMeta: v1.ObjectMeta{
-				Name:        "emptypass-rhcos4-e8",
-				Namespace:   common.GetComplianceOperatorNamespace(),
-				Annotations: nodeProfileAnnotations,
+				Name:      "emptypass-rhcos4-e8",
+				Namespace: common.GetComplianceOperatorNamespace(),
+				Labels:    platformProfileAnnotations,
 			},
 			Spec: compv1alpha1.TailoredProfileSpec{
 				Extends:     profRhcosE8.Name,
@@ -148,49 +114,11 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 			},
 		}
 
-		tpOcpCis = &compv1alpha1.TailoredProfile{
-			ObjectMeta: v1.ObjectMeta{
-				Name:        "auditprofile-ocp4-cis",
-				Namespace:   common.GetComplianceOperatorNamespace(),
-				Annotations: platformProfileAnnotation,
-			},
-			Spec: compv1alpha1.TailoredProfileSpec{
-				Extends:     profOcpCis.Name,
-				Title:       "testing TP",
-				Description: "some desc",
-				DisableRules: []compv1alpha1.RuleReferenceSpec{
-					{
-						Name:      "ocp4-var-openshift-audit-profile",
-						Rationale: "I don't want this rule",
-					},
-				},
-				SetValues: []compv1alpha1.VariableValueSpec{
-					{
-						Name:  "ocp4-var-role-master",
-						Value: "role-1",
-					},
-					{
-						Name:  "ocp4-var-role-worker",
-						Value: "role-2",
-					},
-				},
-			},
-			Status: compv1alpha1.TailoredProfileStatus{
-				ID: "xccdf_compliance.openshift.io_profile_auditprofile-ocp4-cis",
-				OutputRef: compv1alpha1.OutputRef{
-					Name:      "auditprofile-ocp4-cis-tp",
-					Namespace: common.GetComplianceOperatorNamespace(),
-				},
-				State:        compv1alpha1.TailoredProfileStateReady,
-				ErrorMessage: "",
-			},
-		}
-
 		scratchTP = &compv1alpha1.TailoredProfile{
 			ObjectMeta: v1.ObjectMeta{
 				Name:        "scratch-tp",
 				Namespace:   common.GetComplianceOperatorNamespace(),
-				Annotations: nodeProfileAnnotations,
+				Annotations: platformProfileAnnotations,
 			},
 			Spec: compv1alpha1.TailoredProfileSpec{
 				Title:       "testing TP",
@@ -229,7 +157,6 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 		}
 
 		objs = append(objs, ssb, pBundleRhcos, profRhcosE8, tpRhcosE8, scratchTP, suite, setting)
-		objs = append(objs, pBundleOcp, profOcpCis, tpOcpCis)
 
 		scheme := scheme.Scheme
 		scheme.AddKnownTypes(compv1alpha1.SchemeGroupVersion, objs...)
@@ -249,12 +176,6 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 		}, pBundleRhcos)
 		Expect(err).To(BeNil())
 
-		err = client.Get(context.TODO(), types.NamespacedName{
-			Namespace: pBundleOcp.Namespace,
-			Name:      pBundleOcp.Name,
-		}, pBundleOcp)
-		Expect(err).To(BeNil())
-
 		profRhcosE8.OwnerReferences = append(profRhcosE8.OwnerReferences,
 			v1.OwnerReference{
 				Name:       pBundleRhcos.Name,
@@ -269,20 +190,6 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 		}, profRhcosE8)
 		Expect(err).To(BeNil())
 
-		profOcpCis.OwnerReferences = append(profOcpCis.OwnerReferences,
-			v1.OwnerReference{
-				Name:       pBundleOcp.Name,
-				Kind:       pBundleOcp.Kind,
-				APIVersion: pBundleOcp.APIVersion})
-		err = client.Update(context.TODO(), profOcpCis)
-		Expect(err).To(BeNil())
-
-		err = client.Get(context.TODO(), types.NamespacedName{
-			Namespace: profOcpCis.Namespace,
-			Name:      profOcpCis.Name,
-		}, profOcpCis)
-		Expect(err).To(BeNil())
-
 		tpRhcosE8.OwnerReferences = append(tpRhcosE8.OwnerReferences,
 			v1.OwnerReference{
 				Name:       profRhcosE8.Name,
@@ -295,20 +202,6 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 			Namespace: tpRhcosE8.Namespace,
 			Name:      tpRhcosE8.Name,
 		}, tpRhcosE8)
-		Expect(err).To(BeNil())
-
-		tpOcpCis.OwnerReferences = append(tpOcpCis.OwnerReferences,
-			v1.OwnerReference{
-				Name:       profOcpCis.Name,
-				Kind:       profOcpCis.Kind,
-				APIVersion: profOcpCis.APIVersion})
-		err = client.Update(context.TODO(), tpOcpCis)
-		Expect(err).To(BeNil())
-
-		err = client.Get(context.TODO(), types.NamespacedName{
-			Namespace: tpOcpCis.Namespace,
-			Name:      tpOcpCis.Name,
-		}, tpOcpCis)
 		Expect(err).To(BeNil())
 
 		scratchTP.OwnerReferences = append(scratchTP.OwnerReferences,
@@ -860,48 +753,17 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 	})
 
 	When("Validating roles", func() {
-		JustBeforeEach(func() {
-			ssb = &compv1alpha1.ScanSettingBinding{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      "simple-compliance-requirements",
-					Namespace: common.GetComplianceOperatorNamespace(),
-				},
-				Profiles: []compv1alpha1.NamedObjectReference{
-					{
-						Name:     tpOcpCis.Name,
-						Kind:     tpOcpCis.Kind,
-						APIGroup: tpOcpCis.APIVersion,
-					},
-				},
-				SettingsRef: &compv1alpha1.NamedObjectReference{
-					Name:     setting.Name,
-					Kind:     setting.Kind,
-					APIGroup: setting.APIVersion,
-				},
-			}
-
-			ssb.Status.SetConditionPending()
-
-			err := reconciler.Client.Create(context.TODO(), ssb)
-			Expect(err).To(BeNil())
-
-			err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
-				Namespace: ssb.Namespace,
-				Name:      ssb.Name,
-			}, ssb)
-			Expect(err).To(BeNil())
-		})
-
 		DescribeTable("Should pass the validation",
 			func(roles []string) {
 				ss := &compv1alpha1.ScanSetting{
 					Roles: roles,
 				}
-				err := reconciler.validateRoles(ssb, ss, log)
+				err := reconciler.validateRoles(ss)
 				Expect(err).To(BeNil())
 			},
 			Entry("master & worker", []string{"master", "worker"}),
 			Entry("@all", []string{"@all"}),
+			Entry("other samples", []string{"control-plane", "role-1", "role-2", "role-3"}),
 		)
 
 		When("Passing empty roles", func() {
@@ -909,7 +771,7 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 				ss := &compv1alpha1.ScanSetting{
 					Roles: []string{},
 				}
-				err := reconciler.validateRoles(ssb, ss, log)
+				err := reconciler.validateRoles(ss)
 				Expect(err).To(BeNil())
 				// TODO(jaosorior): Validate that a warning was issued
 			})
@@ -920,7 +782,7 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 				ss := &compv1alpha1.ScanSetting{
 					Roles: roles,
 				}
-				err := reconciler.validateRoles(ssb, ss, log)
+				err := reconciler.validateRoles(ss)
 				Expect(err).ToNot(BeNil(), "validation should have returned an error")
 			},
 			Entry("spaces", []string{"master "}),
@@ -928,28 +790,6 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 			Entry("too long", []string{strings.Repeat("foo", 100)}),
 			Entry("empty string", []string{""}),
 			Entry("invalid character", []string{"l33t$"}),
-		)
-
-		DescribeTable("Custom roles defined in TP variables should pass validation",
-			func(roles []string) {
-				ss := &compv1alpha1.ScanSetting{
-					Roles: roles,
-				}
-				err := reconciler.validateRoles(ssb, ss, log)
-				Expect(err).To(BeNil())
-			},
-			Entry("other samples", []string{"role-1", "role-2"}),
-		)
-
-		DescribeTable("Custom roles not defined in TP variables should not pass validation",
-			func(roles []string) {
-				ss := &compv1alpha1.ScanSetting{
-					Roles: roles,
-				}
-				err := reconciler.validateRoles(ssb, ss, log)
-				Expect(err).ToNot(BeNil())
-			},
-			Entry("other samples", []string{"role-3"}),
 		)
 	})
 

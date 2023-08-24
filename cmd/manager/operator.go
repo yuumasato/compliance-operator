@@ -289,7 +289,7 @@ func RunOperator(cmd *cobra.Command, args []string) {
 	}
 
 	// Setup all Controllers
-	if err := controller.AddToManager(mgr, met, si); err != nil {
+	if err := controller.AddToManager(mgr, met, si, kubeClient); err != nil {
 		setupLog.Error(err, "")
 		os.Exit(1)
 	}
