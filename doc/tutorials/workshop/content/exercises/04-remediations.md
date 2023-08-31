@@ -92,13 +92,18 @@ You'll notice that this remediation merely creates a MachineConfig object that s
 sysctl. You'll also notice that there is a controller set in the `ownerReferences` key in the metadata
 of the remediation. This object points to a **ComplianceCheckResult** object which contains further
 explanations about what was checked and why this remediation needs to be applied. We already examined
-the results in the previous chapter, so for this exercise, let's just just see what the check is about:
+the results in the previous chapter, so for this exercise, let's just see what the check is about:
 
 ```
 $ oc get compliancecheckresult rhcos4-e8-worker-sysctl-kernel-dmesg-restrict -o jsonpath="{.description}"
 Restrict Access to Kernel Message Buffer
-Unprivileged access to the kernel syslog can expose sensitive kernel
-address information.
+To set the runtime status of the kernel.dmesg_restrict kernel parameter, run the following command:
+
+$ sudo sysctl -w kernel.dmesg_restrict=1
+
+To make sure that the setting is persistent, add the following line to a file in the directory /etc/sysctl.d :
+
+kernel.dmesg_restrict = 1
 ```
 
 While this information is relevant, we might want to know more. This is where it's relevant to check the
@@ -194,11 +199,8 @@ metadata:
     compliance.openshift.io/scan-name: rhcos4-e8-worker
     compliance.openshift.io/suite: periodic-e8
     machineconfiguration.openshift.io/role: worker
-  managedFields:
-...
   name: 75-rhcos4-e8-worker-sysctl-kernel-dmesg-restrict
   resourceVersion: "136045"
-  selfLink: /apis/machineconfiguration.openshift.io/v1/machineconfigs/75-rhcos4-e8-worker-sysctl-kernel-dmesg-restrict
   uid: 267bda7e-b170-4817-b9f5-89047e7888f5
 spec:
   config:

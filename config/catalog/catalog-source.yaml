@@ -5,6 +5,6 @@ metadata:
   namespace: openshift-marketplace
 spec:
   displayName: Compliance Operator Upstream
-  publisher: github.com/openshift/compliance-operator
+  publisher: github.com/complianceascode/compliance-operator
   sourceType: grpc
   image: ghcr.io/complianceascode/compliance-operator-catalog:latest

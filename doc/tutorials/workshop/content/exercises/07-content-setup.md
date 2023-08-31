@@ -27,7 +27,7 @@ the content requires some Linux-specific packages such as `openscap-utils`.
 If you are already running Linux and can install additional packages, the
 setup is just a matter of running a couple of `yum/dnf` calls and cloning a
 repo. You can head to the [SCAP developer
-documentation](https://github.com/ComplianceAsCode/content/blob/master/docs/manual/developer_guide.adoc#building-complianceascode)
+documentation](https://complianceascode.readthedocs.io/en/latest/)
 for detailed instructions.
 
 If you are running a different OS, like macOS or can't install packages on
@@ -107,8 +107,10 @@ user@compliance$ ./utils/build_ds_container.py
 ```
 This command might take a fair amount of time, but eventually would finish with:
 ```
-Success!
-********
+2023-08-31 15:30:02,170:INFO: Building content for ocp4, rhcos4
+2023-08-31 15:31:03,195:INFO: Successfully built content for ocp4, rhcos4
+2023-08-31 15:31:24,289:INFO: Build status: Running
+...
 Your image is available at: image-registry.openshift-image-registry.svc:5000/openshift-compliance/openscap-ocp4-ds:latest
 ```
 
@@ -137,7 +139,8 @@ new VSCode window that is connected to your host.
 
 Open the compliance content files by clicking the Open icon (Top left on the sidebar)
 and selecting "Open Folder". If you're using the VM setup, open the directory
-`/home/user/content`. The CIS content is located in `ocp4/profiles/cis.profile`.
+`/home/user/content`. The CIS content is defined in `controls/cis_ocp_1_4_0` and
+referenced by a profile in `ocp4/profiles/cis.profile`.
 
 You can even open a terminal in VSCode that proxies to the remote machine by selecting
 "Terminal" which should open a shell in the remote VM.
@@ -145,16 +148,17 @@ You can even open a terminal in VSCode that proxies to the remote machine by sel
 ComplianceAsCode extensions
 ---------------------------
 The ComplianceAsCode extensions written by Gabriel Becker allow you to
-navigate between rules and remediations. The extension is called "Content
-Navigator" and its ID is `ggbecker.content-navigator`.  You should be able to
-install it from the Extensions Marketplace as any other VSCode extension.
+navigate between rules and remediations. The extension is called [Content
+Navigator](content-navigator.net) and its ID is `ggbecker.content-navigator`.
+You should be able to install it from the Extensions Marketplace as any other
+VSCode extension.
 
 Note - if you are using a remote connection to a VM, you need to install the
 extension in the window that opens for the remote connection as well.
 
-If you open the CIS profile at `ocp4/profiles/cis.profile`, you can test the
-extension by e.g. right-clicking a rule name and selecting "Open Rule". All
-the extension features also have keyboard shortcuts.
+If you open the CIS profile at `controls/cis_ocp_1_4_0/section-1.yml`, you can
+test the extension by e.g. right-clicking a rule name and selecting "Open Rule".
+All the extension features also have keyboard shortcuts.
 
 ***
 
