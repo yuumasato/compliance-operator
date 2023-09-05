@@ -1254,7 +1254,34 @@ func TestVariableTemplate(t *testing.T) {
 
 func TestKubeletConfigRemediation(t *testing.T) {
 	f := framework.Global
-	suiteName := "kubelet-remediation-test-suite"
+	var baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "new_kubeletconfig")
+	const requiredRule = "kubelet-enable-streaming-connections"
+	pbName := framework.GetObjNameFromTest(t)
+	prefixName := func(profName, ruleBaseName string) string { return profName + "-" + ruleBaseName }
+
+	ocpPb := &compv1alpha1.ProfileBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pbName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ProfileBundleSpec{
+			ContentImage: baselineImage,
+			ContentFile:  framework.OcpContentFile,
+		},
+	}
+	if err := f.Client.Create(context.TODO(), ocpPb, nil); err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), ocpPb)
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that if the rule we are going to test is there
+	requiredRuleName := prefixName(pbName, requiredRule)
+	requiredVersionRuleName := prefixName(pbName, "version-detect-in-ocp")
+	requiredVariableName := prefixName(pbName, "var-streaming-connection-timeouts")
+	suiteName := "kubelet-remediation-test-suite-node"
 
 	tp := &compv1alpha1.TailoredProfile{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1262,33 +1289,23 @@ func TestKubeletConfigRemediation(t *testing.T) {
 			Namespace: f.OperatorNamespace,
 		},
 		Spec: compv1alpha1.TailoredProfileSpec{
-			Title:       "kubelet-remediation-test",
+			Title:       "kubelet-remediation-test-node",
 			Description: "A test tailored profile to test kubelet remediation",
 			EnableRules: []compv1alpha1.RuleReferenceSpec{
 				{
-					Name:      "ocp4-kubelet-enable-streaming-connections",
+					Name:      requiredRuleName,
 					Rationale: "To be tested",
 				},
 				{
-					Name:      "ocp4-version-detect-in-ocp",
+					Name:      requiredVersionRuleName,
 					Rationale: "To be tested",
 				},
 			},
 			SetValues: []compv1alpha1.VariableValueSpec{
 				{
-					Name:      "ocp4-var-streaming-connection-timeouts",
+					Name:      requiredVariableName,
 					Rationale: "Value to be set",
 					Value:     "8h0m0s",
-				},
-				{
-					Name:      "ocp4-var-role-master",
-					Rationale: "Value to be set",
-					Value:     framework.TestPoolName,
-				},
-				{
-					Name:      "ocp4-var-role-worker",
-					Rationale: "Value to be set",
-					Value:     framework.TestPoolName,
 				},
 			},
 		},
@@ -1330,7 +1347,7 @@ func TestKubeletConfigRemediation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	scanName := suiteName
+	scanName := suiteName + "-" + framework.TestPoolName
 
 	// We need to check that the remediation is auto-applied and save
 	// the object so we can delete it later
@@ -1364,18 +1381,13 @@ func TestKubeletConfigRemediation(t *testing.T) {
 	// Now the check should be passing
 	checkResult := compv1alpha1.ComplianceCheckResult{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-kubelet-enable-streaming-connections", suiteName),
+			Name:      fmt.Sprintf("%s-kubelet-enable-streaming-connections", scanName),
 			Namespace: f.OperatorNamespace,
 		},
 		ID:       "xccdf_org.ssgproject.content_rule_kubelet_enable_streaming_connections",
 		Status:   compv1alpha1.CheckResultPass,
 		Severity: compv1alpha1.CheckResultSeverityMedium,
 	}
-	err = f.AssertHasCheck(suiteName, scanName, checkResult)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	err = f.AssertHasCheck(suiteName, scanName, checkResult)
 	if err != nil {
 		t.Fatal(err)
