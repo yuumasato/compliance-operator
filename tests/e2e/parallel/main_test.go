@@ -173,6 +173,78 @@ func TestProfileModification(t *testing.T) {
 	}
 }
 
+func TestRuleCheckType(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	const (
+		changeTypeRule      = "kubelet-anonymous-auth"
+		moderateProfileName = "moderate"
+	)
+	var (
+		baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "kubelet_default")
+		modifiedImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "new_kubeletconfig")
+	)
+
+	prefixName := func(profName, ruleBaseName string) string { return profName + "-" + ruleBaseName }
+
+	pbName := framework.GetObjNameFromTest(t)
+	origPb := &compv1alpha1.ProfileBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pbName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ProfileBundleSpec{
+			ContentImage: baselineImage,
+			ContentFile:  framework.OcpContentFile,
+		},
+	}
+	// Pass nil in as the cleanupOptions since so we don't invoke all the
+	// cleanup function code in Create. Use defer to cleanup the
+	// ProfileBundle at the end of the test, instead of at the end of the
+	// suite.
+	if err := f.Client.Create(context.TODO(), origPb, nil); err != nil {
+		t.Fatalf("failed to create ProfileBundle: %s", err)
+	}
+	// This should get cleaned up at the end of the test
+	defer f.Client.Delete(context.TODO(), origPb)
+
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid); err != nil {
+		t.Fatalf("failed waiting for the ProfileBundle to become available: %s", err)
+	}
+
+	// Check that the rule exists in the original profile
+	changeTypeRuleName := prefixName(pbName, changeTypeRule)
+	err, found := f.DoesRuleExist(origPb.Namespace, changeTypeRuleName)
+	if err != nil {
+		t.Fatal(err)
+	} else if found != true {
+		t.Fatalf("expected rule %s to exist in namespace %s", changeTypeRuleName, origPb.Namespace)
+	}
+
+	// update the image with a new hash
+	modPb := origPb.DeepCopy()
+	if err := f.Client.Get(context.TODO(), types.NamespacedName{Namespace: modPb.Namespace, Name: modPb.Name}, modPb); err != nil {
+		t.Fatalf("failed to get ProfileBundle %s", modPb.Name)
+	}
+
+	modPb.Spec.ContentImage = modifiedImage
+	if err := f.Client.Update(context.TODO(), modPb); err != nil {
+		t.Fatalf("failed to update ProfileBundle %s: %s", modPb.Name, err)
+	}
+
+	// Wait for the update to happen, the PB will flip first to pending, then to valid
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid); err != nil {
+		t.Fatalf("failed to parse ProfileBundle %s: %s", pbName, err)
+	}
+
+	if err := f.AssertProfileBundleMustHaveParsedRules(pbName); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.AssertRuleCheckTypeChangedAnnotationKey(f.OperatorNamespace, changeTypeRuleName, "Platform"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestProfileISTagUpdate(t *testing.T) {
 	t.Parallel()
 	f := framework.Global

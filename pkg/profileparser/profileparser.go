@@ -108,6 +108,12 @@ func ParseBundle(contentDom *xmlquery.Node, pb *cmpv1alpha1.ProfileBundle, pcfg 
 				}
 
 				foundRule.Annotations = updatedRule.Annotations
+				// if the check type has changed, add an annotation to the rule
+				// to indicate that the rule needs to be checked in TailoredProfile validation
+				if foundRule.CheckType != updatedRule.CheckType {
+					log.Info("Rule check type has changed", "rule", foundRule.Name, "oldCheckType", foundRule.CheckType, "newCheckType", updatedRule.CheckType)
+					foundRule.Annotations[cmpv1alpha1.RuleLastCheckTypeChangedAnnotationKey] = foundRule.CheckType
+				}
 				foundRule.RulePayload = *updatedRule.RulePayload.DeepCopy()
 				return pcfg.Client.Update(context.TODO(), foundRule)
 			})
@@ -207,6 +213,7 @@ func createOrUpdate(cli runtimeclient.Client, kind string, key types.NamespacedN
 	updateTo := obj.DeepCopyObject()
 	err := cli.Get(context.TODO(), key, found)
 	if errors.IsNotFound(err) {
+		log.Info("Object not found, creating", "kind", kind, "key", key)
 		err := cli.Create(context.TODO(), obj)
 		if err != nil {
 			log.Error(err, "Failed to create object", "kind", kind, "key", key)
@@ -602,6 +609,7 @@ func ParseRulesAndDo(contentDom *xmlquery.Node, stdParser *referenceParser, pb *
 				}
 
 				rawFixReader := strings.NewReader(fixNodeObj.InnerText())
+				log.Info("Raw fix", "rawFix", fixNodeObj.InnerText())
 				fixKubeObjs, err := utils.ReadObjectsFromYAML(rawFixReader)
 				if err != nil {
 					log.Info("Couldn't parse Kubernetes object from fix")
