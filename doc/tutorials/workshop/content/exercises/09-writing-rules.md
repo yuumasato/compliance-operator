@@ -13,7 +13,7 @@ benchmark, or simply you have a custom scenario that you want to address.
 
 There is already documentation in place that will help you [write content
 and understand the structure of the project](
-https://github.com/ComplianceAsCode/content/blob/master/docs/manual/developer_guide.adoc#creating-content)
+https://complianceascode.readthedocs.io/en/latest/manual/developer/03_creating_content.html)
 so let's focus instead on writing content for OpenShift.
 
 There is a handy tool in the `utils` directory that will help you create such
@@ -51,6 +51,7 @@ Let's create a rule that simply checks that the `ConfigMap` exists with the appr
 value.
 
 ```
+$ source .pyenv.sh # Configure PYTHONPATH for CaC modules
 $ ./utils/add_platform_rule.py create \
     --rule must_have_compliant_cm \
     --name my-compliance-configmap --namespace openshift --type configmap \
@@ -100,7 +101,7 @@ template:
 
 This template will make the build system generate the appropriate OVAL check
 that OpenSCAP will take into use. You can read more about it in the [documentation
-](https://github.com/ComplianceAsCode/content/blob/master/docs/manual/developer_guide.adoc#732-list-of-available-templates)
+](https://complianceascode.readthedocs.io/en/latest/templates/template_reference.html)
 
 ## Testing our rule
 

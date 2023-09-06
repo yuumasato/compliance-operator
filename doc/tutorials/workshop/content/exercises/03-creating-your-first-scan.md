@@ -35,10 +35,10 @@ usability:
     product where product might be `ocp4` or `rhcos4`.
 
 By default, the Compliance Operator creates two `profilebundle` objects, one for
-OCP and one for RHCOS based on the [upstream ComplianceAsCode content images](https://quay.io/repository/compliance-operator/compliance-operator-content):
+OCP and one for RHCOS based on the [upstream ComplianceAsCode content images](https://github.com/complianceascode/compliance-operator/pkgs/container/compliance-operator):
 ```
 $ oc get profilebundle.compliance
-NAME     CONTENTIMAGE                           CONTENTFILE         STATUS
+NAME     CONTENTIMAGE                                 CONTENTFILE         STATUS
 ocp4     ghcr.io/complianceascode/k8scontent:latest   ssg-ocp4-ds.xml     VALID
 rhcos4   ghcr.io/complianceascode/k8scontent:latest   ssg-rhcos4-ds.xml   VALID
 ```
@@ -50,14 +50,24 @@ $ oc get profilebundle.compliance rhcos4 -o yaml
 apiVersion: compliance.openshift.io/v1alpha1
 kind: ProfileBundle
 metadata:
+  creationTimestamp: "2023-08-31T08:42:10Z"
+  finalizers:
+  - profilebundle.finalizers.compliance.openshift.io
+  generation: 1
   name: rhcos4
   namespace: openshift-compliance
-  selfLink: /apis/compliance.openshift.io/v1alpha1/namespaces/openshift-compliance/profilebundles/rhcos4
-  uid: f5516313-5f16-4ff8-9c69-d79d44126b8b
+  resourceVersion: "64537"
+  uid: ca1cf53a-71b5-4492-acd7-6c79b99c4b4f
 spec:
   contentFile: ssg-rhcos4-ds.xml
   contentImage: ghcr.io/complianceascode/k8scontent:latest
 status:
+  conditions:
+  - lastTransitionTime: "2023-08-31T08:43:30Z"
+    message: Profile bundle successfully parsed
+    reason: Valid
+    status: "True"
+    type: Ready
   dataStreamStatus: VALID
 ```
 The `status.dataStreamStatus` field is set by the operator and reflects
@@ -66,12 +76,17 @@ the result of the content parsing.
 Several `Profile` objects are parsed out of each bundle, for the `rhcos4` bundle we'd have:
 ```
 $ oc get profile.compliance -lcompliance.openshift.io/profile-bundle=rhcos4  -nopenshift-compliance
-NAME              AGE
-rhcos4-e8         5h2m
-rhcos4-moderate   5h2m
-rhcos4-ncp        5h2m
-rhcos4-ospp       5h2m
-rhcos4-stig       5h2m
+NAME                             AGE
+rhcos4-anssi-bp28-enhanced       19m
+rhcos4-anssi-bp28-high           19m
+rhcos4-anssi-bp28-intermediary   19m
+rhcos4-anssi-bp28-minimal        19m
+rhcos4-e8                        19m
+rhcos4-high                      19m
+rhcos4-moderate                  19m
+rhcos4-nerc-cip                  19m
+rhcos4-stig                      19m
+
 ```
 
 For the rest of the chapter we'll be working with the `e8` profile. Inspecting
@@ -79,22 +94,18 @@ the profile shows the following:
 ```
 $ oc get profile.compliance rhcos4-e8 -o yaml
 apiVersion: compliance.openshift.io/v1alpha1
-description: |-
-  This profile contains configuration checks for Red Hat Enterprise Linux CoreOS
-  that align to the Australian Cyber Security Centre (ACSC) Essential Eight.
-
-  A copy of the Essential Eight in Linux Environments guide can be found at the
-  ACSC website:
-
-  https://www.cyber.gov.au/publications/essential-eight-in-linux-environments
+description: 'This profile contains configuration checks for Red Hat Enterprise Linux
+  CoreOS that align to the Australian Cyber Security Centre (ACSC) Essential Eight.
+  A copy of the Essential Eight in Linux Environments guide can be found at the ACSC
+  website: https://www.cyber.gov.au/acsc/view-all-content/publications/hardening-linux-workstations-and-servers'
 id: xccdf_org.ssgproject.content_profile_e8
 kind: Profile
 metadata:
   annotations:
-    compliance.openshift.io/image-digest: pb-rhcos496gpm
+    compliance.openshift.io/image-digest: pb-rhcos4lv4h8
     compliance.openshift.io/product: redhat_enterprise_linux_coreos_4
     compliance.openshift.io/product-type: Node
-  creationTimestamp: "2020-09-08T07:44:10Z"
+  creationTimestamp: "2023-08-31T08:42:24Z"
   generation: 1
   labels:
     compliance.openshift.io/profile-bundle: rhcos4
@@ -106,10 +117,9 @@ metadata:
     controller: true
     kind: ProfileBundle
     name: rhcos4
-    uid: a130fef5-054c-431e-91c7-306995ee86c4
-  resourceVersion: "39697"
-  selfLink: /apis/compliance.openshift.io/v1alpha1/namespaces/openshift-compliance/profiles/rhcos4-e8
-  uid: d2c28fb8-0bfe-4c7e-884e-d5e1be790d3e
+    uid: ca1cf53a-71b5-4492-acd7-6c79b99c4b4f
+  resourceVersion: "62455"
+  uid: 8312087a-87ee-44e7-8e5e-3760dcadbed6
 rules:
 - rhcos4-accounts-no-uid-except-zero
 - rhcos4-audit-rules-dac-modification-chmod
@@ -156,33 +166,43 @@ The (trimmed) result looks somewhat like:
 ```
 $ oc get rule.compliance rhcos4-accounts-no-uid-except-zero -o yaml
 apiVersion: compliance.openshift.io/v1alpha1
-description: <br />If the account is associated with system commands or applications the UID&#xA;should be changed to one greater than &#34;0&#34; but less than &#34;1000.&#34;&#xA;Otherwise assign a UID greater than &#34;1000&#34; that has not already been&#xA;assigned.
+checkType: Node
+description: |-
+  If any account other than root has a UID of 0, this misconfiguration should be investigated and the accounts other than root should be removed or have their UID changed.
+
+  If the account is associated with system commands or applications the UID should be changed to one greater than "0" but less than "1000." Otherwise assign a UID greater than "1000" that has not already been assigned.
 id: xccdf_org.ssgproject.content_rule_accounts_no_uid_except_zero
+instructions: |-
+  Verify that only the "root" account has a UID "0" assignment with the
+  following command:
+  $ awk -F: '$3 == 0 {print $1}' /etc/passwd
+  root
 kind: Rule
 metadata:
   annotations:
-    compliance.openshift.io/image-digest: pb-rhcos4mxp5c
+    compliance.openshift.io/image-digest: pb-rhcos4lv4h8
     compliance.openshift.io/rule: accounts-no-uid-except-zero
+    control.compliance.openshift.io/NERC-CIP: CIP-003-8 R5.1.1;CIP-003-8 R5.3;CIP-004-6
+      R2.2.3;CIP-004-6 R2.3;CIP-007-3 R5.1;CIP-007-3 R5.1.2;CIP-007-3 R5.2;CIP-007-3
+      R5.3.1;CIP-007-3 R5.3.2;CIP-007-3 R5.3.3
     control.compliance.openshift.io/NIST-800-53: IA-2;AC-6(5);IA-4(b)
-    policies.open-cluster-management.io/controls: IA-2,AC-6(5),IA-4(b)
-    policies.open-cluster-management.io/standards: NIST-800-53
-  creationTimestamp: "2020-09-09T07:34:16Z"
+    control.compliance.openshift.io/PCI-DSS: Req-8.5
+    policies.open-cluster-management.io/controls: CIP-003-8 R5.1.1,CIP-003-8 R5.3,CIP-004-6
+      R2.2.3,CIP-004-6 R2.3,CIP-007-3 R5.1,CIP-007-3 R5.1.2,CIP-007-3 R5.2,CIP-007-3
+      R5.3.1,CIP-007-3 R5.3.2,CIP-007-3 R5.3.3,IA-2,AC-6(5),IA-4(b),Req-8.5
+    policies.open-cluster-management.io/standards: NERC-CIP,NIST-800-53,PCI-DSS
+  creationTimestamp: "2023-08-31T08:42:32Z"
   generation: 1
   labels:
     compliance.openshift.io/profile-bundle: rhcos4
   name: rhcos4-accounts-no-uid-except-zero
   namespace: openshift-compliance
-  ownerReferences:
-  - apiVersion: compliance.openshift.io/v1alpha1
-    blockOwnerDeletion: true
-    controller: true
-    kind: ProfileBundle
-    name: rhcos4
-    uid: 597792a5-1caa-4857-8611-ac2301b7f4c2
-  resourceVersion: "40165"
-  selfLink: /apis/compliance.openshift.io/v1alpha1/namespaces/openshift-compliance/rules/rhcos4-accounts-no-uid-except-zero
-  uid: 6794bf39-630a-4592-9d00-10a4279d14fb
-rationale: An account has root authority if it has a UID of 0. Multiple accounts&#xA;with a UID of 0 afford more opportunity for potential intruders to&#xA;guess a password for a privileged account. Proper configuration of&#xA;sudo is recommended to afford multiple system administrators&#xA;access to root privileges in an accountable manner.
+  resourceVersion: "62760"
+  uid: fd09c9c5-756a-4888-807c-f920fa031183
+rationale: An account has root authority if it has a UID of 0. Multiple accounts with
+  a UID of 0 afford more opportunity for potential intruders to guess a password for
+  a privileged account. Proper configuration of sudo is recommended to afford multiple
+  system administrators access to root privileges in an accountable manner.
 severity: high
 title: Verify Only Root Has UID 0
 ```
@@ -436,10 +456,10 @@ tar: Removing leading `/' from member names
 The results are stored in directories numbered sequentially with the
 number of the scan, up to the rotation policy, then reused:
 ```
-$ ls
+$ ls ./extract_results_dir/
 0  lost+found
-$ ls 0 
-openscap-pod-9294a45c73ef807cf82327f147f061fe3833eab7.xml.bzip2  openscap-pod-c41c6ef35a2ed0e442ae209120013ae708417c13.xml.bzip2  openscap-pod-e3f56090e7127d8499113d5188e2a83c18060007.xml.bzip2
+$ ls ./extract_results_dir/0
+rhcos4-e8-master-ip-10-0-110-230.us-east-2.compute.internal-pod.xml.bzip2  rhcos4-e8-master-ip-10-0-114-17.us-east-2.compute.internal-pod.xml.bzip2  rhcos4-e8-master-ip-10-0-25-60.us-east-2.compute.internal-pod.xml.bzip2
 ```
 
 
