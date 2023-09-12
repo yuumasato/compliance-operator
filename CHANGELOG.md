@@ -21,6 +21,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   This also fixes "/api/v1/nodes/NODE_NAME/proxy/configz" warning message in the log.
   [OCPBUGS-11037](https://issues.redhat.com/browse/OCPBUGS-11037)
 
+- Fix api-checks-pod crashes issues caused by outdated MCO dependency, the dependency
+  bump will enable CO to support Ignition 3.4, and therefore solve the issue. 
+  [OCPBUGS-18025](https://issues.redhat.com/browse/OCPBUGS-18025)
+
 ### Internal Changes
 
 -
