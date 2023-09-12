@@ -163,7 +163,7 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 		if !isValidationRequired(instance) {
 			// check if the TailoredProfile is empty without any extends
 			// if it is empty, we should not update the tp, and set the state of tp to Error
-			err = r.handleTailoredProfileStatusError(instance, fmt.Errorf("Custom no extends TailoredProfile does not have any rules enabled"))
+			err = r.handleTailoredProfileStatusError(instance, fmt.Errorf("Custom TailoredProfile with no extends does not have any rules enabled"))
 			if err != nil {
 				return reconcile.Result{}, err
 			}
@@ -205,7 +205,7 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 	}
 
 	ann := instance.GetAnnotations()
-	if _, ok := ann[cmpv1alpha1.OutdatedReferenceValidationDisable]; ok {
+	if _, ok := ann[cmpv1alpha1.DisableOutdatedReferenceValidation]; ok {
 		reqLogger.Info("Reference validation is disabled, skipping validation")
 	} else if isValidationRequired(instance) {
 		// remove any deprecated variables or rules from the tailored profile
@@ -261,8 +261,8 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 	return r.ensureOutputObject(instance, tpcm, reqLogger)
 }
 
-// handleMigration checks if the TailoredProfile has any deprecated variables or or any updated KubeletConfig rules
-// and handle the migration
+// handleMigration check if there are any migrated rules in the TailoredProfile
+// and we will handle the migration of the tailored profile accordingly
 func (r *ReconcileTailoredProfile) handleMigration(
 	v1alphaTp *cmpv1alpha1.TailoredProfile, logger logr.Logger) (bool, error) {
 
@@ -353,15 +353,9 @@ func (r *ReconcileTailoredProfile) handleMigration(
 
 func isValidationRequired(tp *cmpv1alpha1.TailoredProfile) bool {
 	if tp.Spec.Extends != "" {
-		if tp.Spec.DisableRules != nil || tp.Spec.EnableRules != nil || tp.Spec.ManualRules != nil || tp.Spec.SetValues != nil {
-			return true
-		}
-	} else {
-		if tp.Spec.EnableRules != nil || tp.Spec.ManualRules != nil {
-			return true
-		}
+		return tp.Spec.DisableRules != nil || tp.Spec.EnableRules != nil || tp.Spec.ManualRules != nil || tp.Spec.SetValues != nil
 	}
-	return false
+	return tp.Spec.EnableRules != nil || tp.Spec.ManualRules != nil
 }
 
 func (r *ReconcileTailoredProfile) handleDeprecation(
@@ -527,7 +521,7 @@ func (r *ReconcileTailoredProfile) getDeprecatedRules(tp *cmpv1alpha1.TailoredPr
 	for ri := range ruleList.Items {
 		rule := &ruleList.Items[ri]
 		if rule.Annotations != nil {
-			if _, ok := rule.Annotations[cmpv1alpha1.RulesDeprecatedAnnotationKey]; ok {
+			if _, ok := rule.Annotations[cmpv1alpha1.DeprecatedRuleAnnotationKey]; ok {
 				deprecatedRules[rule.GetName()] = ""
 			}
 		}

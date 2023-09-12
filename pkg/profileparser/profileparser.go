@@ -609,7 +609,6 @@ func ParseRulesAndDo(contentDom *xmlquery.Node, stdParser *referenceParser, pb *
 				}
 
 				rawFixReader := strings.NewReader(fixNodeObj.InnerText())
-				log.Info("Raw fix", "rawFix", fixNodeObj.InnerText())
 				fixKubeObjs, err := utils.ReadObjectsFromYAML(rawFixReader)
 				if err != nil {
 					log.Info("Couldn't parse Kubernetes object from fix")

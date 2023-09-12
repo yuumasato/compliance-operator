@@ -6,8 +6,8 @@ import (
 
 // FIXME: move name/rationale to a common struct with an interface?
 
-// OutdatedReferenceValidationDisable a label is used to disable validation of outdated references
-const OutdatedReferenceValidationDisable = "compliance.openshift.io/outdated-reference-validation-disable"
+// DisableOutdatedReferenceValidation a label is used to disable validation of outdated references
+const DisableOutdatedReferenceValidation = "compliance.openshift.io/outdated-reference-validation-disable"
 
 // RuleLastCheckTypeChangedAnnotationKey is the annotation key used to indicate that the rule check type has changed, store its previous check type
 const RuleLastCheckTypeChangedAnnotationKey = "compliance.openshift.io/rule-last-check-type"
@@ -15,8 +15,8 @@ const RuleLastCheckTypeChangedAnnotationKey = "compliance.openshift.io/rule-last
 // VariableDeprecatedAnnotationKey is the annotation key used to indicate that the variable is deprecated
 const VariableDeprecatedAnnotationKey = "compliance.openshift.io/variable-deprecated"
 
-// RulesDeprecatedAnnotationKey is the annotation key used to indicate that the rule is deprecated
-const RulesDeprecatedAnnotationKey = "compliance.openshift.io/rule-deprecated"
+// DeprecatedRuleAnnotationKey is the annotation key used to indicate that the rule is deprecated
+const DeprecatedRuleAnnotationKey = "compliance.openshift.io/deprecated-rule"
 
 // RuleReferenceSpec specifies a rule to be selected/deselected, as well as the reason why
 type RuleReferenceSpec struct {

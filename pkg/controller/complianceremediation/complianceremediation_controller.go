@@ -683,18 +683,11 @@ func (r *ReconcileComplianceRemediation) verifyAndCompleteKC(obj *unstructured.U
 	if err := r.Client.List(context.TODO(), mcfgpools); err != nil {
 		return fmt.Errorf("couldn't list the pools for the remediation: %w", err)
 	}
-	nodeSelector := map[string]string{}
 
-	// If the scan is a platform scan, we need to check if KubeletConfig has the role label set.
-	if scan.Spec.ScanType == compv1alpha1.ScanTypePlatform {
-		nodeSelector = utils.GetNodeRoleSelectorFromRemediation(rem)
-	} else {
-		nodeSelector = scan.Spec.NodeSelector
-	}
 	// The scans contain a nodeSelector that ultimately must match a machineConfigPool. The only way we can
 	// ensure it does is by checking if it matches any MachineConfigPool's labels.
 	// See also: https://github.com/openshift/machine-config-operator/blob/master/docs/custom-pools.md
-	ok, pool := utils.AnyMcfgPoolLabelMatches(nodeSelector, mcfgpools)
+	ok, pool := utils.AnyMcfgPoolLabelMatches(scan.Spec.NodeSelector, mcfgpools)
 	if !ok {
 		return common.NewNonRetriableCtrlError("not applying remediation that doesn't have a matching MachineconfigPool. Scan: %s", scan.Name)
 	}
