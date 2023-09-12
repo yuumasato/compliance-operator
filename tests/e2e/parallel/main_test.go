@@ -2225,72 +2225,211 @@ func TestScanSettingBinding(t *testing.T) {
 
 }
 
-func TestScanSettingBindingTailoringAndNonDefaultRole(t *testing.T) {
+func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
+
 	t.Parallel()
 	f := framework.Global
-	tpName := "non-default-role-tp"
-	scanSettingBindingName := "non-default-role-ssb"
+	const (
+		changeTypeRule      = "kubelet-anonymous-auth"
+		unChangedTypeRule   = "api-server-insecure-port"
+		moderateProfileName = "moderate"
+		tpMixName           = "many-migrated-mix-tp"
+		tpSingleName        = "migrated-single-tp"
+	)
+	var (
+		baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "kubelet_default")
+		modifiedImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "new_kubeletconfig")
+	)
 
-	tp := &compv1alpha1.TailoredProfile{
+	prefixName := func(profName, ruleBaseName string) string { return profName + "-" + ruleBaseName }
+
+	pbName := framework.GetObjNameFromTest(t)
+	origPb := &compv1alpha1.ProfileBundle{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      tpName,
+			Name:      pbName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.ProfileBundleSpec{
+			ContentImage: baselineImage,
+			ContentFile:  framework.OcpContentFile,
+		},
+	}
+	// Pass nil in as the cleanupOptions since so we don't invoke all the
+	// cleanup function code in Create. Use defer to cleanup the
+	// ProfileBundle at the end of the test, instead of at the end of the
+	// suite.
+	if err := f.Client.Create(context.TODO(), origPb, nil); err != nil {
+		t.Fatalf("failed to create ProfileBundle: %s", err)
+	}
+	// This should get cleaned up at the end of the test
+	defer f.Client.Delete(context.TODO(), origPb)
+
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid); err != nil {
+		t.Fatalf("failed waiting for the ProfileBundle to become available: %s", err)
+	}
+
+	// Check that the rule exists in the original profile
+	changeTypeRuleName := prefixName(pbName, changeTypeRule)
+	err, found := f.DoesRuleExist(origPb.Namespace, changeTypeRuleName)
+	if err != nil {
+		t.Fatal(err)
+	} else if found != true {
+		t.Fatalf("expected rule %s to exist in namespace %s", changeTypeRuleName, origPb.Namespace)
+	}
+
+	// Check that the rule exists in the original profile
+	unChangedTypeRuleName := prefixName(pbName, unChangedTypeRule)
+	err, found = f.DoesRuleExist(origPb.Namespace, unChangedTypeRuleName)
+	if err != nil {
+		t.Fatal(err)
+	} else if found != true {
+		t.Fatalf("expected rule %s to exist in namespace %s", unChangedTypeRuleName, origPb.Namespace)
+	}
+
+	tpMix := &compv1alpha1.TailoredProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      tpMixName,
 			Namespace: f.OperatorNamespace,
 		},
 		Spec: compv1alpha1.TailoredProfileSpec{
-			Title:       "TestCisForE2EPool",
-			Description: "TestCisForE2EPool",
-			Extends:     "ocp4-cis",
-			SetValues: []compv1alpha1.VariableValueSpec{
+			Title:       "TestForManyRules",
+			Description: "TestForManyRules",
+			EnableRules: []compv1alpha1.RuleReferenceSpec{
 				{
-					Name:      "ocp4-var-role-master",
-					Rationale: "targets the e2e pool",
-					Value:     "e2e",
+					Name:      changeTypeRuleName,
+					Rationale: "this rule should be removed from the profile",
 				},
 				{
-					Name:      "ocp4-var-role-worker",
-					Rationale: "targets the e2e pool",
-					Value:     "e2e",
+					Name:      unChangedTypeRuleName,
+					Rationale: "this rule should not be removed from the profile",
 				},
 			},
 		},
 	}
 
-	createTPErr := f.Client.Create(context.TODO(), tp, nil)
+	tpSingle := &compv1alpha1.TailoredProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      tpSingleName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.TailoredProfileSpec{
+			Title:       "TestForManyRules",
+			Description: "TestForManyRules",
+			EnableRules: []compv1alpha1.RuleReferenceSpec{
+				{
+					Name:      changeTypeRuleName,
+					Rationale: "this rule should not be removed from the profile",
+				},
+			},
+		},
+	}
+
+	createTPErr := f.Client.Create(context.TODO(), tpMix, nil)
 	if createTPErr != nil {
 		t.Fatal(createTPErr)
 	}
-	defer f.Client.Delete(context.TODO(), tp)
-
-	scanSettingBinding := compv1alpha1.ScanSettingBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      scanSettingBindingName,
-			Namespace: f.OperatorNamespace,
-		},
-		Profiles: []compv1alpha1.NamedObjectReference{
-			{
-				Name:     tpName,
-				Kind:     "TailoredProfile",
-				APIGroup: "compliance.openshift.io/v1alpha1",
-			},
-		},
-		SettingsRef: &compv1alpha1.NamedObjectReference{
-			Name:     "e2e-default",
-			Kind:     "ScanSetting",
-			APIGroup: "compliance.openshift.io/v1alpha1",
-		},
-	}
-
-	err := f.Client.Create(context.TODO(), &scanSettingBinding, nil)
+	defer f.Client.Delete(context.TODO(), tpMix)
+	// check the status of the TP to make sure it has errors
+	err = f.WaitForTailoredProfileStatus(f.OperatorNamespace, tpMixName, compv1alpha1.TailoredProfileStateReady)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Client.Delete(context.TODO(), &scanSettingBinding)
 
-	// it's enough to check that the scan finishes
-	err = f.WaitForSuiteScansStatus(f.OperatorNamespace, scanSettingBindingName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant)
+	hasRule, err := f.EnableRuleExistInTailoredProfile(f.OperatorNamespace, tpMixName, changeTypeRuleName)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !hasRule {
+		t.Fatal("Expected the tailored profile to have the rule")
+	}
+
+	hasRule, err = f.EnableRuleExistInTailoredProfile(f.OperatorNamespace, tpMixName, unChangedTypeRuleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasRule {
+		t.Fatal("Expected the tailored profile to have the rule")
+	}
+
+	// tpSingle test
+	createTPErr = f.Client.Create(context.TODO(), tpSingle, nil)
+	if createTPErr != nil {
+		t.Fatal(createTPErr)
+	}
+	defer f.Client.Delete(context.TODO(), tpSingle)
+	// check the status of the TP to make sure it has errors
+	err = f.WaitForTailoredProfileStatus(f.OperatorNamespace, tpSingleName, compv1alpha1.TailoredProfileStateReady)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hasRule, err = f.EnableRuleExistInTailoredProfile(f.OperatorNamespace, tpSingleName, changeTypeRuleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasRule {
+		t.Fatal("Expected the tailored profile to have the rule")
+	}
+
+	// update the image with a new hash
+	modPb := origPb.DeepCopy()
+	if err := f.Client.Get(context.TODO(), types.NamespacedName{Namespace: modPb.Namespace, Name: modPb.Name}, modPb); err != nil {
+		t.Fatalf("failed to get ProfileBundle %s", modPb.Name)
+	}
+
+	modPb.Spec.ContentImage = modifiedImage
+	if err := f.Client.Update(context.TODO(), modPb); err != nil {
+		t.Fatalf("failed to update ProfileBundle %s: %s", modPb.Name, err)
+	}
+
+	// Wait for the update to happen, the PB will flip first to pending, then to valid
+	if err := f.WaitForProfileBundleStatus(pbName, compv1alpha1.DataStreamValid); err != nil {
+		t.Fatalf("failed to parse ProfileBundle %s: %s", pbName, err)
+	}
+
+	if err := f.AssertProfileBundleMustHaveParsedRules(pbName); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.AssertRuleCheckTypeChangedAnnotationKey(f.OperatorNamespace, changeTypeRuleName, "Platform"); err != nil {
+		t.Fatal(err)
+	}
+
+	// check that the tp has been updated with the removed rule mixTP
+	err = f.WaitForTailoredProfileStatus(f.OperatorNamespace, tpMixName, compv1alpha1.TailoredProfileStateReady)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hasRule, err = f.EnableRuleExistInTailoredProfile(f.OperatorNamespace, tpMixName, changeTypeRuleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasRule {
+		t.Fatal("Expected the tailored profile to not have the rule")
+	}
+
+	hasRule, err = f.EnableRuleExistInTailoredProfile(f.OperatorNamespace, tpMixName, unChangedTypeRuleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasRule {
+		t.Fatal("Expected the tailored profile to have the rule")
+	}
+
+	// check that the tp has been updated with the removed rule singleTP
+	err = f.WaitForTailoredProfileStatus(f.OperatorNamespace, tpSingleName, compv1alpha1.TailoredProfileStateReady)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hasRule, err = f.EnableRuleExistInTailoredProfile(f.OperatorNamespace, tpSingleName, changeTypeRuleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasRule {
+		t.Fatal("Expected the tailored profile to have the rule")
+	}
+
 }
 
 func TestScanSettingBindingUsesDefaultScanSetting(t *testing.T) {
@@ -2518,6 +2657,9 @@ func TestManualRulesTailoredProfile(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      suiteName,
 			Namespace: f.OperatorNamespace,
+			Labels: map[string]string{
+				compv1alpha1.OutdatedReferenceValidationDisable: "true",
+			},
 		},
 		Spec: compv1alpha1.TailoredProfileSpec{
 			Title:       "manual-rules-test",
@@ -2639,6 +2781,9 @@ func TestCheckDefaultKubeletConfig(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      suiteName,
 			Namespace: f.OperatorNamespace,
+			Labels: map[string]string{
+				compv1alpha1.OutdatedReferenceValidationDisable: "true",
+			},
 		},
 		Spec: compv1alpha1.TailoredProfileSpec{
 			Title:       "kubelet-default-test",

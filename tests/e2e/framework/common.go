@@ -136,6 +136,11 @@ func (f *Framework) createFromYAMLFile(p *string) error {
 	if err != nil {
 		return err
 	}
+	return f.createFromYAMLString(string(c))
+}
+
+func (f *Framework) createFromYAMLString(y string) error {
+	c := []byte(y)
 	documents, err := f.readYAML(c)
 	if err != nil {
 		return err
@@ -829,6 +834,68 @@ func (f *Framework) AssertProfileInRuleAnnotation(r *compv1alpha1.Rule, expected
 		return false
 	}
 	return strings.Contains(profileIds, expectedProfileId)
+}
+
+func (f *Framework) EnableRuleExistInTailoredProfile(namespace, name, ruleName string) (bool, error) {
+	tp := &compv1alpha1.TailoredProfile{}
+	defer f.logContainerOutput(namespace, name)
+	// check if rule exist in tailoredprofile enableRules
+	err := f.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      name,
+		Namespace: namespace,
+	}, tp)
+	if err != nil {
+		return false, err
+	}
+
+	hasRule := false
+	for _, r := range tp.Spec.EnableRules {
+		if r.Name == ruleName {
+			hasRule = true
+			break
+		}
+	}
+	if hasRule {
+		log.Printf("rule %s exist in tailoredprofile enableRules\n", ruleName)
+		return true, nil
+	} else {
+		log.Printf("rule %s does not exist in tailoredprofile enableRules\n", ruleName)
+		return false, nil
+	}
+}
+
+func (f *Framework) WaitForTailoredProfileStatus(namespace, name string, targetStatus compv1alpha1.TailoredProfileState) error {
+	tp := &compv1alpha1.TailoredProfile{}
+	var lastErr error
+	defer f.logContainerOutput(namespace, name)
+	// retry and ignore errors until timeout
+	timeoutErr := wait.Poll(RetryInterval, Timeout, func() (bool, error) {
+		lastErr = f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, tp)
+		if lastErr != nil {
+			if apierrors.IsNotFound(lastErr) {
+				log.Printf("Waiting for availability of %s tailoredprofile\n", name)
+				return false, nil
+			}
+			log.Printf("Retrying. Got error: %v\n", lastErr)
+			return false, nil
+		}
+
+		if tp.Status.State == targetStatus {
+			return true, nil
+		}
+		log.Printf("Waiting for run of %s tailoredprofile (%s)\n", name, tp.Status.State)
+		return false, nil
+	})
+
+	if timeoutErr != nil {
+		return fmt.Errorf("failed waiting for tailoredprofile %s due to timeout: %s", name, timeoutErr)
+	}
+	if lastErr != nil {
+		return fmt.Errorf("failed waiting for tailoredprofile %s: %s", name, lastErr)
+	}
+
+	log.Printf("TailoredProfile ready (%s)\n", tp.Status.State)
+	return nil
 }
 
 // waitForScanStatus will poll until the compliancescan that we're lookingfor reaches a certain status, or until

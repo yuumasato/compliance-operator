@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	compliancev1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 	"github.com/PaesslerAG/jsonpath"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -141,6 +142,23 @@ func IsMcfgPoolUsingKC(pool *mcfgv1.MachineConfigPool) (bool, string, error) {
 	}
 
 	return true, currentKCMC, nil
+}
+
+func GetScanType(annotations map[string]string) compliancev1alpha1.ComplianceScanType {
+	// The default type is platform
+	platformType, ok := annotations[compliancev1alpha1.ProductTypeAnnotation]
+	if !ok {
+		return compliancev1alpha1.ScanTypePlatform
+	}
+
+	switch strings.ToLower(platformType) {
+	case strings.ToLower(string(compliancev1alpha1.ScanTypeNode)):
+		return compliancev1alpha1.ScanTypeNode
+	default:
+		break
+	}
+
+	return compliancev1alpha1.ScanTypePlatform
 }
 
 func AreKubeletConfigsRendered(pool *mcfgv1.MachineConfigPool, client runtimeclient.Client) (bool, error, string) {
