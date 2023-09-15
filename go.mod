@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/ginkgo/v2 v2.11.0
+	github.com/onsi/ginkgo/v2 v2.12.0
 	github.com/onsi/gomega v1.27.10
 	github.com/wI2L/jsondiff v0.4.0
 	k8s.io/apimachinery v0.27.4
@@ -267,8 +267,8 @@ require (
 	go4.org v0.0.0-20200104003542-c7e774b10ea0 // indirect
 	golang.org/x/exp v0.0.0-20230510235704-dd950f8aeaea // indirect
 	golang.org/x/exp/typeparams v0.0.0-20230224173230-c95f2b4c22f2 // indirect
-	golang.org/x/sync v0.2.0 // indirect
-	golang.org/x/tools v0.9.3 // indirect
+	golang.org/x/sync v0.3.0 // indirect
+	golang.org/x/tools v0.12.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	honnef.co/go/tools v0.4.3 // indirect
 	k8s.io/code-generator v0.27.4 // indirect
