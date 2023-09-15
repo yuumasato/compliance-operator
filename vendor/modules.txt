@@ -68,6 +68,17 @@ github.com/blang/semver/v4
 ## explicit; go 1.15
 # github.com/butuzov/mirror v1.1.0
 ## explicit; go 1.19
+# github.com/ccojocar/zxcvbn-go v1.0.1
+## explicit; go 1.20
+github.com/ccojocar/zxcvbn-go
+github.com/ccojocar/zxcvbn-go/adjacency
+github.com/ccojocar/zxcvbn-go/data
+github.com/ccojocar/zxcvbn-go/entropy
+github.com/ccojocar/zxcvbn-go/frequency
+github.com/ccojocar/zxcvbn-go/match
+github.com/ccojocar/zxcvbn-go/matching
+github.com/ccojocar/zxcvbn-go/scoring
+github.com/ccojocar/zxcvbn-go/utils/math
 # github.com/cenkalti/backoff/v4 v4.2.1
 ## explicit; go 1.18
 github.com/cenkalti/backoff/v4
@@ -304,7 +315,7 @@ github.com/google/gofuzz/bytesource
 # github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid
-# github.com/gookit/color v1.5.3
+# github.com/gookit/color v1.5.4
 ## explicit; go 1.18
 github.com/gookit/color
 # github.com/gordonklaus/ineffassign v0.0.0-20230610083614-0e73809eb601
@@ -425,15 +436,6 @@ github.com/munnerz/goautoneg
 ## explicit; go 1.15
 # github.com/nbutton23/zxcvbn-go v0.0.0-20210217022336-fa2cb2858354
 ## explicit; go 1.14
-github.com/nbutton23/zxcvbn-go
-github.com/nbutton23/zxcvbn-go/adjacency
-github.com/nbutton23/zxcvbn-go/data
-github.com/nbutton23/zxcvbn-go/entropy
-github.com/nbutton23/zxcvbn-go/frequency
-github.com/nbutton23/zxcvbn-go/match
-github.com/nbutton23/zxcvbn-go/matching
-github.com/nbutton23/zxcvbn-go/scoring
-github.com/nbutton23/zxcvbn-go/utils/math
 # github.com/nishanths/exhaustive v0.11.0
 ## explicit; go 1.18
 # github.com/nishanths/predeclared v0.2.2
@@ -705,8 +707,8 @@ github.com/robfig/cron/v3
 ## explicit; go 1.18
 # github.com/sashamelentyev/usestdlibvars v1.23.0
 ## explicit; go 1.19
-# github.com/securego/gosec/v2 v2.16.0
-## explicit; go 1.19
+# github.com/securego/gosec/v2 v2.17.0
+## explicit; go 1.20
 github.com/securego/gosec/v2
 github.com/securego/gosec/v2/analyzers
 github.com/securego/gosec/v2/cmd/gosec
