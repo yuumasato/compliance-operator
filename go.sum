@@ -671,6 +671,8 @@ github.com/openshift/library-go v0.0.0-20230803043003-e1dfb9bf12bb h1:lZTLi1LHYf
 github.com/openshift/library-go v0.0.0-20230803043003-e1dfb9bf12bb/go.mod h1:jPcIZk2ReAozFTDX2s9peO5at1Hs1BS6JvoASSk6NqQ=
 github.com/openshift/library-go v0.0.0-20230809121909-d7e7beca5bae h1:oE+aPsxqmVyOUcvw3Tnn93kkZtm8RrRi18qYgX+1eJg=
 github.com/openshift/library-go v0.0.0-20230809121909-d7e7beca5bae/go.mod h1:ZFwNwC3opc/7aOvzUbU95zp33Lbxet48h80ryH3p6DY=
+github.com/openshift/library-go v0.0.0-20230915122714-b753831a0dce h1:5ULL0+VCFzIXma7o0wnDddfVQ60/tNVv1uVvL2Ucm4M=
+github.com/openshift/library-go v0.0.0-20230915122714-b753831a0dce/go.mod h1:Y3kMcQhx+oARET073sjj5YruA6Ef4zdAbh9w/ikU7DA=
 github.com/openshift/machine-config-operator v0.0.1-0.20230815171034-c2bb862bc08a h1:3KR43D0bbEi3IYSS6b7abKWbj93RJyuxoHImmYaiWZU=
 github.com/openshift/machine-config-operator v0.0.1-0.20230815171034-c2bb862bc08a/go.mod h1:kP51fbL8QBSY/mAkFicoF73x0QSraPrX4BjWIdzFPio=
 github.com/openshift/machine-config-operator v3.11.0+incompatible/go.mod h1:4IzikyGmUVQwlohScKeaAr5n2YzcWXkZvTMGGxDcU2Q=
@@ -1512,6 +1514,8 @@ k8s.io/klog/v2 v2.100.1 h1:7WCHKK6K8fNhTqfBhISHQ97KrnJNFZMcQvKp7gP/tmg=
 k8s.io/klog/v2 v2.100.1/go.mod h1:y1WjHnz7Dj687irZUWR/WLkLc5N1YHtjLdmgWjndZn0=
 k8s.io/kube-aggregator v0.27.4 h1:WdK9iiBr32G8bWfpUEFVQl70RZO2dU19ZAktUXL5JFc=
 k8s.io/kube-aggregator v0.27.4/go.mod h1:+eG83gkAyh0uilQEAOgheeQW4hr+PkyV+5O1nLGsjlM=
+k8s.io/kube-aggregator v0.28.2 h1:tCjAfB1p/v18yD2NpegNQRuahzyA/szFfcRARnpjDeo=
+k8s.io/kube-aggregator v0.28.2/go.mod h1:g4hZVjC4KhJtZHV2pyiRBiU6AdBA/sAjh9Y9GJC/SbU=
 k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65/go.mod h1:sX9MT8g7NVZM5lVL/j8QyCCJe8YSMW30QvGZWaCIDIk=
 k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42/go.mod h1:Z/45zLw8lUo4wdiUkI+v/ImEGAvu3WatcZl3lPMR4Rk=
 k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a/go.mod h1:y5VtZWM9sHHc2ZodIH/6SHzXj+TPU5USoA8lcIeKEKY=
@@ -1533,6 +1537,8 @@ k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 h1:qY1Ad8PODbnymg2pRbkyMT/ylpTrC
 k8s.io/utils v0.0.0-20230406110748-d93618cff8a2/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 k8s.io/utils v0.0.0-20230505201702-9f6742963106 h1:EObNQ3TW2D+WptiYXlApGNLVy0zm/JIBVY9i+M4wpAU=
 k8s.io/utils v0.0.0-20230505201702-9f6742963106/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
+k8s.io/utils v0.0.0-20230726121419-3b25d923346b h1:sgn3ZU783SCgtaSJjpcVVlRqd6GSnlTLKgpAAttJvpI=
+k8s.io/utils v0.0.0-20230726121419-3b25d923346b/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 mvdan.cc/gofumpt v0.5.0 h1:0EQ+Z56k8tXjj/6TQD25BFNKQXpCvT0rnansIc7Ug5E=
 mvdan.cc/gofumpt v0.5.0/go.mod h1:HBeVDtMKRZpXyxFciAirzdKklDlGu8aAy1wEbH5Y9js=
 mvdan.cc/interfacer v0.0.0-20180901003855-c20040233aed h1:WX1yoOaKQfddO/mLzdV4wptyWgoH/6hwLs7QHTixo0I=
