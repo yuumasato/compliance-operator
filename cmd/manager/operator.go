@@ -659,7 +659,7 @@ func handleServiceMonitor(ctx context.Context, cfg *rest.Config, mClient *moncli
 
 // createNonComplianceAlert tries to create the default PrometheusRule. Returns nil.
 func createNonComplianceAlert(ctx context.Context, client *monclientv1.MonitoringV1Client, namespace string) error {
-        duration := monitoring.Duration("1s")
+	duration := monitoring.Duration("1s")
 	rule := monitoring.Rule{
 		Alert: "NonCompliant",
 		Expr:  intstr.FromString(`compliance_operator_compliance_state{name=~".+"} > 0`),
