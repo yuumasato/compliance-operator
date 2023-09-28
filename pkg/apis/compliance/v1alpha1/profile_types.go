@@ -35,12 +35,16 @@ type ProfilePayload struct {
 	// +optional
 	// +listType=atomic
 	Values []ProfileValue `json:"values,omitempty"`
+	// +optional
+	Version string `json:"version"`
 }
 
 // +kubebuilder:object:root=true
 
 // Profile is the Schema for the profiles API
 // +kubebuilder:resource:path=profiles,scope=Namespaced,shortName=profs;prof
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="Version",type="string",JSONPath=`.version`
 type Profile struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

@@ -17,7 +17,14 @@ spec:
     singular: profile
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    - jsonPath: .version
+      name: Version
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: Profile is the Schema for the profiles API
@@ -55,6 +62,8 @@ spec:
             nullable: true
             type: array
             x-kubernetes-list-type: atomic
+          version:
+            type: string
         required:
         - description
         - id
@@ -62,3 +71,4 @@ spec:
         type: object
     served: true
     storage: true
+    subresources: {}
