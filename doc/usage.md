@@ -575,13 +575,13 @@ error result.
 
 [Hypershift](https://hypershift-docs.netlify.app/) allows one to create and manage clusters on existing infrastructure.
 Compliance Operator is able to create a platform scan on the [HyperShift Management Cluster](https://hypershift-docs.netlify.app/reference/concepts-and-personas/)
-for the Hosted Cluster with a TailoredProfile.
+for the Hosted Cluster with a `TailoredProfile`.
 
 Currently, we only support CIS profile and PCI-DSS profile,
 you can either extend `ocp4-cis` or `ocp4-pci-dss`.
 
-In order to scan a Hosted Cluster, you need to create a TailoredProfile specifying the
-name and namespace of the Hosted cluster that you want to scan.
+In order to scan a Hosted Cluster, you need to create a `TailoredProfile` specifying the
+name and namespace of the Hosted Cluster that you want to scan.
 Set the value of `ocp4-hypershift-cluster` to the name of the target Hosted Cluster,
 and set the value of `ocp4-hypershift-namespace-prefix` to the namespace where the
 Hosted Cluster resides, e.g.: `local-cluster`, or `clusters`.
