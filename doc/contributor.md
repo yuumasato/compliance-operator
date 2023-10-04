@@ -39,7 +39,7 @@ $ make test-unit
 
 ### Coverage Tests
 
-There is a seperate target specifically for unit test coverage that outputs a
+There is a separate target specifically for unit test coverage that outputs a
 coverage report in `coverage.out`. It also provides a coverage summary.
 
 ```console
@@ -223,7 +223,7 @@ This step also requires that you have necessary permissions on the repository.
 ### Releasing Images
 
 The third and final step of the release is to build new images and push them to
-an offical image registry. You can build new images and push using `make
+an official image registry. You can build new images and push using `make
 release-images`. Note that this operation also requires you have proper
 permissions on the remote registry.
 
