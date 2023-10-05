@@ -121,7 +121,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onsi/ginkgo/v2 v2.12.0 // indirect
 	github.com/openshift/client-go v0.0.0-20230926161409-848405da69e1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
