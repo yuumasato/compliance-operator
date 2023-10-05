@@ -1,7 +1,7 @@
 ---
 Title: Troubleshooting
 PrevPage: 08-creating-profile-bundles
-NextPage: ../finish
+NextPage: 10-rule-parametrization
 ---
 Writing your own Rules
 ======================
@@ -52,7 +52,7 @@ value.
 
 ```
 $ source .pyenv.sh # Configure PYTHONPATH for CaC modules
-$ ./utils/add_platform_rule.py create \
+$ ./utils/add_platform_rule.py create platform\
     --rule must_have_compliant_cm \
     --name my-compliance-configmap --namespace openshift --type configmap \
     --title "Must have compliant CM" \
@@ -139,7 +139,7 @@ accept values such as `yessss` or `yeah`. In this case, we'll need to adjust our
 little:
 
 ```
-$ ./utils/add_platform_rule.py create \
+$ ./utils/add_platform_rule.py create platform\
     --rule must_have_compliant_cm \
     --name my-compliance-configmap --namespace openshift --type configmap \
     --title "Must have compliant CM" \
