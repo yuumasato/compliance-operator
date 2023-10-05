@@ -573,13 +573,18 @@ error result.
 
 ## How to Use Compliance Operator with HyperShift Management Cluster
 
-Compliance Operator is able to run a platform scan on the HyperShift Managment cluster
-for the Hosted Cluster with a tailoredProfile.
+[Hypershift](https://hypershift-docs.netlify.app/) allows one to create and manage clusters on existing infrastructure.
+Compliance Operator is able to create a platform scan on the [HyperShift Management Cluster](https://hypershift-docs.netlify.app/reference/concepts-and-personas/)
+for the Hosted Cluster with a `TailoredProfile`.
 
-Currently, we only support CIS profile and PCI-DSS profile, in order to scan Hosted
-Cluster, you need to create a tailoredProfile and then set the value of
-`ocp4-hypershift-cluster` to the name of the Hosted Cluster you want to scan,
+Currently, we only support CIS profile and PCI-DSS profile,
 you can either extend `ocp4-cis` or `ocp4-pci-dss`.
+
+In order to scan a Hosted Cluster, you need to create a `TailoredProfile` specifying the
+name and namespace of the Hosted Cluster that you want to scan.
+Set the value of `ocp4-hypershift-cluster` to the name of the target Hosted Cluster,
+and set the value of `ocp4-hypershift-namespace-prefix` to the namespace where the
+Hosted Cluster resides, e.g.: `local-cluster`, or `clusters`.
 
 ```yaml
 apiVersion: compliance.openshift.io/v1alpha1
@@ -597,6 +602,9 @@ spec:
    - name: ocp4-hypershift-cluster
      value: "<hypershift-hosted-cluster-name>"
      rationale: This value is used for HyperShift version detection
+   - name: ocp4-hypershift-namespace-prefix
+     value: "<hypershift-hosted-namespace-prefix>"
+     rationale: This value is used for HyperShift control plane namespace detection
 ```
 
 And after you save the edit, you can then apply the edited `tailoredProfile`,
@@ -620,7 +628,7 @@ settingsRef:
 
 ## How to Use Compliance Operator with HyperShift Hosted Cluster
 
-Compliance Operator is able to run a platform scan on the HyperShift Hosted cluster
+Compliance Operator is able to run a platform scan on the [HyperShift Hosted Cluster](https://hypershift-docs.netlify.app/reference/concepts-and-personas/)
 without any tailoredProfile. Any unsupport rules will be hidden from the `ComplianceCheckResult`.
 
 However, you need to use a special subscription file to install Compliance Operator on the
