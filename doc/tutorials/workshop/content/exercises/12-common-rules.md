@@ -17,6 +17,12 @@ implement them.
 
 ## Platform checks
 
+The Platform checks are directed towards Kubernetes, a.k.a. the platform.
+
+The check is invoked only once and they evaluate the state of the platform.
+For example, checking the value of a particular Kubernetes resource, or cluster
+configuration option.
+
 ### Checking Kubernetes resources
 
 Checking the configuration of a Kubernetes resource is the obvious task when
@@ -26,11 +32,12 @@ template.
 
 You can write a rule and make use of the template by yourself, or
 use the `./utils/add_platform_rule.py` script showcased in past sections.
-Note that more advanced uses of the template will require you to write the input data by yourself.
+Note that more advanced uses of the template will require you to write the
+input data manualy, check the template's documentation.
 
-One example of this type of rule is a checking whether any registry configured
-for import allow use of insecure protocols. The rule checks the Cluster API and
-assess whether any `allowedRegistriesForImport` has `'{"insecure": true}':
+One example of this type of rule is a check whether any registry configured
+for import allows the use of insecure protocols. The rule checks the Cluster
+API and assess whether any `allowedRegistriesForImport` has `'{"insecure": true}':
 [ocp_insecure_allowed_registries_for_import](https://github.com/ComplianceAsCode/content/blob/master/applications/openshift/registry/ocp_insecure_allowed_registries_for_import/rule.yml)
 
 Another example is checking whether RBAC roles are defined. 
@@ -38,10 +45,17 @@ Another example is checking whether RBAC roles are defined.
 
 ## Node checks
 
+The Node checks are directed towards the Nodes composing the cluster.
+They can assess the configuration of the node's OS and any Platform configuration that is relevant to the node.
+
+The check is invoked once per applicable node.
+For example, a node rule can evaluate an `etcd` configuration across all master nodes.
+Or a node rule may check the permissions of `/etc/sshd_config` (which isn't specific to OpenShift), on all nodes.
+
 ### Checking for a KubeletConfig setting
 
-With Kubelet being the primary agent on the node, its configuration becomes
-important to assess.
+With Kubelet being the primary agent on the node it is important to
+assess its configuration.
 
 You can also use the [yamlfile_value](https://complianceascode.readthedocs.io/en/latest/templates/template_reference.html#yamlfile-value)
 template for this. Note though that these checks are Node checks, not Platform checks.

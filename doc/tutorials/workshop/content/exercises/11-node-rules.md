@@ -57,9 +57,10 @@ $ ./utils/add_platform_rule.py create node \
 
 ### Selecting the nodes to check
 
-When we created our node rule wi`--scan-type option.
-This, by default, creates a rule that is applicable to all nodes in the cluster,
-i.e.: `worker` and `master` nodes.
+The node rules created with `./utils/add_platform_rule.py create node ...`
+are by default applicable to all nodes in the cluster,  i.e.: `worker` and
+`master` nodes.
+
 To restrict a node rule to scan only on master nodes, you need to change the
 `platform` key in the `rule.yml` to `ocp4-master-node`.
 
@@ -72,7 +73,7 @@ To set a node check to run on only on master nodes, set the rule's platform to:
 ### Use of yamlfile_value on node rules
 
 The `yamlfile_value` template is a template like any other in CaC/content
-project, its purpose is to assert whether a yaml key's value satisfiyes a
+project, its purpose is to assert whether a yaml key's value satisfies a
 certain criteria.
 
 The use of this template is not limited to platform rules, it is very handy
