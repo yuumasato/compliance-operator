@@ -188,4 +188,24 @@ my-own-profile   DONE    COMPLIANT
 Our rule is ready to be enabled in multiple profiles checking different values
 in each `Profile`.
 
+To check that rule fails as expected, let's change the `ConfigMap` to an incompliant value:
+```
+$ oc patch -n openshift configmap my-compliance-configmap \
+   -p '{"data": {"compliant": "nope"}}' --type=merge
+configmap/my-compliance-configmap patched
+```
+
+Then manually start a re-scan:
+`$ oc annotate compliancescan/my-own-profile compliance.openshift.io/rescan=`
+
+And follow the scan status and check that is indeed not compliant:
+```
+$ oc get scan -w
+NAME             PHASE     RESULT
+my-own-profile   RUNNING   NOT-AVAILABLE
+my-own-profile   AGGREGATING   NOT-AVAILABLE
+my-own-profile   AGGREGATING   NOT-AVAILABLE
+my-own-profile   DONE          NON-COMPLIANT
+```
+
 Next we will learn what are [node rules](11-node-rules.md) and how do they differ from platform rules.
