@@ -1,7 +1,7 @@
 ---
 Title: All types of rules
 PrevPage: 11-node-rules
-NextPage: ../finish
+NextPage:  13-complex-yaml.md
 ---
 Common types of rules
 ===================
@@ -110,3 +110,6 @@ template:
         datatype: int
 ```
 Check rule [kubelet_enable_protect_kernel_sysctl_kernel_panic_on_oops](https://github.com/ComplianceAsCode/content/blob/master/applications/openshift/kubelet/kubelet_enable_protect_kernel_sysctl_kernel_panic_on_oops/rule.yml) for a complete example.
+
+In the next section we will look at a way to handle [more complex checks](13-complex-yaml.md)
+and resources.

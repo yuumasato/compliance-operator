@@ -197,7 +197,8 @@ $ ./utils/add_platform_rule.py cluster-test --rule must_have_compliant_cm
 
 Once you've tested your rule and feel its in a good shape, you should fill in the missing
 parameters from the template so they'll appear nicely in the report. Finally, you can add
-the rule to a relevant profile in the `ocp4/profiles/` directory, build it, upload it to a
+the rule to a relevant profile in the `ocp4/profiles/` directory, or a control file in
+`controls/` directory, build it, upload it to a
 `ProfileBundle` and take it into use as part of your regular compliance scans!
 
 In the next section we will learn how to make a rule more flexible to our needs
