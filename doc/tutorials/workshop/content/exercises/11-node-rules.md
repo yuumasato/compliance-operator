@@ -85,3 +85,5 @@ One such example is the Kubelet configuration in each node. The
 
 Check the rule [kubelet_enable_cert_rotation](https://github.com/ComplianceAsCode/content/blob/master/applications/openshift/kubelet/kubelet_enable_cert_rotation/rule.yml)
 for an example of how the `yamlfile_value` template is used.
+
+Let's now take a look at the [most common types of rules](12-common-rules.md) and the templates used when writing rules for Kubernetes.

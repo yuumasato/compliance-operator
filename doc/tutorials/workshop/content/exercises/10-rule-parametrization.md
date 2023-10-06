@@ -187,3 +187,5 @@ my-own-profile   DONE    COMPLIANT
 
 Our rule is ready to be enabled in multiple profiles checking different values
 in each `Profile`.
+
+Next we will learn what are [node rules](11-node-rules.md) and how do they differ from platform rules.
