@@ -49,10 +49,10 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.68.0
 	github.com/prometheus-operator/prometheus-operator/pkg/client v0.68.0
-	github.com/prometheus/client_golang v1.16.0
-	github.com/prometheus/client_model v0.4.0
+	github.com/prometheus/client_golang v1.17.0
+	github.com/prometheus/client_model v0.4.1-0.20230718164431-9a2bf3000d16
 	github.com/prometheus/common v0.44.0 // indirect
-	github.com/prometheus/procfs v0.10.1 // indirect
+	github.com/prometheus/procfs v0.11.1 // indirect
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/securego/gosec/v2 v2.17.0
 	github.com/sirupsen/logrus v1.9.3
