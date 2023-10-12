@@ -8,10 +8,10 @@ Checking complex yaml structures
 ====================
 
 The `yamlfile_value` template is great to check if a yaml key exists or not,
-and whether it exists has a specific value.
+and it does exist, if it has a specific value.
 
 But some of the resources and configurations of a Kubernetes cluster can be
-defined in quite a complex way, and just the Yaml path syntax used by the
+defined in quite a complex way, and just the yaml path syntax used by the
 template may not be sufficient to get to the value we want to assess.
 
 For this reason the CaC/content rules used by the Compliance Operator can
@@ -19,14 +19,14 @@ leverage [`jq`](https://jqlang.github.io/jq/) to better select what needs to be 
 A `jq` filter allows us to pre-process the resources and configurations so that
 they are easier to check with the `yamlfile_value` template.
 
-There are two use cases where a `jq` filter is very helpful.
+There are two use cases where a `jq` filter is necessary.
 
 ## 1. Checking a key in a nested yaml or json
 
 Some Kuberentes configurations contain a yaml formatted value in them, and
-checking for these values requires the use of `jqfilters`
+checking for these values requires the use of `jq` filter.
 
-For example, looking at an `openShift-kube-api-server` `ConfigMap` we can see
+For example, looking at an `openshift-kube-api-server` `ConfigMap` we can see
 a `data."config.yaml"` key whose value is yaml formatted.
 
 ```
@@ -93,8 +93,8 @@ $ ./utils/add_platform_rule.py cluster-test --rule check_nested_yaml
 This is a generalization of the first use case, `jq` filters can be used to filter and select the data
 fetched by the operator.
 
-When the resource being checked is extensive or complex, `jq` is prety powerful and using it to filter and trim down
-the data can lead to a simpler `yamlpath` in the template.
+When the resource being checked is extensive or complex, `jq` is invaluable for simplifying the data before it is
+passed down to be evaluated with `yamlpath` in `yamlfile_value` template.
 
 Rule [api_server_encryption_provider_cipher](https://github.com/ComplianceAsCode/content/blob/master/applications/openshift/api-server/api_server_encryption_provider_cipher/rule.yml)
 is one example of a rule that filters the data for a simpler `yamlpath`.
