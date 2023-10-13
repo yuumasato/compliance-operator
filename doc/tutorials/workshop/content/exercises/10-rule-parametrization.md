@@ -70,7 +70,7 @@ EOF
 Then run the following command to change the rule to use the variable
 we just created:
 ```
-$ ./utils/add_platform_rule.py create platform\
+$ ./utils/add_kubernetes_rule.py create platform\
     --rule must_have_compliant_cm \
     --name my-compliance-configmap --namespace openshift --type configmap \
     --title "Must have compliant CM" \
@@ -90,14 +90,14 @@ $ oc patch -n openshift configmap my-compliance-configmap \
    -p '{"data": {"compliant": "yep"}}' --type=merge
 ```
 ```
-$ ./utils/add_platform_rule.py cluster-test --rule must_have_compliant_cm
+$ ./utils/add_kubernetes_rule.py cluster-test --rule must_have_compliant_cm
 ...
 * The result is 'COMPLIANT'
 ```
 
 ### Testing Rules with Profile Tailorings
 
-So far we have been using the `./utils/add_platform_rule.py` script to test
+So far we have been using the `./utils/add_kubernetes_rule.py` script to test
 our rule. It creates very specific `ComplianceScans` that cannot cover all the use
 cases.
 

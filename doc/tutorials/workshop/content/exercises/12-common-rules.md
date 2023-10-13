@@ -31,7 +31,7 @@ This type of check is handled by the [yamlfile_value](https://complianceascode.r
 template.
 
 You can write a rule and make use of the template by yourself, or
-use the `./utils/add_platform_rule.py` script showcased in past sections.
+use the `./utils/add_kubernetes_rule.py` script showcased in past sections.
 Note that more advanced uses of the template will require you to write the
 input data manualy, check the template's documentation.
 

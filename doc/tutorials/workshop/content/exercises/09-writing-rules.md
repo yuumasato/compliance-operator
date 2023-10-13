@@ -18,8 +18,8 @@ so let's focus instead on writing content for OpenShift.
 
 There is a handy tool in the `utils` directory that will help you create such
 rules and test them locally or against an existing cluster: [`
-./utils/add_platform_rule.py`](
-https://github.com/ComplianceAsCode/content/blob/master/utils/add_platform_rule.py).
+./utils/add_kubernetes_rule.py`](
+https://github.com/ComplianceAsCode/content/blob/master/utils/add_kubernetes_rule.py).
 
 Let's take it into use!
 
@@ -52,7 +52,7 @@ value.
 
 ```
 $ source .pyenv.sh # Configure PYTHONPATH for CaC modules
-$ ./utils/add_platform_rule.py create platform\
+$ ./utils/add_kubernetes_rule.py create platform\
     --rule must_have_compliant_cm \
     --name my-compliance-configmap --namespace openshift --type configmap \
     --title "Must have compliant CM" \
@@ -116,7 +116,7 @@ $ oc project openshift-compliance
 We can test the rule as follows:
 
 ```
-$ ./utils/add_platform_rule.py cluster-test --rule must_have_compliant_cm
+$ ./utils/add_kubernetes_rule.py cluster-test --rule must_have_compliant_cm
 ```
 
 This command will:
@@ -139,7 +139,7 @@ accept values such as `yessss` or `yeah`. In this case, we'll need to adjust our
 little:
 
 ```
-$ ./utils/add_platform_rule.py create platform\
+$ ./utils/add_kubernetes_rule.py create platform\
     --rule must_have_compliant_cm \
     --name my-compliance-configmap --namespace openshift --type configmap \
     --title "Must have compliant CM" \
@@ -162,7 +162,7 @@ $ grep operation applications/openshift/must_have_compliant_cm/rule.yml
 Let's test it out and see that the pattern still matches:
 
 ```
-$ ./utils/add_platform_rule.py cluster-test --rule must_have_compliant_cm
+$ ./utils/add_kubernetes_rule.py cluster-test --rule must_have_compliant_cm
 ...
 * The result is 'COMPLIANT'
 ```
@@ -180,7 +180,7 @@ $ oc patch -n openshift configmap my-compliance-configmap \
 And let's verify that it still matches:
 
 ```
-$ ./utils/add_platform_rule.py cluster-test --rule must_have_compliant_cm
+$ ./utils/add_kubernetes_rule.py cluster-test --rule must_have_compliant_cm
 ...
 * The result is 'COMPLIANT'
 ```
@@ -190,7 +190,7 @@ For completeness, lets modify the `ConfigMap` to have a non-compliant value and 
 ```
 $ oc patch -n openshift configmap my-compliance-configmap \
    -p '{"data": {"compliant": "hehehe nope"}}' --type=merge
-$ ./utils/add_platform_rule.py cluster-test --rule must_have_compliant_cm
+$ ./utils/add_kubernetes_rule.py cluster-test --rule must_have_compliant_cm
 ...
 * The result is 'NON-COMPLIANT'
 ```

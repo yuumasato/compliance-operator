@@ -103,7 +103,7 @@ There are two diffences this time around:
 
 You can test the rule with:
 ```
-$ ./utils/add_platform_rule.py cluster-test --rule check_nested_yaml
+$ ./utils/add_kubernetes_rule.py cluster-test --rule check_nested_yaml
 * Testing rule check_nested_yaml in-cluster
 * Ensuring openshift-compliance namespace exists.
 ...
