@@ -23,8 +23,8 @@ There are two use cases where a `jq` filter is necessary.
 
 ## 1. Checking a key in a nested yaml or json
 
-Some Kuberentes configurations contain a yaml formatted value in them, and
-checking for these values requires the use of `jq` filter.
+Some Kuberentes configurations contain a yaml or json formatted value in them,
+and checking for these values requires the use of `jq` filter.
 
 For example, looking at an `openshift-kube-api-server` `ConfigMap` we can see
 a `data."config.yaml"` key whose value is yaml formatted.
@@ -56,7 +56,16 @@ metadata:
 To check the value of `audit-log-maxbackup`, which is in the `config.yaml` key,
 we need to use the `jq` query to select the value and "extract" it for us.
 
-Let's create a machine config that has a nested yaml value:
+Rule [api_server_audit_log_maxbackup](https://github.com/ComplianceAsCode/content/blob/master/applications/openshift/api-server/api_server_audit_log_maxbackup/rule.yml)
+is evaluating the resource listed above.
+The rule's `jq` filter is `.data."config.yaml" | fromjson'` and its `yamlpath` is `.apiServerArguments["audit-log-maxbackup"][:]`.
+The Compliance Operator will fetch the resource and pass down for checking only the data that came out from the `jq` filter.
+
+![Diagram of resource colection and check with and without a jq filter](images/jqfilter_preprocessing.png)
+
+For this section, we will create a very simple `ConfigMap` with embedded yaml and check one of its keys.
+
+So let's create a machine config that has a nested yaml value:
 ```
 $ cat << EOF | oc create -f -
 apiVersion: v1
@@ -65,12 +74,14 @@ metadata:
   name: my-nested-compliance-configmap
   namespace: openshift
 data:
-  my-config.yaml: '{"foo": "bar", "nested-key": "nested-compliant"}'
+  my-config.yaml: '{foo: bar, nested-key: nested-compliant}'
 EOF
 ```
 
 Now let's write a rule to check whether the value of `nested-key` is `nested-compliant`.
 
+The script `utils/add_kubernetes_rule.py` provides an easy way to create a rule that uses `jq` filters.
+Just pass the option `--jqfilter` with the desired filter.
 ```
 $ ./utils/add_kubernetes_rule.py create platform \
     --rule check_nested_yaml \
@@ -83,9 +94,36 @@ $ ./utils/add_kubernetes_rule.py create platform \
     --jqfilter '.data."my-config.yaml"'
 ```
 
-And then you can test the rule with:
+Just like when we were creating the other rules, the tool lays down a `rule.yml` file with the same keys filled out.
+There are two diffences this time around:
+* First, is the warning messsage. Which is now defined by a different macro.
+  This macro adds the `jq` filter to the rule, which is parsed by the operator when collecting the resource.
+* Second difference is the `filepath` key in the template, which is define with the help of macro too.
+  This macro ensures that a unique `filepath` is set for this resource when it is collected.
+
+You can test the rule with:
 ```
 $ ./utils/add_platform_rule.py cluster-test --rule check_nested_yaml
+* Testing rule check_nested_yaml in-cluster
+* Ensuring openshift-compliance namespace exists.
+...
+* Running scan with rule 'check_nested_yaml'
+> Output from last phase check: LAUNCHING NOT-AVAILABLE
+...
+> Output from last phase check: RUNNING NOT-AVAILABLE
+...
+> Output from last phase check: AGGREGATING NOT-AVAILABLE
+> Output from last phase check: DONE COMPLIANT
+* The result is 'COMPLIANT'
+```
+
+If you'd like to test that the rule fails with incompliant values, patch the `ConfigMap` with an incompliant value, and run the test again.
+```
+$ oc patch -n openshift configmap my-nested-compliance-configmap -p '{"data": {"my-config.yaml": "{foo: bar, nested-key: nested-not-compliant}"}}
+configmap/my-nested-compliance-configmap patched
+$ ./utils/add_kubernetes_rule.py cluster-test --rule check_nested_yaml
+...
+* The result is 'NON-COMPLIANT'
 ```
 
 ## 2. Filtering the data to have simpler yamlpaths
