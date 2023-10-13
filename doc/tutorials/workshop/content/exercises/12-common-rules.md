@@ -1,7 +1,7 @@
 ---
 Title: All types of rules
 PrevPage: 11-node-rules
-NextPage: ../finish
+NextPage:  13-complex-yaml.md
 ---
 Common types of rules
 ===================
@@ -31,7 +31,7 @@ This type of check is handled by the [yamlfile_value](https://complianceascode.r
 template.
 
 You can write a rule and make use of the template by yourself, or
-use the `./utils/add_platform_rule.py` script showcased in past sections.
+use the `./utils/add_kubernetes_rule.py` script showcased in past sections.
 Note that more advanced uses of the template will require you to write the
 input data manualy, check the template's documentation.
 
@@ -110,3 +110,6 @@ template:
         datatype: int
 ```
 Check rule [kubelet_enable_protect_kernel_sysctl_kernel_panic_on_oops](https://github.com/ComplianceAsCode/content/blob/master/applications/openshift/kubelet/kubelet_enable_protect_kernel_sysctl_kernel_panic_on_oops/rule.yml) for a complete example.
+
+In the next section we will look at a way to handle [more complex checks](13-complex-yaml.md)
+and resources.

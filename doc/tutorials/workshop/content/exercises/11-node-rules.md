@@ -27,7 +27,7 @@ owned by root in our cluster's nodes.
 
 To create this node rule, execute the following `create node` command:
 ```
-$ ./utils/add_platform_rule.py create node \
+$ ./utils/add_kubernetes_rule.py create node \
     --rule file_owner_etc_system_release \
     --title "File /etc/system-release must be owned by root" \
     --description "We need to ensure that root owns the system release file"  \
@@ -47,7 +47,7 @@ input arguments.
 Here is another example of how to quickly generate a a node rule that checks
 the sysctl `kernel.randomize_va_space` value:
 ```
-$ ./utils/add_platform_rule.py create node \
+$ ./utils/add_kubernetes_rule.py create node \
     --rule sysctl_kernel_randomize_va_space \
     --title "Ensure ASLR is fully enabled" \
     --description "Make it harder to exploit vulnerabilities by employing full address space layout randomization"  \
@@ -57,7 +57,7 @@ $ ./utils/add_platform_rule.py create node \
 
 ### Selecting the nodes to check
 
-The node rules created with `./utils/add_platform_rule.py create node ...`
+The node rules created with `./utils/add_kubernetes_rule.py create node ...`
 are by default applicable to all nodes in the cluster,  i.e.: `worker` and
 `master` nodes.
 
@@ -85,3 +85,5 @@ One such example is the Kubelet configuration in each node. The
 
 Check the rule [kubelet_enable_cert_rotation](https://github.com/ComplianceAsCode/content/blob/master/applications/openshift/kubelet/kubelet_enable_cert_rotation/rule.yml)
 for an example of how the `yamlfile_value` template is used.
+
+Let's now take a look at the [most common types of rules](12-common-rules.md) and the templates used when writing rules for Kubernetes.

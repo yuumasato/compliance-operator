@@ -70,7 +70,7 @@ EOF
 Then run the following command to change the rule to use the variable
 we just created:
 ```
-$ ./utils/add_platform_rule.py create platform\
+$ ./utils/add_kubernetes_rule.py create platform\
     --rule must_have_compliant_cm \
     --name my-compliance-configmap --namespace openshift --type configmap \
     --title "Must have compliant CM" \
@@ -90,14 +90,14 @@ $ oc patch -n openshift configmap my-compliance-configmap \
    -p '{"data": {"compliant": "yep"}}' --type=merge
 ```
 ```
-$ ./utils/add_platform_rule.py cluster-test --rule must_have_compliant_cm
+$ ./utils/add_kubernetes_rule.py cluster-test --rule must_have_compliant_cm
 ...
 * The result is 'COMPLIANT'
 ```
 
 ### Testing Rules with Profile Tailorings
 
-So far we have been using the `./utils/add_platform_rule.py` script to test
+So far we have been using the `./utils/add_kubernetes_rule.py` script to test
 our rule. It creates very specific `ComplianceScans` that cannot cover all the use
 cases.
 
@@ -187,3 +187,25 @@ my-own-profile   DONE    COMPLIANT
 
 Our rule is ready to be enabled in multiple profiles checking different values
 in each `Profile`.
+
+To check that rule fails as expected, let's change the `ConfigMap` to an incompliant value:
+```
+$ oc patch -n openshift configmap my-compliance-configmap \
+   -p '{"data": {"compliant": "nope"}}' --type=merge
+configmap/my-compliance-configmap patched
+```
+
+Then manually start a re-scan:
+`$ oc annotate compliancescan/my-own-profile compliance.openshift.io/rescan=`
+
+And follow the scan status and check that is indeed not compliant:
+```
+$ oc get scan -w
+NAME             PHASE     RESULT
+my-own-profile   RUNNING   NOT-AVAILABLE
+my-own-profile   AGGREGATING   NOT-AVAILABLE
+my-own-profile   AGGREGATING   NOT-AVAILABLE
+my-own-profile   DONE          NON-COMPLIANT
+```
+
+Next we will learn what are [node rules](11-node-rules.md) and how do they differ from platform rules.
