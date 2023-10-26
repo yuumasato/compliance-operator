@@ -33,7 +33,6 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 		pBundleRhcos *compv1alpha1.ProfileBundle
 		profRhcosE8  *compv1alpha1.Profile
 		tpRhcosE8    *compv1alpha1.TailoredProfile
-		scratchTP    *compv1alpha1.TailoredProfile
 
 		setting *compv1alpha1.ScanSetting
 		ssb     *compv1alpha1.ScanSettingBinding
@@ -43,6 +42,12 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 
 		suite *compv1alpha1.ComplianceSuite
 	)
+	scratchTP := &compv1alpha1.TailoredProfile{
+		TypeMeta: v1.TypeMeta{
+			Kind:       "TailoredProfile",
+			APIVersion: compv1alpha1.SchemeGroupVersion.String(),
+		},
+	}
 
 	BeforeEach(func() {
 		// Uncomment these lines if you need to debug the controller's output.
@@ -115,6 +120,10 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 		}
 
 		scratchTP = &compv1alpha1.TailoredProfile{
+			TypeMeta: v1.TypeMeta{
+				Kind:       "TailoredProfile",
+				APIVersion: compv1alpha1.SchemeGroupVersion.String(),
+			},
 			ObjectMeta: v1.ObjectMeta{
 				Name:        "scratch-tp",
 				Namespace:   common.GetComplianceOperatorNamespace(),
@@ -591,6 +600,10 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 			Expect(updateErr).To(BeNil())
 
 			ssb = &compv1alpha1.ScanSettingBinding{
+				TypeMeta: v1.TypeMeta{
+					Kind:       "ScanSettingBinding",
+					APIVersion: compv1alpha1.SchemeGroupVersion.String(),
+				},
 				ObjectMeta: v1.ObjectMeta{
 					Name:      "tp-not-ready",
 					Namespace: common.GetComplianceOperatorNamespace(),
@@ -642,6 +655,10 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 			Expect(updateErr).To(BeNil())
 
 			ssb = &compv1alpha1.ScanSettingBinding{
+				TypeMeta: v1.TypeMeta{
+					Kind:       "ScanSettingBinding",
+					APIVersion: compv1alpha1.SchemeGroupVersion.String(),
+				},
 				ObjectMeta: v1.ObjectMeta{
 					Name:      "tp-errored",
 					Namespace: common.GetComplianceOperatorNamespace(),
