@@ -119,7 +119,7 @@ $ ./utils/add_kubernetes_rule.py cluster-test --rule check_nested_yaml
 
 If you'd like to test that the rule fails with incompliant values, patch the `ConfigMap` with an incompliant value, and run the test again.
 ```
-$ oc patch -n openshift configmap my-nested-compliance-configmap -p '{"data": {"my-config.yaml": "{foo: bar, nested-key: nested-not-compliant}"}}
+$ oc patch -n openshift configmap my-nested-compliance-configmap -p '{"data": {"my-config.yaml": "{foo: bar, nested-key: nested-not-compliant}"}}'
 configmap/my-nested-compliance-configmap patched
 $ ./utils/add_kubernetes_rule.py cluster-test --rule check_nested_yaml
 ...
