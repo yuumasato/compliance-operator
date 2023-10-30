@@ -32,7 +32,7 @@ $ ./utils/add_kubernetes_rule.py create node \
     --title "File /etc/system-release must be owned by root" \
     --description "We need to ensure that root owns the system release file"  \
     --template file_owner \
-    --template-vars "filepath: /etc/system-release, fileuid: '0'"
+    --template-vars "filepath: /etc/system-release, fileuid: 0"
 ```
 
 We already know the `rule`, `title` and `description` are for, they are
@@ -52,7 +52,7 @@ $ ./utils/add_kubernetes_rule.py create node \
     --title "Ensure ASLR is fully enabled" \
     --description "Make it harder to exploit vulnerabilities by employing full address space layout randomization"  \
     --template sysctl \
-    --template-vars "sysctlvar: kernel.randomize_va_space, sysctlval: '2', datatype: int"
+    --template-vars "sysctlvar: kernel.randomize_va_space, sysctlval: 2, datatype: int"
 ```
 
 ### Selecting the nodes to check

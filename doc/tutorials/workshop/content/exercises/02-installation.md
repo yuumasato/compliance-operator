@@ -44,7 +44,7 @@ subscription.operators.coreos.com/compliance-operator-sub created
 ```
 
 The Subscription file can be edited to optionally deploy a custom version,
-see the `startingCSV` attribute in the `deploy/olm-catalog/subscription.yaml`
+see the `startingCSV` attribute in the `config/catalog/subscription.yaml`
 file.
 
 After a minute or two, the operator should be installed. Verify that the
