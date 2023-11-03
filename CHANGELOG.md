@@ -15,6 +15,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   more ergonomic to pause scans during maintenance periods. See the
   [enhancement](https://github.com/ComplianceAsCode/compliance-operator/pull/375)
   for more details.
+- Implemented support for an optional `version` attribute on `Profile` custom
+  resources.
 
 ### Fixes
 

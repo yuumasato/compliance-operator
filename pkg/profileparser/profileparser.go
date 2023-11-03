@@ -311,6 +311,11 @@ func parseProfileFromNode(profileRoot *xmlquery.Node, pb *cmpv1alpha1.ProfileBun
 		if description == nil {
 			return LogAndReturnError("no description in profile")
 		}
+		v := profileObj.SelectElement("xccdf-1.2:version")
+		var version string
+		if v != nil {
+			version = v.InnerText()
+		}
 		log.Info("Found profile", "id", id)
 
 		// In case the profile sets its own CPE string
@@ -362,6 +367,7 @@ func parseProfileFromNode(profileRoot *xmlquery.Node, pb *cmpv1alpha1.ProfileBun
 				Description: utils.XmlNodeAsMarkdown(description),
 				Rules:       selectedrules,
 				Values:      selectedvalues,
+				Version:     version,
 			},
 		}
 

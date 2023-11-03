@@ -55,6 +55,21 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
+func TestProfileVersion(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+
+	profile := &compv1alpha1.Profile{}
+	// We know this profile has a version and it's set in the ComplianceAsCode/content
+	profileName := "ocp4-cis"
+	if err := f.Client.Get(context.TODO(), types.NamespacedName{Namespace: f.OperatorNamespace, Name: profileName}, profile); err != nil {
+		t.Fatalf("failed to get profile %s: %s", profileName, err)
+	}
+	if profile.Version == "" {
+		t.Fatalf("expected profile %s to have version set", profileName)
+	}
+}
+
 func TestProfileModification(t *testing.T) {
 	t.Parallel()
 	f := framework.Global
