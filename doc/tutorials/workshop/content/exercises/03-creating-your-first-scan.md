@@ -480,7 +480,7 @@ Once you’re done with the extraction.
 
 > **NOTE**
 > 
-> Using the [`oc-compliance`](https://github.com/JAORMX/oc-compliance) plugin 
+> Using the [`oc-compliance`](https://github.com/openshift/oc-compliance) plugin 
 > it's also possible to extract the compliance results using the subcommand
 > `oc compliance fetch-raw`. For this example, the invocation would have been:
 > 
