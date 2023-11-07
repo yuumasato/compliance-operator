@@ -9,6 +9,9 @@ import (
 // DisableOutdatedReferenceValidation a label is used to disable validation of outdated references
 const DisableOutdatedReferenceValidation = "compliance.openshift.io/outdated-reference-validation-disable"
 
+// PurneOutdatedReferencesAnnotationKey is the annotation key used to indicate that the outdated references of rules or variables should be pruned
+const PurneOutdatedReferencesAnnotationKey = "compliance.openshift.io/prune-outdated-references"
+
 // RuleLastCheckTypeChangedAnnotationKey is the annotation key used to indicate that the rule check type has changed, store its previous check type
 const RuleLastCheckTypeChangedAnnotationKey = "compliance.openshift.io/rule-last-check-type"
 

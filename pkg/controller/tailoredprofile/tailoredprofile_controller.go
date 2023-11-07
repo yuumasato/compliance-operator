@@ -208,8 +208,12 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 	if _, ok := ann[cmpv1alpha1.DisableOutdatedReferenceValidation]; ok {
 		reqLogger.Info("Reference validation is disabled, skipping validation")
 	} else if isValidationRequired(instance) {
+		pureOutdated := false
+		if _, ok := ann[cmpv1alpha1.PurneOutdatedReferencesAnnotationKey]; ok {
+			pureOutdated = true
+		}
 		// remove any deprecated variables or rules from the tailored profile
-		doContinue, err := r.handleDeprecation(instance, reqLogger)
+		doContinue, err := r.handleDeprecation(instance, reqLogger, pureOutdated)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -217,7 +221,7 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 			return reconcile.Result{}, nil
 		}
 
-		doContinue, err = r.handleMigration(instance, reqLogger)
+		doContinue, err = r.handleMigration(instance, reqLogger, pureOutdated)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -264,7 +268,7 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 // handleMigration check if there are any migrated rules in the TailoredProfile
 // and we will handle the migration of the tailored profile accordingly
 func (r *ReconcileTailoredProfile) handleMigration(
-	v1alphaTp *cmpv1alpha1.TailoredProfile, logger logr.Logger) (bool, error) {
+	v1alphaTp *cmpv1alpha1.TailoredProfile, logger logr.Logger, pruneOudated bool) (bool, error) {
 
 	// Get the list of KubeletConfig rules that are migrated with checkType change
 	migratedRules, err := r.getMigratedRules(v1alphaTp, logger)
@@ -288,9 +292,15 @@ func (r *ReconcileTailoredProfile) handleMigration(
 			rule := &v1alphaTp.Spec.DisableRules[ri]
 			if checkType, ok := migratedRules[rule.Name]; ok && checkType != string(profileType) {
 				// remove the rule from the list of disabled rules
-				doContinue = false
-				logger.Info("Removing migrated rule from disableRules", "rule", rule.Name)
-				r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileMigratedRule", "Removing migrated rule: %s from disableRules", rule.Name)
+				if pruneOudated {
+					doContinue = false
+					logger.Info("Removing migrated rule from disableRules", "rule", rule.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileMigratedRule", "Removing migrated rule: %s from disableRules", rule.Name)
+				} else {
+					logger.Info("Migrated rule detected in disableRules", "rule", rule.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileMigratedRule", "Migrated rule detected: %s Please migrate it or remove it from the TailoredProfile", rule.Name)
+					newRules = append(newRules, *rule)
+				}
 				continue
 			}
 			newRules = append(newRules, *rule)
@@ -306,9 +316,15 @@ func (r *ReconcileTailoredProfile) handleMigration(
 		for ri := range v1alphaTp.Spec.EnableRules {
 			rule := &v1alphaTp.Spec.EnableRules[ri]
 			if checkType, ok := migratedRules[rule.Name]; ok && checkType != string(profileType) {
-				doContinue = false
-				logger.Info("Removing migrated rule from enableRules", "rule", rule.Name)
-				r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileMigratedRule", "Removing migrated rule %s from enableRules", rule.Name)
+				if pruneOudated {
+					doContinue = false
+					logger.Info("Removing migrated rule from enableRules", "rule", rule.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileMigratedRule", "Removing migrated rule %s from enableRules", rule.Name)
+				} else {
+					logger.Info("Migrated rule detected in enableRules", "rule", rule.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileMigratedRule", "Migrated rule detected: %s Please migrate it or remove it from the TailoredProfile", rule.Name)
+					newRules = append(newRules, *rule)
+				}
 				continue
 			}
 			newRules = append(newRules, *rule)
@@ -316,19 +332,6 @@ func (r *ReconcileTailoredProfile) handleMigration(
 
 		if len(newRules) != len(v1alphaTp.Spec.EnableRules) {
 			v1alphaTpCP.Spec.EnableRules = newRules
-		}
-		if v1alphaTp.Spec.Extends == "" && len(newRules) == 0 && len(v1alphaTpCP.Spec.DisableRules) == 0 && !doContinue {
-			// flip the checkType of the TailoredProfile to the new checkType if the TailoredProfile does not extend any profile
-			// and it does not have any rules left after removing migrated rules and the before migration TailoredProfile has
-			// enableRules
-			if profileType == cmpv1alpha1.ScanTypeNode {
-				v1alphaTpCP.SetAnnotations(map[string]string{cmpv1alpha1.ProductTypeAnnotation: string(cmpv1alpha1.ScanTypePlatform)})
-			} else {
-				v1alphaTpCP.SetAnnotations(map[string]string{cmpv1alpha1.ProductTypeAnnotation: string(cmpv1alpha1.ScanTypeNode)})
-			}
-			v1alphaTpCP.Spec.EnableRules = v1alphaTp.Spec.EnableRules
-			logger.Info("Flipping the checkType of the TailoredProfile to the new checkType", "checkType", profileType)
-			r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileMigratedCheckType", "Flipping the checkType of the TailoredProfile to the new checkType: %s", profileType)
 		}
 	}
 
@@ -359,7 +362,7 @@ func isValidationRequired(tp *cmpv1alpha1.TailoredProfile) bool {
 }
 
 func (r *ReconcileTailoredProfile) handleDeprecation(
-	v1alphaTp *cmpv1alpha1.TailoredProfile, logger logr.Logger) (bool, error) {
+	v1alphaTp *cmpv1alpha1.TailoredProfile, logger logr.Logger, pruneOudated bool) (bool, error) {
 
 	deprecatedRules, err := r.getDeprecatedRules(v1alphaTp, logger)
 	if err != nil {
@@ -380,9 +383,15 @@ func (r *ReconcileTailoredProfile) handleDeprecation(
 		for vi := range v1alphaTp.Spec.SetValues {
 			variables := &v1alphaTp.Spec.SetValues[vi]
 			if _, ok := deprecatedVariables[variables.Name]; ok {
-				doContinue = false
-				logger.Info("Removing deprecated variable", "variable", variables.Name)
-				r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Removing deprecated variable: %s", variables.Name)
+				if pruneOudated {
+					doContinue = false
+					logger.Info("Removing deprecated variable", "variable", variables.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Removing deprecated variable: %s", variables.Name)
+				} else {
+					logger.Info("Deprecated variable detected", "variable", variables.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Deprecated variable detected: %s Please remove it from the TailoredProfile", variables.Name)
+					newVariables = append(newVariables, *variables)
+				}
 				continue
 			} else {
 				newVariables = append(newVariables, *variables)
@@ -399,9 +408,15 @@ func (r *ReconcileTailoredProfile) handleDeprecation(
 		for ri := range v1alphaTp.Spec.EnableRules {
 			rule := &v1alphaTp.Spec.EnableRules[ri]
 			if _, ok := deprecatedRules[rule.Name]; ok {
-				doContinue = false
-				logger.Info("Removing deprecated rule from enableRules", "rule", rule.Name)
-				r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Removing deprecated rule: %s", rule.Name)
+				if pruneOudated {
+					doContinue = false
+					logger.Info("Removing deprecated rule from enableRules", "rule", rule.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Removing deprecated rule: %s", rule.Name)
+				} else {
+					logger.Info("Deprecated rule detected in enableRules", "rule", rule.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Deprecated rule detected: %s Please remove it from the TailoredProfile", rule.Name)
+					newRules = append(newRules, *rule)
+				}
 				continue
 			} else {
 				newRules = append(newRules, *rule)
@@ -417,9 +432,15 @@ func (r *ReconcileTailoredProfile) handleDeprecation(
 		for ri := range v1alphaTp.Spec.DisableRules {
 			rule := &v1alphaTp.Spec.DisableRules[ri]
 			if _, ok := deprecatedRules[rule.Name]; ok {
-				doContinue = false
-				logger.Info("Removing deprecated rule from disableRules", "rule", rule.Name)
-				r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Removing deprecated rule: %s", rule.Name)
+				if pruneOudated {
+					doContinue = false
+					logger.Info("Removing deprecated rule from disableRules", "rule", rule.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Removing deprecated rule: %s", rule.Name)
+				} else {
+					logger.Info("Deprecated rule detected in disableRules", "rule", rule.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Deprecated rule detected: %s Please remove it from the TailoredProfile", rule.Name)
+					newRules = append(newRules, *rule)
+				}
 				continue
 			} else {
 				newRules = append(newRules, *rule)

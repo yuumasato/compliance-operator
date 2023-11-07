@@ -2218,6 +2218,9 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      tpMixName,
 			Namespace: f.OperatorNamespace,
+			Annotations: map[string]string{
+				compv1alpha1.PurneOutdatedReferencesAnnotationKey: "",
+			},
 		},
 		Spec: compv1alpha1.TailoredProfileSpec{
 			Title:       "TestForManyRules",
@@ -2239,6 +2242,9 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      tpSingleName,
 			Namespace: f.OperatorNamespace,
+			Annotations: map[string]string{
+				compv1alpha1.PurneOutdatedReferencesAnnotationKey: "",
+			},
 		},
 		Spec: compv1alpha1.TailoredProfileSpec{
 			Title:       "TestForManyRules",
