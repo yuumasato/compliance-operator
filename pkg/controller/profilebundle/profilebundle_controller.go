@@ -439,6 +439,7 @@ func (r *ReconcileProfileBundle) newWorkloadForBundle(pb *compliancev1alpha1.Pro
 							SecurityContext: &corev1.SecurityContext{
 								AllowPrivilegeEscalation: &falseP,
 								ReadOnlyRootFilesystem:   &trueP,
+								RunAsNonRoot:             &trueP,
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
@@ -466,6 +467,7 @@ func (r *ReconcileProfileBundle) newWorkloadForBundle(pb *compliancev1alpha1.Pro
 							SecurityContext: &corev1.SecurityContext{
 								AllowPrivilegeEscalation: &falseP,
 								ReadOnlyRootFilesystem:   &trueP,
+								RunAsNonRoot:             &trueP,
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
@@ -502,6 +504,10 @@ func (r *ReconcileProfileBundle) newWorkloadForBundle(pb *compliancev1alpha1.Pro
 							SecurityContext: &corev1.SecurityContext{
 								AllowPrivilegeEscalation: &falseP,
 								ReadOnlyRootFilesystem:   &trueP,
+								RunAsNonRoot:             &trueP,
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
 							},
 							Command: []string{
 								"/bin/sh", "-c",
