@@ -192,6 +192,11 @@ func newRuleHashTable(dsDom *xmlquery.Node) NodeByIdHashTable {
 func NewOcilQuestionTable(dsDom *xmlquery.Node) NodeByIdHashTable {
 	return newHashTableFromRootAndQuery(dsDom, "//ds:component/ocil:ocil", "//ocil:boolean_question")
 }
+
+func NewProfileTable(dsDom *xmlquery.Node) NodeByIdHashTable {
+	return newHashTableFromRootAndQuery(dsDom, "//ds:component/xccdf-1.2:Benchmark", "//xccdf-1.2:Profile")
+}
+
 func newStateHashTable(dsDom *xmlquery.Node) NodeByIdHashTable {
 	return newHashTableFromRootAndQuery(dsDom, "//ds:component/oval-def:oval_definitions/oval-def:states", "*")
 }
@@ -306,6 +311,21 @@ func findAllVariablesFromObject(node *xmlquery.Node) ([]string, bool) {
 	} else {
 		return valueList, false
 	}
+}
+
+func GetRuleProfile(rule *xmlquery.Node, profileTable NodeByIdHashTable) NodeByIdHashTable {
+	// loop through profile table to find which profile uses the rule
+	ruleProfile := make(NodeByIdHashTable)
+	for _, profile := range profileTable {
+		for _, selectRule := range profile.SelectElements("//xccdf-1.2:select") {
+			if selectRule.SelectAttr("idref") == rule.SelectAttr("id") {
+				if selectRule.SelectAttr("selected") == "true" {
+					ruleProfile[profile.SelectAttr("id")] = profile
+				}
+			}
+		}
+	}
+	return ruleProfile
 }
 
 func GetRuleOvalTest(rule *xmlquery.Node, defTable NodeByIdHashTable) NodeByIdHashTable {

@@ -548,6 +548,7 @@ func ParseRulesAndDo(contentDom *xmlquery.Node, stdParser *referenceParser, pb *
 	var wg sync.WaitGroup
 	questionsTable := utils.NewOcilQuestionTable(contentDom)
 	defTable := utils.NewDefHashTable(contentDom)
+	profileTable := utils.NewProfileTable(contentDom)
 
 	allValues := xmlquery.Find(contentDom, "//xccdf-1.2:Value")
 	valuesList := make(map[string]string)
@@ -585,6 +586,7 @@ func ParseRulesAndDo(contentDom *xmlquery.Node, stdParser *referenceParser, pb *
 			rationale := ruleObj.SelectElement("xccdf-1.2:rationale")
 			warnings := utils.GetWarningsForRule(ruleObj)
 			severity := ruleObj.SelectAttr("severity")
+			profiles := utils.GetRuleProfile(ruleObj, profileTable)
 
 			fixes := []cmpv1alpha1.FixDefinition{}
 			foundPlatformMap := make(map[string]bool)
@@ -638,6 +640,23 @@ func ParseRulesAndDo(contentDom *xmlquery.Node, stdParser *referenceParser, pb *
 			if utils.RuleHasHideTagWarning(ruleObj) {
 				log.Info("Rule has hide tag warning")
 				annotations[cmpv1alpha1.RuleHideTagAnnotationKey] = "true"
+			}
+
+			profileList := []string{}
+
+			// add profiles to annotations
+			if len(profiles) > 0 {
+				for _, profile := range profiles {
+					profileID := profile.SelectAttr("id")
+					if profileID == "" {
+						log.Info("no id in profile")
+						continue
+					}
+					profileList = append(profileList, GetPrefixedName(pb.Name, xccdf.GetProfileNameFromID(profileID)))
+				}
+				if len(profileList) > 0 {
+					annotations[cmpv1alpha1.RuleProfileAnnotationKey] = strings.Join(profileList, ",")
+				}
 			}
 
 			p := cmpv1alpha1.Rule{

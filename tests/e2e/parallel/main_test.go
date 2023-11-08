@@ -2827,3 +2827,33 @@ func TestResultServerHTTPVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestRuleHasProfileAnnotation(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	const requiredRule = "ocp4-file-groupowner-worker-kubeconfig"
+	const expectedRuleProfileAnnotation = "ocp4-pci-dss-node,ocp4-moderate-node,ocp4-stig-node,ocp4-nerc-cip-node,ocp4-cis-node,ocp4-high-node"
+	err, found := f.DoesRuleExist(f.OperatorNamespace, requiredRule)
+	if err != nil {
+		t.Fatal(err)
+	} else if !found {
+		t.Fatalf("Expected rule %s not found", requiredRule)
+	}
+
+	// Check if requiredRule has the correct profile annotation
+	rule := &compv1alpha1.Rule{}
+	err = f.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      requiredRule,
+		Namespace: f.OperatorNamespace,
+	}, rule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedProfiles := strings.Split(expectedRuleProfileAnnotation, ",")
+	for _, profileName := range expectedProfiles {
+		if !f.AssertProfileInRuleAnnotation(rule, profileName) {
+			t.Fatalf("expected to find profile %s in rule %s", profileName, rule.Name)
+		}
+	}
+
+}
