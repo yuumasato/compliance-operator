@@ -91,7 +91,7 @@ rhcos4-no-kptr-restrict-worker   RUNNING   NOT-AVAILABLE
 
 > **NOTE**
 > 
-> Using the [`oc-compliance`](https://github.com/JAORMX/oc-compliance) plugin 
+> Using the [`oc-compliance`](https://github.com/openshift/oc-compliance) plugin 
 > it's also possible to re-run the scans using the subcommand
 > `oc compliance rerun-now`. For this example, the invocation would have been:
 > 
