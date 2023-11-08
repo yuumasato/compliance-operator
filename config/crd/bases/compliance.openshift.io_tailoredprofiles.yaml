@@ -156,6 +156,8 @@ spec:
               state:
                 description: The current state of the tailored profile
                 type: string
+              warnings:
+                type: string
             type: object
         type: object
     served: true

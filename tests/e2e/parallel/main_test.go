@@ -2163,6 +2163,7 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 		moderateProfileName = "moderate"
 		tpMixName           = "many-migrated-mix-tp"
 		tpSingleName        = "migrated-single-tp"
+		tpSingleNoPruneName = "migrated-single-no-prune-tp"
 	)
 	var (
 		baselineImage = fmt.Sprintf("%s:%s", brokenContentImagePath, "kubelet_default")
@@ -2219,7 +2220,7 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 			Name:      tpMixName,
 			Namespace: f.OperatorNamespace,
 			Annotations: map[string]string{
-				compv1alpha1.PurneOutdatedReferencesAnnotationKey: "",
+				compv1alpha1.PruneOutdatedReferencesAnnotationKey: "",
 			},
 		},
 		Spec: compv1alpha1.TailoredProfileSpec{
@@ -2243,7 +2244,7 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 			Name:      tpSingleName,
 			Namespace: f.OperatorNamespace,
 			Annotations: map[string]string{
-				compv1alpha1.PurneOutdatedReferencesAnnotationKey: "",
+				compv1alpha1.PruneOutdatedReferencesAnnotationKey: "",
 			},
 		},
 		Spec: compv1alpha1.TailoredProfileSpec{
@@ -2252,6 +2253,27 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 			EnableRules: []compv1alpha1.RuleReferenceSpec{
 				{
 					Name:      changeTypeRuleName,
+					Rationale: "this rule should be removed from the profile",
+				},
+			},
+		},
+	}
+
+	tpSingleNoPrune := &compv1alpha1.TailoredProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      tpSingleNoPruneName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.TailoredProfileSpec{
+			Title:       "TestForNoPrune",
+			Description: "TestForNoPrune",
+			EnableRules: []compv1alpha1.RuleReferenceSpec{
+				{
+					Name:      changeTypeRuleName,
+					Rationale: "this rule should not be removed from the profile",
+				},
+				{
+					Name:      unChangedTypeRuleName,
 					Rationale: "this rule should not be removed from the profile",
 				},
 			},
@@ -2305,6 +2327,27 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 		t.Fatalf("Expected the tailored profile to have rule: %s", changeTypeRuleName)
 	}
 
+	// tpSingleNoPrune test
+	createTPErr = f.Client.Create(context.TODO(), tpSingleNoPrune, nil)
+	if createTPErr != nil {
+		t.Fatal(createTPErr)
+	}
+	defer f.Client.Delete(context.TODO(), tpSingleNoPrune)
+	// check the status of the TP to make sure it has no errors
+	err = f.WaitForTailoredProfileStatus(f.OperatorNamespace, tpSingleNoPruneName, compv1alpha1.TailoredProfileStateReady)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hasRule, err = f.EnableRuleExistInTailoredProfile(f.OperatorNamespace, tpSingleNoPruneName, changeTypeRuleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !hasRule {
+		t.Fatalf("Expected the tailored profile to have rule: %s", changeTypeRuleName)
+	}
+
 	// update the image with a new hash
 	modPb := origPb.DeepCopy()
 	if err := f.Client.Get(context.TODO(), types.NamespacedName{Namespace: modPb.Namespace, Name: modPb.Name}, modPb); err != nil {
@@ -2351,7 +2394,7 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 	}
 
 	// check that the tp has been updated with the removed rule singleTP
-	err = f.WaitForTailoredProfileStatus(f.OperatorNamespace, tpSingleName, compv1alpha1.TailoredProfileStateReady)
+	err = f.WaitForTailoredProfileStatus(f.OperatorNamespace, tpSingleName, compv1alpha1.TailoredProfileStateError)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2360,8 +2403,70 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if hasRule {
+		t.Fatalf("Expected the tailored profile not to have rule: %s", changeTypeRuleName)
+	}
+
+	// check that the no prune tp still has the rule
+	err = f.WaitForTailoredProfileStatus(f.OperatorNamespace, tpSingleNoPruneName, compv1alpha1.TailoredProfileStateReady)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hasRule, err = f.EnableRuleExistInTailoredProfile(f.OperatorNamespace, tpSingleNoPruneName, changeTypeRuleName)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !hasRule {
 		t.Fatalf("Expected the tailored profile to have rule: %s", changeTypeRuleName)
+	}
+
+	// check that we have a warning message in the tailored profile
+	tpSingleNoPruneFetched := &compv1alpha1.TailoredProfile{}
+	key := types.NamespacedName{Namespace: f.OperatorNamespace, Name: tpSingleNoPruneName}
+	if err := f.Client.Get(context.Background(), key, tpSingleNoPruneFetched); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(tpSingleNoPruneFetched.Status.Warnings) == 0 {
+		t.Fatalf("Expected the tailored profile to have a warning message but got none")
+	}
+
+	// check that the warning message is about the rule
+	if !strings.Contains(tpSingleNoPruneFetched.Status.Warnings, changeTypeRule) {
+		t.Fatalf("Expected the tailored profile to have a warning message about migrated rule: %s but got: %s", changeTypeRule, tpSingleNoPruneFetched.Status.Warnings)
+	}
+
+	// Annotate the TP to prune outdated references
+	tpSingleNoPruneFetchedCopy := tpSingleNoPruneFetched.DeepCopy()
+	tpSingleNoPruneFetchedCopy.Annotations[compv1alpha1.PruneOutdatedReferencesAnnotationKey] = "true"
+	if err := f.Client.Update(context.Background(), tpSingleNoPruneFetchedCopy); err != nil {
+		t.Fatal(err)
+	}
+
+	// check that the warning message is gone when we prune outdated references
+	err = f.WaitForTailoredProfileStatus(f.OperatorNamespace, tpSingleNoPruneName, compv1alpha1.TailoredProfileStateReady)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tpSingleNoPruneNoWarning := &compv1alpha1.TailoredProfile{}
+	key = types.NamespacedName{Namespace: f.OperatorNamespace, Name: tpSingleNoPruneName}
+	if err := f.Client.Get(context.Background(), key, tpSingleNoPruneFetched); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(tpSingleNoPruneNoWarning.Status.Warnings) != 0 {
+		t.Fatalf("Expected the tailored profile to have no warning message but got: %s", tpSingleNoPruneFetched.Status.Warnings)
+	}
+	// check that the rule is being removed from the profile
+	hasRule, err = f.EnableRuleExistInTailoredProfile(f.OperatorNamespace, tpSingleNoPruneName, changeTypeRuleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if hasRule {
+		t.Fatalf("Expected the tailored profile not to have rule: %s", changeTypeRuleName)
 	}
 
 }
