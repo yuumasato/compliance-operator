@@ -820,6 +820,17 @@ func (f *Framework) WaitForScanSettingBindingStatus(namespace, name string, targ
 	return nil
 }
 
+func (f *Framework) AssertProfileInRuleAnnotation(r *compv1alpha1.Rule, expectedProfileId string) bool {
+	if r.Annotations == nil {
+		return false
+	}
+	profileIds := r.Annotations[compv1alpha1.RuleProfileAnnotationKey]
+	if profileIds == "" {
+		return false
+	}
+	return strings.Contains(profileIds, expectedProfileId)
+}
+
 // waitForScanStatus will poll until the compliancescan that we're lookingfor reaches a certain status, or until
 // a timeout is reached.
 func (f *Framework) WaitForSuiteScansStatus(namespace, name string, targetStatus compv1alpha1.ComplianceScanStatusPhase, targetComplianceStatus compv1alpha1.ComplianceScanStatusResult) error {

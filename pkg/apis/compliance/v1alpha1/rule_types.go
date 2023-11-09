@@ -18,6 +18,9 @@ const RuleHideTagAnnotationKey = "compliance.openshift.io/hide-tag"
 // RuleVariableAnnotationKey store list of xccdf variables used to render the rule
 const RuleVariableAnnotationKey = "compliance.openshift.io/rule-variable"
 
+// RuleProfileAnnotationKey is the annotation used to store which profiles are using a particular rule
+const RuleProfileAnnotationKey = "compliance.openshift.io/profiles"
+
 const (
 	CheckTypePlatform = "Platform"
 	CheckTypeNode     = "Node"
