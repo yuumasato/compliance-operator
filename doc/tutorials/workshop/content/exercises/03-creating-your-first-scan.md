@@ -299,7 +299,7 @@ scansettingbinding.compliance.openshift.io/periodic-e8 created
 
 > **NOTE**
 > 
-> Using the [`oc-compliance`](https://github.com/JAORMX/oc-compliance) plugin 
+> Using the [`oc-compliance`](https://github.com/openshift/oc-compliance) plugin 
 > it's also possible to create `ScanSettingBindings` using the subcommand
 > `oc compliance bind`. For this example, the invocation would have been:
 > 
