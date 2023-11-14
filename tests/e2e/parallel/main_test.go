@@ -2855,5 +2855,118 @@ func TestRuleHasProfileAnnotation(t *testing.T) {
 			t.Fatalf("expected to find profile %s in rule %s", profileName, rule.Name)
 		}
 	}
+}
 
+func TestScanCleansUpComplianceCheckResults(t *testing.T) {
+	f := framework.Global
+	t.Parallel()
+
+	tpName := framework.GetObjNameFromTest(t)
+	bindingName := tpName + "-binding"
+
+	// create a tailored profile
+	tp := &compv1alpha1.TailoredProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      tpName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.TailoredProfileSpec{
+			Title:       tpName,
+			Description: tpName,
+			Extends:     "ocp4-cis",
+		},
+	}
+
+	err := f.Client.Create(context.TODO(), tp, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), tp)
+
+	// run a scan
+	ssb := compv1alpha1.ScanSettingBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      bindingName,
+			Namespace: f.OperatorNamespace,
+		},
+		Profiles: []compv1alpha1.NamedObjectReference{
+			{
+				Name:     tpName,
+				Kind:     "TailoredProfile",
+				APIGroup: "compliance.openshift.io/v1alpha1",
+			},
+		},
+		SettingsRef: &compv1alpha1.NamedObjectReference{
+			Name:     "default",
+			Kind:     "ScanSetting",
+			APIGroup: "compliance.openshift.io/v1alpha1",
+		},
+	}
+	err = f.Client.Create(context.TODO(), &ssb, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), &ssb)
+
+	if err := f.WaitForSuiteScansStatus(f.OperatorNamespace, bindingName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant); err != nil {
+		t.Fatal(err)
+	}
+
+	// verify a compliance check result exists
+	checkName := tpName + "-audit-profile-set"
+	checkResult := compv1alpha1.ComplianceCheckResult{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      checkName,
+			Namespace: f.OperatorNamespace,
+		},
+		ID:       "xccdf_org.ssgproject.content_rule_audit_profile_set",
+		Status:   compv1alpha1.CheckResultFail,
+		Severity: compv1alpha1.CheckResultSeverityMedium,
+	}
+	err = f.AssertHasCheck(bindingName, tpName, checkResult)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.AssertRemediationExists(checkName, f.OperatorNamespace); err != nil {
+		t.Fatal(err)
+	}
+
+	// update tailored profile to exclude the rule before we kick off another run
+	tpGet := &compv1alpha1.TailoredProfile{}
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: tpName, Namespace: f.OperatorNamespace}, tpGet)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tpUpdate := tpGet.DeepCopy()
+	ruleName := "ocp4-audit-profile-set"
+	tpUpdate.Spec.DisableRules = []compv1alpha1.RuleReferenceSpec{
+		{
+			Name:      ruleName,
+			Rationale: "testing to ensure scan results are cleaned up",
+		},
+	}
+
+	err = f.Client.Update(context.TODO(), tpUpdate)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// rerun the scan
+	err = f.ReRunScan(tpName, f.OperatorNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.WaitForSuiteScansStatus(f.OperatorNamespace, bindingName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant); err != nil {
+		t.Fatal(err)
+	}
+
+	// verify the compliance check result doesn't exist, which will also
+	// mean the compliance remediation should also be gone
+	if err = f.AssertScanDoesNotContainCheck(tpName, checkName, f.OperatorNamespace); err != nil {
+		t.Fatal(err)
+	}
+	if err = f.AssertRemediationDoesNotExists(checkName, f.OperatorNamespace); err != nil {
+		t.Fatal(err)
+	}
 }
