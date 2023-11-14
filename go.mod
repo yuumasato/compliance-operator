@@ -137,5 +137,5 @@ require (
 
 replace (
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20231113191037-5e6069c685ad
-	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20231024221206-506d798bc61c
+	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20231110140829-a6ca51f6d5ba
 )

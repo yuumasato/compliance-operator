@@ -371,7 +371,7 @@ github.com/openshift/api/template
 github.com/openshift/api/template/v1
 github.com/openshift/api/user
 github.com/openshift/api/user/v1
-# github.com/openshift/client-go v0.0.0-20230926161409-848405da69e1 => github.com/openshift/client-go v0.0.0-20231024221206-506d798bc61c
+# github.com/openshift/client-go v0.0.0-20230926161409-848405da69e1 => github.com/openshift/client-go v0.0.0-20231110140829-a6ca51f6d5ba
 ## explicit; go 1.20
 github.com/openshift/client-go/build/applyconfigurations/build/v1
 github.com/openshift/client-go/build/applyconfigurations/internal
@@ -1221,4 +1221,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 # github.com/openshift/api => github.com/openshift/api v0.0.0-20231113191037-5e6069c685ad
-# github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20231024221206-506d798bc61c
+# github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20231110140829-a6ca51f6d5ba
