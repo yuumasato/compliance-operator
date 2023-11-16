@@ -9,6 +9,7 @@ import (
 	cron "github.com/robfig/cron/v3"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -49,7 +50,7 @@ func (r *ReconcileComplianceSuite) validateSchedule(suite *compv1alpha1.Complian
 }
 
 func (r *ReconcileComplianceSuite) handleCreate(suite *compv1alpha1.ComplianceSuite, logger logr.Logger) error {
-	return r.cronJobCompatCreate(suite, reRunnerNamespacedName(suite.Name), logger)
+	return r.CreateOrUpdateRerunner(suite, reRunnerNamespacedName(suite.Name), logger)
 }
 
 // getPriorityClassName for rerunner from suite scan
@@ -73,18 +74,12 @@ func (r *ReconcileComplianceSuite) getPriorityClassName(suite *compv1alpha1.Comp
 }
 
 func (r *ReconcileComplianceSuite) handleRerunnerDelete(suite *compv1alpha1.ComplianceSuite, logger logr.Logger) error {
-	key := reRunnerNamespacedName(suite.Name)
-	found, err := cronJobCompatGet(r, key)
-	if err != nil {
-		return err
-	}
-
 	inNs := client.InNamespace(common.GetComplianceOperatorNamespace())
 	withLabel := client.MatchingLabels{
 		compv1alpha1.SuiteLabel:       suite.Name,
 		compv1alpha1.SuiteScriptLabel: "",
 	}
-	err = r.Client.DeleteAllOf(context.Background(), &corev1.Pod{}, inNs, withLabel)
+	err := r.Client.DeleteAllOf(context.Background(), &corev1.Pod{}, inNs, withLabel)
 	if err != nil {
 		return err
 	}
@@ -94,6 +89,13 @@ func (r *ReconcileComplianceSuite) handleRerunnerDelete(suite *compv1alpha1.Comp
 		return err
 	}
 
+	key := reRunnerNamespacedName(suite.Name)
+	found, err := r.getCronJob(key)
+	if err != nil && errors.IsNotFound(err) {
+		// The CronJob is already gone, so don't bother trying to clean
+		// it up.
+		return nil
+	}
 	logger.Info("Deleting rerunner", "CronJob.Name", key.Name)
-	return cronJobCompatDelete(r, found)
+	return r.Client.Delete(context.TODO(), &found)
 }
