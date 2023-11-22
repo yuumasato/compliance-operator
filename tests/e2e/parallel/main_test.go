@@ -2219,7 +2219,7 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 			Name:      tpMixName,
 			Namespace: f.OperatorNamespace,
 			Annotations: map[string]string{
-				compv1alpha1.PruneOutdatedReferencesAnnotationKey: "",
+				compv1alpha1.PruneOutdatedReferencesAnnotationKey: "true",
 			},
 		},
 		Spec: compv1alpha1.TailoredProfileSpec{
@@ -2243,7 +2243,7 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 			Name:      tpSingleName,
 			Namespace: f.OperatorNamespace,
 			Annotations: map[string]string{
-				compv1alpha1.PruneOutdatedReferencesAnnotationKey: "",
+				compv1alpha1.PruneOutdatedReferencesAnnotationKey: "true",
 			},
 		},
 		Spec: compv1alpha1.TailoredProfileSpec{

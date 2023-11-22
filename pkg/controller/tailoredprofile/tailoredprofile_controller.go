@@ -205,12 +205,12 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 	}
 
 	ann := instance.GetAnnotations()
-	if _, ok := ann[cmpv1alpha1.DisableOutdatedReferenceValidation]; ok {
+	if v, ok := ann[cmpv1alpha1.DisableOutdatedReferenceValidation]; ok && v == "true" {
 		reqLogger.Info("Reference validation is disabled, skipping validation")
 	} else if isValidationRequired(instance) {
 		reqLogger.Info("Validating TailoredProfile")
 		pruneOutdated := false
-		if _, ok := ann[cmpv1alpha1.PruneOutdatedReferencesAnnotationKey]; ok {
+		if v, ok := ann[cmpv1alpha1.PruneOutdatedReferencesAnnotationKey]; ok && v == "true" {
 			pruneOutdated = true
 		}
 		// remove any deprecated variables or rules from the tailored profile
