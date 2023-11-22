@@ -2439,3 +2439,25 @@ func (f *Framework) AssertScanDoesNotContainCheck(scanName, checkName, namespace
 	}
 	return nil
 }
+
+func (f *Framework) assertRuleType(ruleName, namespace, expectedRuleType string) error {
+	var r compv1alpha1.Rule
+	key := types.NamespacedName{Name: ruleName, Namespace: namespace}
+	err := f.Client.Get(context.TODO(), key, &r)
+	if err != nil {
+		return err
+	}
+	if r.CheckType != expectedRuleType {
+		m := fmt.Sprintf("expected rule %s to be %s type, found %s type instead", r.Name, expectedRuleType, r.CheckType)
+		return errors.New(m)
+	}
+	return nil
+}
+
+func (f *Framework) AssertRuleIsNodeType(ruleName, namespace string) error {
+	return f.assertRuleType(ruleName, namespace, "Node")
+}
+
+func (f *Framework) AssertRuleIsPlatformType(ruleName, namespace string) error {
+	return f.assertRuleType(ruleName, namespace, "Platform")
+}

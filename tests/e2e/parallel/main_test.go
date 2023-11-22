@@ -2196,7 +2196,7 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 		t.Fatalf("failed waiting for the ProfileBundle to become available: %s", err)
 	}
 
-	// Check that the rule exists in the original profile
+	// Check that the rule exists in the original profile and it is a Platform rule
 	changeTypeRuleName := prefixName(pbName, changeTypeRule)
 	err, found := f.DoesRuleExist(origPb.Namespace, changeTypeRuleName)
 	if err != nil {
@@ -2204,14 +2204,20 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 	} else if found != true {
 		t.Fatalf("expected rule %s to exist in namespace %s", changeTypeRuleName, origPb.Namespace)
 	}
+	if err := f.AssertRuleIsPlatformType(changeTypeRuleName, f.OperatorNamespace); err != nil {
+		t.Fatal(err)
+	}
 
-	// Check that the rule exists in the original profile
+	// Check that the rule exists in the original profile and it is a Platform rule
 	unChangedTypeRuleName := prefixName(pbName, unChangedTypeRule)
 	err, found = f.DoesRuleExist(origPb.Namespace, unChangedTypeRuleName)
 	if err != nil {
 		t.Fatal(err)
 	} else if found != true {
 		t.Fatalf("expected rule %s to exist in namespace %s", unChangedTypeRuleName, origPb.Namespace)
+	}
+	if err := f.AssertRuleIsPlatformType(unChangedTypeRuleName, f.OperatorNamespace); err != nil {
+		t.Fatal(err)
 	}
 
 	tpMix := &compv1alpha1.TailoredProfile{
@@ -2363,9 +2369,20 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 		t.Fatalf("failed to parse ProfileBundle %s: %s", pbName, err)
 	}
 
+	// Make sure the rules parsed correctly and one did indeed change from
+	// a Platform to a Node rule. Note that this switch didn't happen
+	// because of the test, but how the data stream was built.
 	if err := f.AssertProfileBundleMustHaveParsedRules(pbName); err != nil {
 		t.Fatal(err)
 	}
+	if err := f.AssertRuleIsPlatformType(unChangedTypeRuleName, f.OperatorNamespace); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.AssertRuleIsNodeType(changeTypeRuleName, f.OperatorNamespace); err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert the kubelet-anonymous-auth rule switched from Platform to Node type
 	if err := f.AssertRuleCheckTypeChangedAnnotationKey(f.OperatorNamespace, changeTypeRuleName, "Platform"); err != nil {
 		t.Fatal(err)
 	}
