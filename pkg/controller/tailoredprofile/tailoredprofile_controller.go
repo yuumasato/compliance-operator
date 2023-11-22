@@ -213,14 +213,8 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 		if v, ok := ann[cmpv1alpha1.PruneOutdatedReferencesAnnotationKey]; ok && v == "true" {
 			pruneOutdated = true
 		}
-		// remove any deprecated variables or rules from the tailored profile
-		doContinue, variableNeedtoBeDeprecatedList, ruleNeedToBeDeprecatedList, err := r.handleDeprecation(instance, reqLogger, pruneOutdated)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-		if !doContinue {
-			return reconcile.Result{}, nil
-		}
+
+		// handle deprecated rules here in the future
 
 		doContinue, ruleNeedToBeMigratedList, err := r.handleRulePruning(instance, reqLogger, pruneOutdated)
 		if err != nil {
@@ -230,7 +224,7 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 			return reconcile.Result{}, nil
 		}
 
-		warningMsg := generateWarningMessage(variableNeedtoBeDeprecatedList, ruleNeedToBeDeprecatedList, ruleNeedToBeMigratedList)
+		warningMsg := generateWarningMessage(ruleNeedToBeMigratedList)
 		// check if warning message matches the previous warning message
 		// if it does, we don't need to update the tp, if not we need to update it with the new warning message
 		if warningMsg != instance.Status.Warnings {
@@ -280,18 +274,8 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 // based on the list of deprecated variables and rules that are detected
 // as well as the list of migrated rules that are detected that are not
 // migrated yet
-func generateWarningMessage(variableNeedtoBeDeprecatedList []string, ruleNeedToBeDeprecatedList []string, ruleNeedToBeMigratedList []string) string {
+func generateWarningMessage(ruleNeedToBeMigratedList []string) string {
 	var warningMessage string
-	if len(variableNeedtoBeDeprecatedList) > 0 {
-		warningMessage = fmt.Sprintf("The following variables are deprecated and need to be removed from the TailoredProfile: %s\n", strings.Join(variableNeedtoBeDeprecatedList, ","))
-	}
-	if len(ruleNeedToBeDeprecatedList) > 0 {
-		if warningMessage != "" {
-			warningMessage = fmt.Sprintf("%sThe following rules are deprecated and need to be removed from the TailoredProfile: %s\n", warningMessage, strings.Join(ruleNeedToBeDeprecatedList, ","))
-		} else {
-			warningMessage = fmt.Sprintf("The following rules are deprecated and need to be removed from the TailoredProfile: %s\n", strings.Join(ruleNeedToBeDeprecatedList, ","))
-		}
-	}
 	if len(ruleNeedToBeMigratedList) > 0 {
 		if warningMessage != "" {
 			warningMessage = fmt.Sprintf("%sThe following rules are migrated and need to be migrated or removed from the TailoredProfile: %s\n", warningMessage, strings.Join(ruleNeedToBeMigratedList, ","))
@@ -397,119 +381,6 @@ func isValidationRequired(tp *cmpv1alpha1.TailoredProfile) bool {
 		return tp.Spec.DisableRules != nil || tp.Spec.EnableRules != nil || tp.Spec.ManualRules != nil || tp.Spec.SetValues != nil
 	}
 	return tp.Spec.EnableRules != nil || tp.Spec.ManualRules != nil || tp.Spec.SetValues != nil
-}
-
-func (r *ReconcileTailoredProfile) handleDeprecation(
-	v1alphaTp *cmpv1alpha1.TailoredProfile, logger logr.Logger, pruneOudated bool) (doContinue bool, variableNeedtoBeDeprecatedList []string, ruleNeedToBeDeprecatedList []string, err error) {
-	doContinue = true
-	deprecatedRules, err := r.getDeprecatedRules(v1alphaTp, logger)
-	if err != nil {
-		return false, nil, nil, err
-	}
-
-	deprecatedVariables, err := r.getDeprecatedVariables(v1alphaTp, logger)
-	if err != nil {
-		return false, nil, nil, err
-	}
-
-	v1alphaTpCP := v1alphaTp.DeepCopy()
-
-	// remove any deprecated variables from the tailored profile
-	if len(v1alphaTp.Spec.SetValues) > 0 && len(deprecatedVariables) > 0 {
-		var newVariables []cmpv1alpha1.VariableValueSpec
-		for vi := range v1alphaTp.Spec.SetValues {
-			variables := &v1alphaTp.Spec.SetValues[vi]
-			if _, ok := deprecatedVariables[variables.Name]; ok {
-				if pruneOudated {
-					doContinue = false
-					logger.Info("Removing deprecated variable", "variable", variables.Name)
-					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Removing deprecated variable: %s", variables.Name)
-				} else {
-					logger.Info("Deprecated variable detected", "variable", variables.Name)
-					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Deprecated variable detected: %s Please remove it from the TailoredProfile", variables.Name)
-					variableNeedtoBeDeprecatedList = append(variableNeedtoBeDeprecatedList, variables.Name)
-					newVariables = append(newVariables, *variables)
-				}
-				continue
-			} else {
-				newVariables = append(newVariables, *variables)
-			}
-		}
-		if len(newVariables) != len(v1alphaTp.Spec.SetValues) {
-			v1alphaTpCP.Spec.SetValues = newVariables
-		}
-	}
-
-	// remove any deprecated rules from the tailored profile
-	if len(v1alphaTp.Spec.EnableRules) > 0 && len(deprecatedRules) > 0 {
-		var newRules []cmpv1alpha1.RuleReferenceSpec
-		for ri := range v1alphaTp.Spec.EnableRules {
-			rule := &v1alphaTp.Spec.EnableRules[ri]
-			if _, ok := deprecatedRules[rule.Name]; ok {
-				if pruneOudated {
-					doContinue = false
-					logger.Info("Removing deprecated rule from enableRules", "rule", rule.Name)
-					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Removing deprecated rule: %s", rule.Name)
-				} else {
-					logger.Info("Deprecated rule detected in enableRules", "rule", rule.Name)
-					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Deprecated rule detected: %s Please remove it from the TailoredProfile", rule.Name)
-					ruleNeedToBeDeprecatedList = append(ruleNeedToBeDeprecatedList, rule.Name)
-					newRules = append(newRules, *rule)
-				}
-				continue
-			} else {
-				newRules = append(newRules, *rule)
-			}
-		}
-		if len(newRules) != len(v1alphaTp.Spec.EnableRules) {
-			v1alphaTpCP.Spec.EnableRules = newRules
-		}
-	}
-
-	if len(v1alphaTp.Spec.DisableRules) > 0 && len(deprecatedRules) > 0 {
-		var newRules []cmpv1alpha1.RuleReferenceSpec
-		for ri := range v1alphaTp.Spec.DisableRules {
-			rule := &v1alphaTp.Spec.DisableRules[ri]
-			if _, ok := deprecatedRules[rule.Name]; ok {
-				if pruneOudated {
-					doContinue = false
-					logger.Info("Removing deprecated rule from disableRules", "rule", rule.Name)
-					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Removing deprecated rule: %s", rule.Name)
-				} else {
-					logger.Info("Deprecated rule detected in disableRules", "rule", rule.Name)
-					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", "Deprecated rule detected: %s Please remove it from the TailoredProfile", rule.Name)
-					ruleNeedToBeDeprecatedList = append(ruleNeedToBeDeprecatedList, rule.Name)
-					newRules = append(newRules, *rule)
-				}
-				continue
-			} else {
-				newRules = append(newRules, *rule)
-			}
-		}
-		if len(newRules) != len(v1alphaTp.Spec.DisableRules) {
-			v1alphaTpCP.Spec.DisableRules = newRules
-		}
-	}
-
-	// if tp does not have any rules, variables left, and it does not extend any profile
-	// we should not update the tp, and set the state of tp to Error
-	if len(v1alphaTpCP.Spec.EnableRules) == 0 && len(v1alphaTpCP.Spec.DisableRules) == 0 && len(v1alphaTpCP.Spec.ManualRules) == 0 && v1alphaTpCP.Spec.Extends == "" {
-		errorMsg := "TailoredProfile does not have any rules left after removing deprecated rules and variables"
-		v1alphaTpCP.Status.State = cmpv1alpha1.TailoredProfileStateError
-		v1alphaTpCP.Status.ErrorMessage = errorMsg
-		doContinue = false
-		logger.Info(errorMsg)
-		r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileDeprecatedSetting", errorMsg)
-	}
-
-	if !doContinue {
-		err = r.Client.Update(context.TODO(), v1alphaTpCP)
-		logger.Info("Updating TailoredProfile with deprecated rules and variables removed")
-		if err != nil {
-			return false, nil, nil, err
-		}
-	}
-	return doContinue, variableNeedtoBeDeprecatedList, ruleNeedToBeDeprecatedList, nil
 }
 
 // getMigratedRules get list of rules and check if it has RuleLastCheckTypeChangedAnnotationKey annotation
