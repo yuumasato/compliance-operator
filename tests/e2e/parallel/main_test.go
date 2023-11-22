@@ -2258,7 +2258,7 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 		},
 	}
 
-	tpSingleNoPrune := &compv1alpha1.TailoredProfile{
+	tpMixNoPrune := &compv1alpha1.TailoredProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      tpSingleNoPruneName,
 			Namespace: f.OperatorNamespace,
@@ -2326,12 +2326,12 @@ func TestScanSettingBindingTailoringManyEnablingRulePass(t *testing.T) {
 		t.Fatalf("Expected the tailored profile to have rule: %s", changeTypeRuleName)
 	}
 
-	// tpSingleNoPrune test
-	createTPErr = f.Client.Create(context.TODO(), tpSingleNoPrune, nil)
+	// tpMixNoPrune test
+	createTPErr = f.Client.Create(context.TODO(), tpMixNoPrune, nil)
 	if createTPErr != nil {
 		t.Fatal(createTPErr)
 	}
-	defer f.Client.Delete(context.TODO(), tpSingleNoPrune)
+	defer f.Client.Delete(context.TODO(), tpMixNoPrune)
 	// check the status of the TP to make sure it has no errors
 	err = f.WaitForTailoredProfileStatus(f.OperatorNamespace, tpSingleNoPruneName, compv1alpha1.TailoredProfileStateReady)
 	if err != nil {
