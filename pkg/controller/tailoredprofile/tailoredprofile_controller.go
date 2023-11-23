@@ -413,54 +413,6 @@ func (r *ReconcileTailoredProfile) getMigratedRules(tp *cmpv1alpha1.TailoredProf
 	return migratedRules, nil
 }
 
-// getDeprecatedVariables gets the list of deprecated variables
-func (r *ReconcileTailoredProfile) getDeprecatedVariables(tp *cmpv1alpha1.TailoredProfile, logger logr.Logger) (map[string]string, error) {
-	// get all the variables in the namespace
-	variableList := &cmpv1alpha1.VariableList{}
-	err := r.Client.List(context.TODO(), variableList, &client.ListOptions{
-		Namespace: tp.GetNamespace(),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// get all the variables that are deprecated
-	deprecatedVariables := make(map[string]string)
-	for vi := range variableList.Items {
-		variable := &variableList.Items[vi]
-		if variable.Annotations != nil {
-			if _, ok := variable.Annotations[cmpv1alpha1.DeprecatedAnnotationKey]; ok {
-				deprecatedVariables[variable.GetName()] = ""
-			}
-		}
-	}
-	return deprecatedVariables, nil
-}
-
-// getDeprecatedRules gets the list of deprecated rules
-func (r *ReconcileTailoredProfile) getDeprecatedRules(tp *cmpv1alpha1.TailoredProfile, logger logr.Logger) (map[string]string, error) {
-	// get all the rules in the namespace
-	ruleList := &cmpv1alpha1.RuleList{}
-	err := r.Client.List(context.TODO(), ruleList, &client.ListOptions{
-		Namespace: tp.GetNamespace(),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// get all the rules that are deprecated
-	deprecatedRules := make(map[string]string)
-	for ri := range ruleList.Items {
-		rule := &ruleList.Items[ri]
-		if rule.Annotations != nil {
-			if _, ok := rule.Annotations[cmpv1alpha1.DeprecatedAnnotationKey]; ok {
-				deprecatedRules[rule.GetName()] = ""
-			}
-		}
-	}
-	return deprecatedRules, nil
-}
-
 // getProfileInfoFromExtends gets the Profile and ProfileBundle where the rules come from
 // out of the profile that's being extended
 func (r *ReconcileTailoredProfile) getProfileInfoFromExtends(tp *cmpv1alpha1.TailoredProfile) (*cmpv1alpha1.Profile, *cmpv1alpha1.ProfileBundle, error) {

@@ -15,9 +15,6 @@ const PruneOutdatedReferencesAnnotationKey = "compliance.openshift.io/prune-outd
 // RuleLastCheckTypeChangedAnnotationKey is the annotation key used to indicate that the rule check type has changed, store its previous check type
 const RuleLastCheckTypeChangedAnnotationKey = "compliance.openshift.io/rule-last-check-type"
 
-// DeprecatedAnnotationKey is the annotation key used to indicate that the variable or rule is deprecated
-const DeprecatedAnnotationKey = "compliance.openshift.io/deprecated"
-
 // RuleReferenceSpec specifies a rule to be selected/deselected, as well as the reason why
 type RuleReferenceSpec struct {
 	// Name of the rule that's being referenced
