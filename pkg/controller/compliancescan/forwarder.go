@@ -31,7 +31,7 @@ func (f logForwarder) SendComplianceCheckResult(c *compv1alpha1.ComplianceCheckR
 }
 
 func (f logForwarder) SendComplianceRemediation(r *compv1alpha1.ComplianceRemediation) error {
-	logf.Log.Info("ComplianceRemediation", r.Spec, r.Status)
+	logf.Log.Info("ComplianceRemediation", "ComplianceRemediation.Name", r.Name)
 	return nil
 }
 
