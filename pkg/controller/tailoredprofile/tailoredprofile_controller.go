@@ -278,9 +278,9 @@ func generateWarningMessage(ruleNeedToBeMigratedList []string) string {
 	var warningMessage string
 	if len(ruleNeedToBeMigratedList) > 0 {
 		if warningMessage != "" {
-			warningMessage = fmt.Sprintf("%sThe following rules are migrated and need to be migrated or removed from the TailoredProfile: %s\n", warningMessage, strings.Join(ruleNeedToBeMigratedList, ","))
+			warningMessage = fmt.Sprintf("%sThe following rules changed check type and need to be removed from the TailoredProfile. If these rules are important for you, add them to a TailoredProfile of matching check type: %s\n", warningMessage, strings.Join(ruleNeedToBeMigratedList, ","))
 		} else {
-			warningMessage = fmt.Sprintf("The following rules are migrated and need to be migrated or removed from the TailoredProfile: %s\n", strings.Join(ruleNeedToBeMigratedList, ","))
+			warningMessage = fmt.Sprintf("The following rules changed check type and need to be removed from the TailoredProfile. If these rules are important for you, add them to a TailoredProfile of matching check type: %s\n", strings.Join(ruleNeedToBeMigratedList, ","))
 		}
 	}
 	return warningMessage
