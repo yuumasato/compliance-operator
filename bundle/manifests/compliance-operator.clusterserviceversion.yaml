@@ -1542,8 +1542,10 @@ spec:
           verbs:
           - create
           - get
+          - list
           - update
           - patch
+          - delete
         - apiGroups:
           - compliance.openshift.io
           resources:
