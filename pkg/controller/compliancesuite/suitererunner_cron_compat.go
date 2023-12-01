@@ -2,18 +2,14 @@ package compliancesuite
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/common"
@@ -31,127 +27,51 @@ func GetRerunnerName(suiteName string) string {
 	return suiteName + "-rerunner"
 }
 
-func (r *ReconcileComplianceSuite) cronJobCompatCreate(
+func (r *ReconcileComplianceSuite) CreateOrUpdateRerunner(
 	suite *compv1alpha1.ComplianceSuite,
 	key types.NamespacedName,
 	logger logr.Logger,
 ) error {
-	var getObj client.Object
+	c := batchv1.CronJob{}
+	err := r.Client.Get(context.TODO(), key, &c)
 
+	if err != nil && errors.IsNotFound(err) {
+		return r.createCronJob(suite, &c, logger)
+	} else if err != nil {
+		return err
+	}
+	return r.updateCronJob(suite, &c, logger)
+}
+
+func (r *ReconcileComplianceSuite) getCronJob(key types.NamespacedName) (batchv1.CronJob, error) {
+	c := batchv1.CronJob{}
+	err := r.Client.Get(context.TODO(), key, &c)
+	if err != nil {
+		return c, err
+	}
+	return c, nil
+}
+
+func (r *ReconcileComplianceSuite) createCronJob(suite *compv1alpha1.ComplianceSuite, c *batchv1.CronJob, logger logr.Logger) error {
+	logger.Info("Creating rerunner", "CronJob.Name", c.GetName())
 	priorityClassName, err := r.getPriorityClassName(suite)
 	if err != nil {
 		logger.Error(err, "Cannot get priority class name, scan will not be run with set priority class")
 	}
-
-	createBeta := func() *batchv1beta1.CronJob {
-		getObj = &batchv1beta1.CronJob{}
-		return r.getBetaV1Rerunner(suite, priorityClassName)
-	}
-
-	createV1 := func() *batchv1.CronJob {
-		getObj = &batchv1.CronJob{}
-		return r.getV1Rerunner(suite, priorityClassName)
-	}
-
-	updateBeta := func() error {
-		getObjTyped, ok := getObj.(*batchv1beta1.CronJob)
-		if !ok {
-			return fmt.Errorf("failed to cast object to beta CronJob")
-		}
-		if getObjTyped.Spec.Schedule == suite.Spec.Schedule {
-			return nil
-		}
-		cronJobCopy := getObjTyped.DeepCopy()
-		cronJobCopy.Spec.Schedule = suite.Spec.Schedule
-		logger.Info("Updating beta rerunner", "CronJob.Name", cronJobCopy.GetName())
-		return r.Client.Update(context.TODO(), cronJobCopy)
-	}
-
-	updateV1 := func() error {
-		getObjTyped, ok := getObj.(*batchv1.CronJob)
-		if !ok {
-			return fmt.Errorf("failed to cast object to v1 CronJob")
-		}
-		if getObjTyped.Spec.Schedule == suite.Spec.Schedule && getObjTyped.Spec.Suspend == &suite.Spec.Suspend {
-			return nil
-		}
-		cronJobCopy := getObjTyped.DeepCopy()
-		cronJobCopy.Spec.Schedule = suite.Spec.Schedule
-		cronJobCopy.Spec.Suspend = &suite.Spec.Suspend
-		logger.Info("Updating v1 rerunner", "CronJob.Name", cronJobCopy.GetName())
-		return r.Client.Update(context.TODO(), cronJobCopy)
-	}
-
-	createAction := func(o client.Object) error {
-		err := r.Client.Get(context.TODO(), key, getObj)
-		if err != nil && errors.IsNotFound(err) {
-			// No re-runner found, create it
-			logger.Info("Creating rerunner", "CronJob.Name", o.GetName())
-			return r.Client.Create(context.TODO(), o)
-		} else if err != nil {
-			return err
-		}
-
-		switch o.(type) {
-		case *batchv1beta1.CronJob:
-			return updateBeta()
-		case *batchv1.CronJob:
-			return updateV1()
-		}
-
-		return nil
-	}
-
-	return doCompat(createAction, createBeta, createV1)
+	s := r.generateRerunnerSpec(suite, priorityClassName)
+	return r.Client.Create(context.TODO(), s)
 }
 
-func cronJobCompatGet(r *ReconcileComplianceSuite, key types.NamespacedName) (client.Object, error) {
-	var retObj client.Object
-
-	getEmptyBeta := func() *batchv1beta1.CronJob {
-		return &batchv1beta1.CronJob{}
-	}
-
-	getEmptyV1 := func() *batchv1.CronJob {
-		return &batchv1.CronJob{}
-	}
-
-	getAction := func(o client.Object) error {
-		err := r.Client.Get(context.TODO(), key, o)
-		if err != nil && errors.IsNotFound(err) {
-			// No re-runner found, we're good
-			return nil
-		} else if err != nil {
-			return err
-		}
-
-		retObj = o
+func (r *ReconcileComplianceSuite) updateCronJob(suite *compv1alpha1.ComplianceSuite, c *batchv1.CronJob, logger logr.Logger) error {
+	if c.Spec.Schedule == suite.Spec.Schedule && c.Spec.Suspend == &suite.Spec.Suspend {
+		logger.Info("Suite rerunner configuration is up-to-date, no update necessary", "CronJob.Name", c.GetName())
 		return nil
 	}
-
-	err := doCompat(getAction, getEmptyBeta, getEmptyV1)
-	return retObj, err
-}
-
-func cronJobCompatDelete(r *ReconcileComplianceSuite, cron client.Object) error {
-	if cron == nil {
-		// for cases where cronJobCompatGet returns nil,nil
-		return nil
-	}
-
-	return r.Client.Delete(context.TODO(), cron)
-}
-
-type compatAction func(o client.Object) error
-type getBetaCron func() *batchv1beta1.CronJob
-type getV1Cron func() *batchv1.CronJob
-
-func doCompat(what compatAction, betaCron getBetaCron, v1cron getV1Cron) error {
-	err := what(v1cron())
-	if meta.IsNoMatchError(err) {
-		return what(betaCron())
-	}
-	return err
+	logger.Info("Updating rerunner configuration", "CronJob.Name", c.GetName())
+	co := c.DeepCopy()
+	co.Spec.Schedule = suite.Spec.Schedule
+	co.Spec.Suspend = &suite.Spec.Suspend
+	return r.Client.Update(context.TODO(), co)
 }
 
 func reRunnerNamespacedName(suiteName string) types.NamespacedName {
@@ -170,7 +90,7 @@ func reRunnerObjectMeta(suiteName string) *metav1.ObjectMeta {
 	}
 }
 
-func (r *ReconcileComplianceSuite) getV1Rerunner(
+func (r *ReconcileComplianceSuite) generateRerunnerSpec(
 	suite *compv1alpha1.ComplianceSuite,
 	priorityClassName string,
 ) *batchv1.CronJob {
@@ -179,23 +99,6 @@ func (r *ReconcileComplianceSuite) getV1Rerunner(
 		Spec: batchv1.CronJobSpec{
 			Schedule: suite.Spec.Schedule,
 			JobTemplate: batchv1.JobTemplateSpec{
-				Spec: batchv1.JobSpec{
-					Template: *r.getRerunnerPodTemplate(suite, priorityClassName),
-				},
-			},
-		},
-	}
-}
-
-func (r *ReconcileComplianceSuite) getBetaV1Rerunner(
-	suite *compv1alpha1.ComplianceSuite,
-	priorityClassName string,
-) *batchv1beta1.CronJob {
-	return &batchv1beta1.CronJob{
-		ObjectMeta: *reRunnerObjectMeta(suite.Name),
-		Spec: batchv1beta1.CronJobSpec{
-			Schedule: suite.Spec.Schedule,
-			JobTemplate: batchv1beta1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
 					Template: *r.getRerunnerPodTemplate(suite, priorityClassName),
 				},
