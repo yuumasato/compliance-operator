@@ -6,6 +6,15 @@ import (
 
 // FIXME: move name/rationale to a common struct with an interface?
 
+// DisableOutdatedReferenceValidation a label is used to disable validation of outdated references
+const DisableOutdatedReferenceValidation = "compliance.openshift.io/disable-outdated-reference-validation"
+
+// PruneOutdatedReferencesAnnotationKey is the annotation key used to indicate that the outdated references of rules or variables should be pruned
+const PruneOutdatedReferencesAnnotationKey = "compliance.openshift.io/prune-outdated-references"
+
+// RuleLastCheckTypeChangedAnnotationKey is the annotation key used to indicate that the rule check type has changed, store its previous check type
+const RuleLastCheckTypeChangedAnnotationKey = "compliance.openshift.io/rule-last-check-type"
+
 // RuleReferenceSpec specifies a rule to be selected/deselected, as well as the reason why
 type RuleReferenceSpec struct {
 	// Name of the rule that's being referenced
@@ -74,6 +83,7 @@ type TailoredProfileStatus struct {
 	// The current state of the tailored profile
 	State        TailoredProfileState `json:"state,omitempty"`
 	ErrorMessage string               `json:"errorMessage,omitempty"`
+	Warnings     string               `json:"warnings,omitempty"`
 }
 
 // OutputRef is a reference to the object created from the tailored profile

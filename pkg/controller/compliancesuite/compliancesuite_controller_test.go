@@ -452,25 +452,6 @@ var _ = Describe("ComplianceSuiteController", func() {
 				"something": "0s"
 			}
 			`
-		remediationKCMCPayload := `
-		{
-			"ignition": {
-				"version": "3.2.0"
-			},
-			"storage": {
-				"files": [
-					{
-						"contents": {
-							"source": "data:text/plain,%7B%0A%20%20%22kind%22%3A%20%22KubeletConfiguration%22%2C%0A%20%20%22apiVersion%22%3A%20%22kubelet.config.k8s.io%2Fv1beta1%22%2C%0A%20%20%22staticPodPath%22%3A%20%22%2Fetc%2Fkubernetes%2Fmanifests%22%2C%0A%20%20%22syncFrequency%22%3A%20%220s%22%2C%0A%20%20%22fileCheckFrequency%22%3A%20%220s%22%2C%0A%20%20%22httpCheckFrequency%22%3A%20%220s%22%2C%0A%20%20%22tlsCipherSuites%22%3A%20%5B%0A%20%20%20%20%22TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256%22%2C%0A%20%20%20%20%22TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256%22%2C%0A%20%20%20%20%22TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384%22%2C%0A%20%20%20%20%22TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384%22%2C%0A%20%20%20%20%22TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256%22%2C%0A%20%20%20%20%22TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256%22%0A%20%20%5D%2C%0A%20%20%22tlsMinVersion%22%3A%20%22VersionTLS12%22%2C%0A%20%20%22rotateCertificates%22%3A%20true%2C%0A%20%20%22serverTLSBootstrap%22%3A%20true%2C%0A%20%20%22authentication%22%3A%20%7B%0A%20%20%20%20%22x509%22%3A%20%7B%0A%20%20%20%20%20%20%22clientCAFile%22%3A%20%22%2Fetc%2Fkubernetes%2Fkubelet-ca.crt%22%0A%20%20%20%20%7D%2C%0A%20%20%20%20%22webhook%22%3A%20%7B%0A%20%20%20%20%20%20%22cacheTTL%22%3A%20%220s%22%0A%20%20%20%20%7D%2C%0A%20%20%20%20%22anonymous%22%3A%20%7B%0A%20%20%20%20%20%20%22enabled%22%3A%20false%0A%20%20%20%20%7D%0A%20%20%7D%2C%0A%20%20%22authorization%22%3A%20%7B%0A%20%20%20%20%22webhook%22%3A%20%7B%0A%20%20%20%20%20%20%22cacheAuthorizedTTL%22%3A%20%220s%22%2C%0A%20%20%20%20%20%20%22cacheUnauthorizedTTL%22%3A%20%220s%22%0A%20%20%20%20%7D%0A%20%20%7D%2C%0A%20%20%22clusterDomain%22%3A%20%22cluster.local%22%2C%0A%20%20%22clusterDNS%22%3A%20%5B%0A%20%20%20%20%22172.30.0.10%22%0A%20%20%5D%2C%0A%20%20%22streamingConnectionIdleTimeout%22%3A%20%220s%22%2C%0A%20%20%22nodeStatusUpdateFrequency%22%3A%20%220s%22%2C%0A%20%20%22nodeStatusReportFrequency%22%3A%20%220s%22%2C%0A%20%20%22imageMinimumGCAge%22%3A%20%220s%22%2C%0A%20%20%22volumeStatsAggPeriod%22%3A%20%220s%22%2C%0A%20%20%22systemCgroups%22%3A%20%22%2Fsystem.slice%22%2C%0A%20%20%22cgroupRoot%22%3A%20%22%2F%22%2C%0A%20%20%22cgroupDriver%22%3A%20%22systemd%22%2C%0A%20%20%22cpuManagerReconcilePeriod%22%3A%20%220s%22%2C%0A%20%20%22runtimeRequestTimeout%22%3A%20%220s%22%2C%0A%20%20%22maxPods%22%3A%20250%2C%0A%20%20%22something%22%3A%20%220s%22%2C%0A%20%20%22kubeAPIBurst%22%3A%20100%2C%0A%20%20%22serializeImagePulls%22%3A%20false%2C%0A%20%20%22evictionPressureTransitionPeriod%22%3A%20%220s%22%2C%0A%20%20%22featureGates%22%3A%20%7B%0A%20%20%20%20%22APIPriorityAndFairness%22%3A%20true%2C%0A%20%20%20%20%22CSIMigrationAWS%22%3A%20false%2C%0A%20%20%20%20%22CSIMigrationAzureDisk%22%3A%20false%2C%0A%20%20%20%20%22CSIMigrationAzureFile%22%3A%20false%2C%0A%20%20%20%20%22CSIMigrationGCE%22%3A%20false%2C%0A%20%20%20%20%22CSIMigrationOpenStack%22%3A%20false%2C%0A%20%20%20%20%22CSIMigrationvSphere%22%3A%20false%2C%0A%20%20%20%20%22DownwardAPIHugePages%22%3A%20true%2C%0A%20%20%20%20%22LegacyNodeRoleBehavior%22%3A%20false%2C%0A%20%20%20%20%22NodeDisruptionExclusion%22%3A%20true%2C%0A%20%20%20%20%22PodSecurity%22%3A%20true%2C%0A%20%20%20%20%22RotateKubeletServerCertificate%22%3A%20true%2C%0A%20%20%20%20%22ServiceNodeExclusion%22%3A%20true%2C%0A%20%20%20%20%22SupportPodPidsLimit%22%3A%20true%0A%20%20%7D%2C%0A%20%20%22memorySwap%22%3A%20%7B%7D%2C%0A%20%20%22containerLogMaxSize%22%3A%20%2250Mi%22%2C%0A%20%20%22systemReserved%22%3A%20%7B%0A%20%20%20%20%22ephemeral-storage%22%3A%20%221Gi%22%0A%20%20%7D%2C%0A%20%20%22logging%22%3A%20%7B%0A%20%20%20%20%22flushFrequency%22%3A%200%2C%0A%20%20%20%20%22verbosity%22%3A%200%2C%0A%20%20%20%20%22options%22%3A%20%7B%0A%20%20%20%20%20%20%22json%22%3A%20%7B%0A%20%20%20%20%20%20%20%20%22infoBufferSize%22%3A%20%220%22%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%7D%0A%20%20%7D%2C%0A%20%20%22shutdownGracePeriod%22%3A%20%220s%22%2C%0A%20%20%22shutdownGracePeriodCriticalPods%22%3A%20%220s%22%0A%7D%0A"
-						},
-						"mode": 420,
-						"overwrite": true,
-						"path": "/etc/kubernetes/kubelet.conf"
-					}
-				]
-			}
-		}`
-
 		BeforeEach(func() {
 			mcp := &mcfgv1.MachineConfigPool{
 				TypeMeta: metav1.TypeMeta{
@@ -620,25 +601,7 @@ var _ = Describe("ComplianceSuiteController", func() {
 			_, err = reconciler.reconcileRemediations(suite, logger)
 			Expect(err).To(BeNil())
 
-			By("the pool should not be un-paused because the KubeletConfig is not rendered into Machine Config")
-			err = reconciler.Client.Get(ctx, poolkey, p)
-			Expect(err).To(BeNil())
-			Expect(p.Spec.Paused).To(BeTrue())
-
-			By("Render KubeLetconfig into Machine Config")
-			mcCurrent := &mcfgv1.MachineConfig{}
-			mckey := types.NamespacedName{Name: "99-master-generated-kubelet"}
-			err = reconciler.Client.Get(ctx, mckey, mcCurrent)
-			Expect(err).To(BeNil())
-			mcCurrent.Spec.Config.Raw = []byte(remediationKCMCPayload)
-			err = reconciler.Client.Update(ctx, mcCurrent)
-			Expect(err).To(BeNil())
-
-			By("Running a second reconcile loop")
-			_, err = reconciler.reconcileRemediations(suite, logger)
-			Expect(err).To(BeNil())
-
-			By("the pool should be un-paused because machine config has been updated with the new kubelet config content")
+			By("the pool should be un-paused")
 			err = reconciler.Client.Get(ctx, poolkey, p)
 			Expect(err).To(BeNil())
 			Expect(p.Spec.Paused).To(BeFalse())
@@ -731,24 +694,6 @@ var _ = Describe("ComplianceSuiteController", func() {
 					"something": "0s"
 				}
 				`
-		remediationKCMCPayload := `
-			{
-				"ignition": {
-					"version": "3.2.0"
-				},
-				"storage": {
-					"files": [
-						{
-							"contents": {
-								"source": "data:text/plain;charset=utf-8;base64,ewogICJraW5kIjogIkt1YmVsZXRDb25maWd1cmF0aW9uIiwKICAiYXBpVmVyc2lvbiI6ICJrdWJlbGV0LmNvbmZpZy5rOHMuaW8vdjFiZXRhMSIsCiAgInN0YXRpY1BvZFBhdGgiOiAiL2V0Yy9rdWJlcm5ldGVzL21hbmlmZXN0cyIsCiAgInN5bmNGcmVxdWVuY3kiOiAiMHMiLAogICJmaWxlQ2hlY2tGcmVxdWVuY3kiOiAiMHMiLAogICJodHRwQ2hlY2tGcmVxdWVuY3kiOiAiMHMiLAogICJ0bHNDaXBoZXJTdWl0ZXMiOiBbCiAgICAiVExTX0VDREhFX0VDRFNBX1dJVEhfQUVTXzEyOF9HQ01fU0hBMjU2IiwKICAgICJUTFNfRUNESEVfUlNBX1dJVEhfQUVTXzEyOF9HQ01fU0hBMjU2IiwKICAgICJUTFNfRUNESEVfRUNEU0FfV0lUSF9BRVNfMjU2X0dDTV9TSEEzODQiLAogICAgIlRMU19FQ0RIRV9SU0FfV0lUSF9BRVNfMjU2X0dDTV9TSEEzODQiLAogICAgIlRMU19FQ0RIRV9FQ0RTQV9XSVRIX0NIQUNIQTIwX1BPTFkxMzA1X1NIQTI1NiIsCiAgICAiVExTX0VDREhFX1JTQV9XSVRIX0NIQUNIQTIwX1BPTFkxMzA1X1NIQTI1NiIKICBdLAogICJ0bHNNaW5WZXJzaW9uIjogIlZlcnNpb25UTFMxMiIsCiAgInJvdGF0ZUNlcnRpZmljYXRlcyI6IHRydWUsCiAgInNlcnZlclRMU0Jvb3RzdHJhcCI6IHRydWUsCiAgImF1dGhlbnRpY2F0aW9uIjogewogICAgIng1MDkiOiB7CiAgICAgICJjbGllbnRDQUZpbGUiOiAiL2V0Yy9rdWJlcm5ldGVzL2t1YmVsZXQtY2EuY3J0IgogICAgfSwKICAgICJ3ZWJob29rIjogewogICAgICAiY2FjaGVUVEwiOiAiMHMiCiAgICB9LAogICAgImFub255bW91cyI6IHsKICAgICAgImVuYWJsZWQiOiBmYWxzZQogICAgfQogIH0sCiAgImF1dGhvcml6YXRpb24iOiB7CiAgICAid2ViaG9vayI6IHsKICAgICAgImNhY2hlQXV0aG9yaXplZFRUTCI6ICIwcyIsCiAgICAgICJjYWNoZVVuYXV0aG9yaXplZFRUTCI6ICIwcyIKICAgIH0KICB9LAogICJjbHVzdGVyRG9tYWluIjogImNsdXN0ZXIubG9jYWwiLAogICJjbHVzdGVyRE5TIjogWwogICAgIjE3Mi4zMC4wLjEwIgogIF0sCiAgInN0cmVhbWluZ0Nvbm5lY3Rpb25JZGxlVGltZW91dCI6ICIwcyIsCiAgIm5vZGVTdGF0dXNVcGRhdGVGcmVxdWVuY3kiOiAiMHMiLAogICJub2RlU3RhdHVzUmVwb3J0RnJlcXVlbmN5IjogIjBzIiwKICAiaW1hZ2VNaW5pbXVtR0NBZ2UiOiAiMHMiLAogICJ2b2x1bWVTdGF0c0FnZ1BlcmlvZCI6ICIwcyIsCiAgInN5c3RlbUNncm91cHMiOiAiL3N5c3RlbS5zbGljZSIsCiAgImNncm91cFJvb3QiOiAiLyIsCiAgImNncm91cERyaXZlciI6ICJzeXN0ZW1kIiwKICAiY3B1TWFuYWdlclJlY29uY2lsZVBlcmlvZCI6ICIwcyIsCiAgInJ1bnRpbWVSZXF1ZXN0VGltZW91dCI6ICIwcyIsCiAgIm1heFBvZHMiOiAyNTAsCiAgInNvbWV0aGluZyI6ICIwcyIsCiAgImt1YmVBUElCdXJzdCI6IDEwMCwKICAic2VyaWFsaXplSW1hZ2VQdWxscyI6IGZhbHNlLAogICJldmljdGlvblByZXNzdXJlVHJhbnNpdGlvblBlcmlvZCI6ICIwcyIsCiAgImZlYXR1cmVHYXRlcyI6IHsKICAgICJBUElQcmlvcml0eUFuZEZhaXJuZXNzIjogdHJ1ZSwKICAgICJDU0lNaWdyYXRpb25BV1MiOiBmYWxzZSwKICAgICJDU0lNaWdyYXRpb25BenVyZURpc2siOiBmYWxzZSwKICAgICJDU0lNaWdyYXRpb25BenVyZUZpbGUiOiBmYWxzZSwKICAgICJDU0lNaWdyYXRpb25HQ0UiOiBmYWxzZSwKICAgICJDU0lNaWdyYXRpb25PcGVuU3RhY2siOiBmYWxzZSwKICAgICJDU0lNaWdyYXRpb252U3BoZXJlIjogZmFsc2UsCiAgICAiRG93bndhcmRBUElIdWdlUGFnZXMiOiB0cnVlLAogICAgIkxlZ2FjeU5vZGVSb2xlQmVoYXZpb3IiOiBmYWxzZSwKICAgICJOb2RlRGlzcnVwdGlvbkV4Y2x1c2lvbiI6IHRydWUsCiAgICAiUG9kU2VjdXJpdHkiOiB0cnVlLAogICAgIlJvdGF0ZUt1YmVsZXRTZXJ2ZXJDZXJ0aWZpY2F0ZSI6IHRydWUsCiAgICAiU2VydmljZU5vZGVFeGNsdXNpb24iOiB0cnVlLAogICAgIlN1cHBvcnRQb2RQaWRzTGltaXQiOiB0cnVlCiAgfSwKICAibWVtb3J5U3dhcCI6IHt9LAogICJjb250YWluZXJMb2dNYXhTaXplIjogIjUwTWkiLAogICJzeXN0ZW1SZXNlcnZlZCI6IHsKICAgICJlcGhlbWVyYWwtc3RvcmFnZSI6ICIxR2kiCiAgfSwKICAibG9nZ2luZyI6IHsKICAgICJmbHVzaEZyZXF1ZW5jeSI6IDAsCiAgICAidmVyYm9zaXR5IjogMCwKICAgICJvcHRpb25zIjogewogICAgICAianNvbiI6IHsKICAgICAgICAiaW5mb0J1ZmZlclNpemUiOiAiMCIKICAgICAgfQogICAgfQogIH0sCiAgInNodXRkb3duR3JhY2VQZXJpb2QiOiAiMHMiLAogICJzaHV0ZG93bkdyYWNlUGVyaW9kQ3JpdGljYWxQb2RzIjogIjBzIgp9Cg=="
-							},
-							"mode": 420,
-							"overwrite": true,
-							"path": "/etc/kubernetes/kubelet.conf"
-						}
-					]
-				}
-			}`
 
 		BeforeEach(func() {
 			mcp := &mcfgv1.MachineConfigPool{
@@ -899,29 +844,10 @@ var _ = Describe("ComplianceSuiteController", func() {
 			_, err = reconciler.reconcileRemediations(suite, logger)
 			Expect(err).To(BeNil())
 
-			By("the pool should not be un-paused because the KubeletConfig is not rendered into Machine Config")
-			err = reconciler.Client.Get(ctx, poolkey, p)
-			Expect(err).To(BeNil())
-			Expect(p.Spec.Paused).To(BeTrue())
-
-			By("Render KubeLetconfig into Machine Config")
-			mcCurrent := &mcfgv1.MachineConfig{}
-			mckey := types.NamespacedName{Name: "99-master-generated-kubelet"}
-			err = reconciler.Client.Get(ctx, mckey, mcCurrent)
-			Expect(err).To(BeNil())
-			mcCurrent.Spec.Config.Raw = []byte(remediationKCMCPayload)
-			err = reconciler.Client.Update(ctx, mcCurrent)
-			Expect(err).To(BeNil())
-
-			By("Running a second reconcile loop")
-			_, err = reconciler.reconcileRemediations(suite, logger)
-			Expect(err).To(BeNil())
-
-			By("the pool should be un-paused because machine config has been updated with the new kubelet config content")
+			By("the pool should be un-paused")
 			err = reconciler.Client.Get(ctx, poolkey, p)
 			Expect(err).To(BeNil())
 			Expect(p.Spec.Paused).To(BeFalse())
-
 			s := &compv1alpha1.ComplianceRemediation{}
 			key := types.NamespacedName{Name: remediationName, Namespace: namespace}
 			reconciler.Client.Get(ctx, key, s)

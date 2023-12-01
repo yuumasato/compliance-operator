@@ -17,15 +17,13 @@ package utils
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
 
-	"github.com/PaesslerAG/jsonpath"
+	compliancev1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -143,101 +141,21 @@ func IsMcfgPoolUsingKC(pool *mcfgv1.MachineConfigPool) (bool, string, error) {
 	return true, currentKCMC, nil
 }
 
-func AreKubeletConfigsRendered(pool *mcfgv1.MachineConfigPool, client runtimeclient.Client) (bool, error, string) {
-	// find out if pool is using a custom kubelet config
-	isUsingKC, currentKCMCName, err := IsMcfgPoolUsingKC(pool)
-	if err != nil {
-		return false, fmt.Errorf("failed to check if pool %s is using a custom kubelet config: %w", pool.Name, err), ""
-	}
-	if !isUsingKC || currentKCMCName == "" {
-		return true, nil, ""
-	}
-	// if the pool is using a custom kubelet config, check if the kubelet config is rendered
-	kcmcfg := &mcfgv1.MachineConfig{}
-	err = client.Get(context.TODO(), types.NamespacedName{Name: currentKCMCName}, kcmcfg)
-	if err != nil {
-		return false, fmt.Errorf("failed to get machine config %s: %w", currentKCMCName, err), ""
+func GetScanType(annotations map[string]string) compliancev1alpha1.ComplianceScanType {
+	// The default type is platform
+	platformType, ok := annotations[compliancev1alpha1.ProductTypeAnnotation]
+	if !ok {
+		return compliancev1alpha1.ScanTypePlatform
 	}
 
-	kc, err := GetKCFromMC(kcmcfg, client)
-	if err != nil {
-		return false, fmt.Errorf("failed to get kubelet config using machine config name %s: %w", currentKCMCName, err), ""
+	switch strings.ToLower(platformType) {
+	case strings.ToLower(string(compliancev1alpha1.ScanTypeNode)):
+		return compliancev1alpha1.ScanTypeNode
+	default:
+		break
 	}
 
-	return IsKCSubsetOfMC(kc, kcmcfg)
-}
-
-// IsKCSubsetOfMC determines if the KubeletConfig is a subset of the MachineConfig
-func IsKCSubsetOfMC(kc *mcfgv1.KubeletConfig, mc *mcfgv1.MachineConfig) (bool, error, string) {
-	if kc == nil {
-		return false, fmt.Errorf("kubelet config is nil"), ""
-	}
-	if mc == nil {
-		return false, fmt.Errorf("machine config is nil"), ""
-	}
-	if kc.Spec.KubeletConfig == nil {
-		return false, fmt.Errorf("kubelet config spec is nil, please check if KubeletConfig object has been used correctly"), ""
-	}
-
-	var obj interface{}
-	if err := json.Unmarshal(mc.Spec.Config.Raw, &obj); err != nil {
-		return false, fmt.Errorf("failed to unmarshal machine config %s: %w", mc.Name, err), ""
-	}
-
-	// Filter to kubelet.conf file as other files (e.g. /etc/node-sizing-enabled.env) can exist.
-	encodedKC, err := jsonpath.Get(`$.storage.files[?(@.path=="/etc/kubernetes/kubelet.conf")].contents.source`, obj)
-	if err != nil {
-		return false, fmt.Errorf("failed to get encoded kubelet config from machine config %s: %w", mc.Name, err), ""
-	}
-	encodedKCSlice := encodedKC.([]interface{})
-	if len(encodedKCSlice) == 0 {
-		return false, fmt.Errorf("encoded kubeletconfig %s is missing", mc.Name), ""
-	}
-	encodedKCStr := encodedKCSlice[0].(string)
-	if encodedKCStr == "" {
-		return false, fmt.Errorf("encoded kubeletconfig %s is empty", mc.Name), ""
-	}
-
-	// Decode kubelet.conf file content
-	var encodedKCStrTrimmed string
-	var decodedKC []byte
-	if strings.HasPrefix(encodedKCStr, mcBase64PayloadPrefix) {
-		encodedKCStrTrimmed = strings.TrimPrefix(encodedKCStr, mcBase64PayloadPrefix)
-		decodedKC, err = base64.StdEncoding.DecodeString(encodedKCStrTrimmed)
-		if err != nil {
-			return false, fmt.Errorf("failed to decode base64 encoded kubeletconfig %s: %w", mc.Name, err), ""
-		}
-	} else if strings.HasPrefix(encodedKCStr, mcPayloadPrefix) {
-		encodedKCStrTrimmed = strings.TrimPrefix(encodedKCStr, mcPayloadPrefix)
-		decodedStr, err := url.PathUnescape(encodedKCStrTrimmed)
-		decodedKC = []byte(decodedStr)
-		if err != nil {
-			return false, fmt.Errorf("failed to decode urlencoded kubeletconfig %s: %w", mc.Name, err), ""
-		}
-	} else {
-		return false, fmt.Errorf("encoded kubeletconfig %s does not contain encoding prefix", mc.Name), ""
-	}
-
-	// remove node sizing related fields from kubelet config
-	filteredKC, err := removeNodeSizingEnvParams(kc.Spec.KubeletConfig.Raw)
-	if err != nil {
-		return false, fmt.Errorf("failed to remove node sizing related fields from decoded kubelet config: %w", err), ""
-	}
-
-	// Check if KubeletConfig is a subset of the MachineConfig
-	isSubset, diff, err := JSONIsSubset(filteredKC, decodedKC)
-	if err != nil {
-		return false, fmt.Errorf("failed to check if kubeletconfig %s is subset of rendered MC %s: %w", kc.Name, mc.Name, err), ""
-	}
-
-	if isSubset {
-		return true, nil, ""
-	}
-	diffData := make([][]string, 0)
-	for _, r := range diff.Rows {
-		diffData = append(diffData, []string{fmt.Sprintf("Path: %s", r.Key), fmt.Sprintf("Expected: %s", r.Expected), fmt.Sprintf("Got: %s", r.Got)})
-	}
-	return false, nil, fmt.Sprintf("kubeletconfig %s is not subset of rendered MC %s, diff: %v", kc.Name, mc.Name, diffData)
+	return compliancev1alpha1.ScanTypePlatform
 }
 
 func GetKCFromMC(mc *mcfgv1.MachineConfig, client runtimeclient.Client) (*mcfgv1.KubeletConfig, error) {
@@ -296,15 +214,5 @@ func GetNodeRoleSelector(role string) map[string]string {
 	}
 	return map[string]string{
 		nodeRolePrefix + role: "",
-	}
-}
-
-func GetNodeRoleSelectorFromRemediation(rem *cmpv1alpha1.ComplianceRemediation) map[string]string {
-	nodeRoles := rem.Annotations[cmpv1alpha1.RemediationNodeRoleAnnotation]
-	if nodeRoles == "" {
-		return map[string]string{}
-	}
-	return map[string]string{
-		nodeRolePrefix + nodeRoles: "",
 	}
 }

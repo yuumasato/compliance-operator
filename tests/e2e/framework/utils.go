@@ -57,6 +57,22 @@ func (f *Framework) AssertMustHaveParsedProfiles(pbName, productType, productNam
 	return nil
 }
 
+// AssertRuleCheckTypeChangedAnnotationKey asserts that the rule check type changed annotation key exists
+func (f *Framework) AssertRuleCheckTypeChangedAnnotationKey(namespace, ruleName, lastCheckType string) error {
+	var r compv1alpha1.Rule
+	key := types.NamespacedName{Namespace: namespace, Name: ruleName}
+	if err := f.Client.Get(context.Background(), key, &r); err != nil {
+		return err
+	}
+	if r.Annotations == nil {
+		return fmt.Errorf("expected annotations to be not nil")
+	}
+	if r.Annotations[compv1alpha1.RuleLastCheckTypeChangedAnnotationKey] != lastCheckType {
+		return fmt.Errorf("expected %s to be %s, got %s instead", compv1alpha1.RuleLastCheckTypeChangedAnnotationKey, lastCheckType, r.Annotations[compv1alpha1.RuleLastCheckTypeChangedAnnotationKey])
+	}
+	return nil
+}
+
 func (f *Framework) DoesRuleExist(namespace, ruleName string) (error, bool) {
 	err, found := f.DoesObjectExist("Rule", namespace, ruleName)
 	if err != nil {

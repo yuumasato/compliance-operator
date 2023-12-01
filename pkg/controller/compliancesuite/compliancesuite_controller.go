@@ -506,16 +506,6 @@ func (r *ReconcileComplianceSuite) reconcileRemediations(suite *compv1alpha1.Com
 	// Only un-pause MachineConfigPools once the remediations have been applied
 	for idx := range affectedMcfgPools {
 		pool := affectedMcfgPools[idx]
-		// only un-pause if the kubeletconfig is fully rendered for the pool
-		isRendered, err, diffString := utils.AreKubeletConfigsRendered(pool, r.Client)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-		if !isRendered {
-			logger.Info("Waiting until all kubeletconfigs are rendered before un-pausing", "MachineConfigPool.Name", pool.Name)
-			logger.Info("KubeletConfig render diff:", "MachineConfigPool.Name", pool.Name, "Diff", diffString)
-			return reconcile.Result{Requeue: true, RequeueAfter: 10 * time.Second}, nil
-		}
 		poolKey := types.NamespacedName{Name: pool.GetName()}
 		// refresh pool reference directly from the API Server
 		if getErr := r.Reader.Get(context.TODO(), poolKey, pool); getErr != nil {
@@ -555,7 +545,7 @@ func (r *ReconcileComplianceSuite) applyRemediation(rem compv1alpha1.ComplianceR
 	logger logr.Logger) error {
 	if utils.IsMachineConfig(rem.Spec.Current.Object) || utils.IsKubeletConfig(rem.Spec.Current.Object) {
 		// get affected pool
-		pool := r.getAffectedMcfgPool(scan, &rem, mcfgpools)
+		pool := r.getAffectedMcfgPool(scan, mcfgpools)
 		// we only need to operate on pools that are affected
 		if pool != nil {
 			foundPool, poolIsTracked := affectedMcfgPools[pool.Name]
@@ -622,16 +612,10 @@ func (r *ReconcileComplianceSuite) applyMcfgRemediationAndPausePool(rem compv1al
 	return nil
 }
 
-func (r *ReconcileComplianceSuite) getAffectedMcfgPool(scan *compv1alpha1.ComplianceScan, rem *compv1alpha1.ComplianceRemediation, mcfgpools *mcfgv1.MachineConfigPoolList) *mcfgv1.MachineConfigPool {
+func (r *ReconcileComplianceSuite) getAffectedMcfgPool(scan *compv1alpha1.ComplianceScan, mcfgpools *mcfgv1.MachineConfigPoolList) *mcfgv1.MachineConfigPool {
 	for i := range mcfgpools.Items {
 		pool := &mcfgpools.Items[i]
-		nodeSelector := map[string]string{}
-		if scan.Spec.ScanType == compv1alpha1.ScanTypePlatform {
-			nodeSelector = utils.GetNodeRoleSelectorFromRemediation(rem)
-		} else {
-			nodeSelector = scan.Spec.NodeSelector
-		}
-		if utils.McfgPoolLabelMatches(nodeSelector, pool) {
+		if utils.McfgPoolLabelMatches(scan.Spec.NodeSelector, pool) {
 			return pool
 		}
 	}

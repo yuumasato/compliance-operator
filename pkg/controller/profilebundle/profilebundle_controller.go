@@ -580,14 +580,18 @@ func workloadNeedsUpdate(image string, depl *appsv1.Deployment) bool {
 		return true
 	}
 
+	isSameContentImage := false
+	isSaneProfileparserImage := false
+
 	for _, container := range initContainers {
 		if container.Name == "content-container" {
 			// we need an update if the image reference doesn't match.
-			return image != container.Image
+			isSameContentImage = container.Image == image
+		}
+		if container.Name == "profileparser" {
+			isSaneProfileparserImage = utils.GetComponentImage(utils.OPERATOR) == container.Image
 		}
 	}
 
-	// If we didn't find the container we were looking for. There's something funky going on
-	// and we should try to update anyway
-	return true
+	return !(isSameContentImage && isSaneProfileparserImage)
 }

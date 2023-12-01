@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -48,28 +49,41 @@ func Add(mgr manager.Manager, met *metrics.Metrics, _ utils.CtlplaneSchedulingIn
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, met *metrics.Metrics) reconcile.Reconciler {
-	return &ReconcileTailoredProfile{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Metrics: met}
+	return &ReconcileTailoredProfile{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Metrics: met, Recorder: common.NewSafeRecorder("tailoredprofile-controller", mgr)}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
+	varMapper := &variableMapper{mgr.GetClient()}
+	ruleMapper := &ruleMapper{mgr.GetClient()}
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("tailoredprofile-controller").
 		For(&cmpv1alpha1.TailoredProfile{}).
 		Owns(&corev1.ConfigMap{}).
+		Watches(&cmpv1alpha1.Variable{}, handler.EnqueueRequestsFromMapFunc(varMapper.Map)).
+		Watches(&cmpv1alpha1.Rule{}, handler.EnqueueRequestsFromMapFunc(ruleMapper.Map)).
 		Complete(r)
 }
 
 // blank assignment to verify that ReconcileTailoredProfile implements reconcile.Reconciler
 var _ reconcile.Reconciler = &ReconcileTailoredProfile{}
 
+func (r *ReconcileTailoredProfile) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	if r.Recorder == nil {
+		return
+	}
+
+	r.Recorder.Eventf(object, eventtype, reason, messageFmt, args...)
+}
+
 // ReconcileTailoredProfile reconciles a TailoredProfile object
 type ReconcileTailoredProfile struct {
 	// This Client, initialized using mgr.Client() above, is a split Client
 	// that reads objects from the cache and writes to the apiserver
-	Client  client.Client
-	Scheme  *runtime.Scheme
-	Metrics *metrics.Metrics
+	Client   client.Client
+	Scheme   *runtime.Scheme
+	Metrics  *metrics.Metrics
+	Recorder *common.SafeRecorder
 }
 
 // Reconcile reads that state of the cluster for a TailoredProfile object and makes changes based on the state read
@@ -109,14 +123,52 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 			return reconcile.Result{}, pbgetErr
 		}
 
-		// Make TailoredProfile be owned by the Profile it extends. This way
-		// we can ensure garbage collection happens.
-		// This update will trigger a requeue with the new object.
+		needsAnnotation := false
+
+		if instance.GetAnnotations() == nil {
+			needsAnnotation = true
+		} else {
+			if _, ok := instance.GetAnnotations()[cmpv1alpha1.ProductTypeAnnotation]; !ok {
+				needsAnnotation = true
+			}
+		}
+
+		if needsAnnotation {
+			tpCopy := instance.DeepCopy()
+			anns := tpCopy.GetAnnotations()
+			if anns == nil {
+				anns = make(map[string]string)
+			}
+
+			scanType := utils.GetScanType(p.GetAnnotations())
+			anns[cmpv1alpha1.ProductTypeAnnotation] = string(scanType)
+			tpCopy.SetAnnotations(anns)
+			// Make TailoredProfile be owned by the Profile it extends. This way
+			// we can ensure garbage collection happens.
+			// This update will trigger a requeue with the new object.
+			if needsControllerRef(tpCopy) {
+				return r.setOwnership(tpCopy, p)
+			} else {
+				r.Client.Update(context.TODO(), tpCopy)
+				return reconcile.Result{}, nil
+			}
+		}
+
 		if needsControllerRef(instance) {
 			tpCopy := instance.DeepCopy()
 			return r.setOwnership(tpCopy, p)
 		}
+
 	} else {
+		if !isValidationRequired(instance) {
+			// check if the TailoredProfile is empty without any extends
+			// if it is empty, we should not update the tp, and set the state of tp to Error
+			err = r.handleTailoredProfileStatusError(instance, fmt.Errorf("Custom TailoredProfile with no extends does not have any rules enabled"))
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{}, nil
+		}
 		var pbgetErr error
 		pb, pbgetErr = r.getProfileBundleFromRulesOrVars(instance)
 		if pbgetErr != nil && !common.IsRetriable(pbgetErr) {
@@ -152,6 +204,37 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 		}
 	}
 
+	ann := instance.GetAnnotations()
+	if v, ok := ann[cmpv1alpha1.DisableOutdatedReferenceValidation]; ok && v == "true" {
+		reqLogger.Info("Reference validation is disabled, skipping validation")
+	} else if isValidationRequired(instance) {
+		reqLogger.Info("Validating TailoredProfile")
+		pruneOutdated := false
+		if v, ok := ann[cmpv1alpha1.PruneOutdatedReferencesAnnotationKey]; ok && v == "true" {
+			pruneOutdated = true
+		}
+
+		// handle deprecated rules here in the future
+
+		doContinue, ruleNeedToBeMigratedList, err := r.handleRulePruning(instance, reqLogger, pruneOutdated)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		if !doContinue {
+			return reconcile.Result{}, nil
+		}
+
+		warningMsg := generateWarningMessage(ruleNeedToBeMigratedList)
+		// check if warning message matches the previous warning message
+		// if it does, we don't need to update the tp, if not we need to update it with the new warning message
+		if warningMsg != instance.Status.Warnings {
+			tpCopy := instance.DeepCopy()
+			tpCopy.Status.Warnings = warningMsg
+			r.Client.Status().Update(context.TODO(), tpCopy)
+		}
+
+	}
+
 	rules, ruleErr := r.getRulesFromSelections(instance, pb)
 	if ruleErr != nil && !common.IsRetriable(ruleErr) {
 		// Surface the error.
@@ -185,6 +268,149 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 	}
 
 	return r.ensureOutputObject(instance, tpcm, reqLogger)
+}
+
+// generateWarningMessage generates a warning message for the user
+// based on the list of deprecated variables and rules that are detected
+// as well as the list of migrated rules that are detected that are not
+// migrated yet
+func generateWarningMessage(ruleNeedToBeMigratedList []string) string {
+	var warningMessage string
+	if len(ruleNeedToBeMigratedList) > 0 {
+		if warningMessage != "" {
+			warningMessage = fmt.Sprintf("%sThe following rules changed check type and need to be removed from the TailoredProfile. If these rules are important for you, add them to a TailoredProfile of matching check type: %s\n", warningMessage, strings.Join(ruleNeedToBeMigratedList, ","))
+		} else {
+			warningMessage = fmt.Sprintf("The following rules changed check type and need to be removed from the TailoredProfile. If these rules are important for you, add them to a TailoredProfile of matching check type: %s\n", strings.Join(ruleNeedToBeMigratedList, ","))
+		}
+	}
+	return warningMessage
+}
+
+// handleRulePruning check if there are any migrated rules in the TailoredProfile
+// and we will handle the migration of the tailored profile accordingly
+func (r *ReconcileTailoredProfile) handleRulePruning(
+	v1alphaTp *cmpv1alpha1.TailoredProfile, logger logr.Logger, pruneOudated bool) (doContinue bool, ruleNeedToBeMigratedList []string, err error) {
+	doContinue = true
+	// Get the list of KubeletConfig rules that are migrated with checkType change
+	migratedRules, err := r.getMigratedRules(v1alphaTp, logger)
+	if err != nil {
+		return false, nil, err
+	}
+
+	if len(migratedRules) == 0 {
+		return true, nil, nil
+	}
+
+	profileType := utils.GetScanType(v1alphaTp.GetAnnotations())
+
+	v1alphaTpCP := v1alphaTp.DeepCopy()
+
+	// check if there are any disabled rules that are migrated
+	if len(v1alphaTp.Spec.DisableRules) > 0 {
+		var newRules []cmpv1alpha1.RuleReferenceSpec
+		for ri := range v1alphaTp.Spec.DisableRules {
+			rule := &v1alphaTp.Spec.DisableRules[ri]
+			if checkType, ok := migratedRules[rule.Name]; ok && checkType != string(profileType) {
+				// remove the rule from the list of disabled rules
+				if pruneOudated {
+					doContinue = false
+					logger.Info("Removing migrated rule from disableRules", "rule", rule.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileMigratedRule", "Removing migrated rule: %s from disableRules, it has been changed from %s to %s", rule.Name, checkType, profileType)
+				} else {
+					logger.Info("Migrated rule detected in disableRules", "rule", rule.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileMigratedRule", "%s type changed from %s to %s. Please migrate it or remove it from the TailoredProfile", rule.Name, checkType, profileType)
+					ruleNeedToBeMigratedList = append(ruleNeedToBeMigratedList, rule.Name)
+					newRules = append(newRules, *rule)
+				}
+				continue
+			}
+			newRules = append(newRules, *rule)
+		}
+		if len(newRules) != len(v1alphaTp.Spec.DisableRules) {
+			v1alphaTpCP.Spec.DisableRules = newRules
+		}
+	}
+
+	// check if there are any enabled rules that are migrated
+	if len(v1alphaTp.Spec.EnableRules) > 0 {
+		var newRules []cmpv1alpha1.RuleReferenceSpec
+		for ri := range v1alphaTp.Spec.EnableRules {
+			rule := &v1alphaTp.Spec.EnableRules[ri]
+			if checkType, ok := migratedRules[rule.Name]; ok && checkType != string(profileType) {
+				if pruneOudated {
+					doContinue = false
+					logger.Info("Removing migrated rule from enableRules", "rule", rule.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileMigratedRule", "Removing migrated rule %s from enableRules, it has been changed from %s to %s", rule.Name, checkType, profileType)
+				} else {
+					logger.Info("Migrated rule detected in enableRules", "rule", rule.Name)
+					r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileMigratedRule", "%s type changed from %s to %s. Please migrate it or remove it from the TailoredProfile", rule.Name, checkType, profileType)
+					ruleNeedToBeMigratedList = append(ruleNeedToBeMigratedList, rule.Name)
+					newRules = append(newRules, *rule)
+				}
+				continue
+			}
+			newRules = append(newRules, *rule)
+		}
+
+		if len(newRules) != len(v1alphaTp.Spec.EnableRules) {
+			v1alphaTpCP.Spec.EnableRules = newRules
+		}
+	}
+
+	if v1alphaTp.Spec.Extends == "" && len(v1alphaTpCP.Spec.DisableRules) == 0 && len(v1alphaTpCP.Spec.EnableRules) == 0 {
+		errorMsg := "TailoredProfile does not have any rules left after removing migrated rules and it does not extend any profile"
+		v1alphaTpCP.Status.State = cmpv1alpha1.TailoredProfileStateError
+		v1alphaTpCP.Status.ErrorMessage = errorMsg
+		doContinue = false
+		logger.Info(errorMsg)
+		r.Eventf(v1alphaTp, corev1.EventTypeWarning, "TailoredProfileMigratedRule", errorMsg)
+	}
+
+	if !doContinue {
+		err = r.Client.Update(context.TODO(), v1alphaTpCP)
+		logger.Info("Updating TailoredProfile after handling migration")
+		if err != nil {
+			return false, nil, err
+		}
+	}
+	return doContinue, ruleNeedToBeMigratedList, nil
+}
+
+func isValidationRequired(tp *cmpv1alpha1.TailoredProfile) bool {
+	if tp.Spec.Extends != "" {
+		return tp.Spec.DisableRules != nil || tp.Spec.EnableRules != nil || tp.Spec.ManualRules != nil || tp.Spec.SetValues != nil
+	}
+	return tp.Spec.EnableRules != nil || tp.Spec.ManualRules != nil || tp.Spec.SetValues != nil
+}
+
+// getMigratedRules get list of rules and check if it has RuleLastCheckTypeChangedAnnotationKey annotation
+// if it does, add it to the map with the current check type
+func (r *ReconcileTailoredProfile) getMigratedRules(tp *cmpv1alpha1.TailoredProfile, logger logr.Logger) (map[string]string, error) {
+	// get all the rules in the namespace
+	ruleList := &cmpv1alpha1.RuleList{}
+	err := r.Client.List(context.TODO(), ruleList, &client.ListOptions{
+		Namespace: tp.GetNamespace(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// get all the rules that are migrated
+	migratedRules := make(map[string]string)
+	for ri := range ruleList.Items {
+		rule := &ruleList.Items[ri]
+		if rule.Annotations != nil {
+			if _, ok := rule.Annotations[cmpv1alpha1.RuleLastCheckTypeChangedAnnotationKey]; ok {
+				if rule.CheckType == cmpv1alpha1.CheckTypeNone {
+					logger.Info("Rule has been changed to manual check", "rule", rule.GetName())
+					r.Eventf(tp, corev1.EventTypeWarning, "TailoredProfileMigratedRule", "Rule has been changed to manual check: %s", rule.GetName())
+					continue
+				}
+				migratedRules[rule.GetName()] = rule.CheckType
+			}
+		}
+	}
+	return migratedRules, nil
 }
 
 // getProfileInfoFromExtends gets the Profile and ProfileBundle where the rules come from
@@ -493,6 +719,10 @@ func assertValidRuleTypes(rules map[string]*cmpv1alpha1.Rule) error {
 		// cmpv1alpha1.CheckTypeNone fits every type since it's
 		// merely informational
 		if rule.CheckType == cmpv1alpha1.CheckTypeNone {
+			continue
+		}
+		// check if the rule is a migrated rule and if it is, we should not check the type
+		if _, ok := rule.Annotations[cmpv1alpha1.RuleLastCheckTypeChangedAnnotationKey]; ok {
 			continue
 		}
 		// Initialize expected check type
