@@ -9,28 +9,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Enhancements
 
-- Users can now pause scan schedules by setting the `ScanSetting.suspend`
-  attribute to `True`. This allows users to suspend a scan, and reactivate it
-  without having to delete and recreate the `ScanSettingBinding`, making it
-  more ergonomic to pause scans during maintenance periods. See the
-  [enhancement](https://github.com/ComplianceAsCode/compliance-operator/pull/375)
-  for more details.
-- Implemented support for an optional `version` attribute on `Profile` custom
-  resources.
+-
 
 ### Fixes
 
-- Optimize how we check the KubeletConfig rule, we now store the runtime KubeletConfig
-  in a ConfigMap per node when a node scan is launched. Then, we mount the ConfigMap to
-  the scanner pod to scan for it. Hold on to applying remediation until all scans are 
-  done in the suite.
-  This fixes issues when comparing the KubeletConfig for each node.
-  This also fixes "/api/v1/nodes/NODE_NAME/proxy/configz" warning message in the log.
-  [OCPBUGS-11037](https://issues.redhat.com/browse/OCPBUGS-11037)
-
-- Fix api-checks-pod crashes issues caused by outdated MCO dependency, the dependency
-  bump will enable CO to support Ignition 3.4, and therefore solve the issue. 
-  [OCPBUGS-18025](https://issues.redhat.com/browse/OCPBUGS-18025)
+-
 
 ### Internal Changes
 
@@ -42,14 +25,67 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removals
 
-- We have reverted commit 9cbf874, which is a fix for OCPBUGS-3864, the fix
-  is not needed anymore since the issue is fixed when we switched back to
-  the old way remediate the KubeletConfig.
+-
 
 ### Security
 
 -
 
+
+## [1.4.0] - 2023-12-01
+
+### Enhancements
+
+- Users can now pause scan schedules by setting the `ScanSetting.suspend`
+  attribute to `True`. This allows users to suspend a scan, and reactivate it
+  without having to delete and recreate the `ScanSettingBinding`, making it
+  more ergonomic to pause scans during maintenance periods. See the
+  [enhancement](https://github.com/ComplianceAsCode/compliance-operator/pull/375)
+  for more details.
+- Implemented support for an optional `version` attribute on `Profile` custom
+  resources.
+- `Rule` custom resources now contain an annotation
+  (`compliance.openshift.io/profiles`) that maps the rule to the profiles that
+  use it, making it easier to understand where a rule is used. The alternative
+  to this approach would be to query each `Profile` and join all rules.
+
+### Fixes
+
+- Optimize how the operator checks `KubeletConfig` rules by storing the runtime
+  `KubeletConfig` in a `ConfigMap` per node when a node scan is launched. The
+  `ConfigMap` is then mounted to the scanner pod for evaluation. The operator
+  will wait to apply `ComplianceRemediation` objects until all scans are
+  processed. This also fixes issues when comparing the `KubeletConfig` options
+  for each node, and removes `/api/v1/nodes/NODE_NAME/proxy/configz` warning
+  messages in the log [OCPBUGS-11037](https://issues.redhat.com/browse/OCPBUGS-11037).
+- Fix api-checks-pod crashes issues caused by an outdated Machine Config Operator
+  dependency. The dependency bump allows the operator to support Ignition 3.4,
+  and therefore solves the issue [OCPBUGS-18025](https://issues.redhat.com/browse/OCPBUGS-18025).
+- Stale `ComplianceCheckResult` resources are now pruned on each rescan
+  [OCPBUGS-3009](https://issues.redhat.com/browse/OCPBUGS-3009).
+
+### Internal Changes
+
+- All compatibility code for the `CronJob` beta API has been removed [CMP-2310](https://issues.redhat.com/browse/CMP-2310).
+
+### Removals
+
+- We have reverted commit
+  [9cbf874](https://github.com/ComplianceAsCode/compliance-operator/commit/9cbf874),
+  which is a fix for
+  [OCPBUGS-3864](https://issues.redhat.com/browse/OCPBUGS-3864), the fix is not
+  needed anymore with how `KubeletConfig` rules are processed.
+
+## [1.3.1] - 2023-10-11
+
+### Fixes
+
+- Fix an issue caused by outdated Machine Config Operator dependencies where
+  the API check pod crashes due to Machine Config Operator using newer versions
+  of Ignition (3.4).
+  [OCPBUGS-18025](https://issues.redhat.com/browse/OCPBUGS-18025)
+
+## [1.3.0] - 2023-09-11
 
 ## [1.2.0] - 2023-07-21
 
