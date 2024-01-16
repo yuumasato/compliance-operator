@@ -63,7 +63,10 @@ func (r *ReconcileComplianceSuite) createCronJob(suite *compv1alpha1.ComplianceS
 }
 
 func (r *ReconcileComplianceSuite) updateCronJob(suite *compv1alpha1.ComplianceSuite, c *batchv1.CronJob, logger logr.Logger) error {
-	if c.Spec.Schedule == suite.Spec.Schedule && c.Spec.Suspend == &suite.Spec.Suspend {
+	var isSameSchedule = c.Spec.Schedule == suite.Spec.Schedule
+	var isSuspend = c.Spec.Suspend == &suite.Spec.Suspend
+	var isSameImage = c.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image == utils.GetComponentImage(utils.OPERATOR)
+	if isSameSchedule && isSuspend && isSameImage {
 		logger.Info("Suite rerunner configuration is up-to-date, no update necessary", "CronJob.Name", c.GetName())
 		return nil
 	}
@@ -71,6 +74,7 @@ func (r *ReconcileComplianceSuite) updateCronJob(suite *compv1alpha1.ComplianceS
 	co := c.DeepCopy()
 	co.Spec.Schedule = suite.Spec.Schedule
 	co.Spec.Suspend = &suite.Spec.Suspend
+	co.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image = utils.GetComponentImage(utils.OPERATOR)
 	return r.Client.Update(context.TODO(), co)
 }
 
