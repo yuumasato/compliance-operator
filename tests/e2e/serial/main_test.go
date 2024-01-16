@@ -232,7 +232,7 @@ func TestSuiteScan(t *testing.T) {
 				},
 			},
 			ID:       "xccdf_org.ssgproject.content_rule_coreos_vsyscall_kernel_argument",
-			Status:   compv1alpha1.CheckResultInfo,
+			Status:   compv1alpha1.CheckResultFail,
 			Severity: compv1alpha1.CheckResultSeverityMedium,
 		}
 
