@@ -326,6 +326,20 @@ func TestMixProductScan(t *testing.T) {
 				if s.Phase != compv1alpha1.PhaseDone {
 					t.Fatalf("expected scan %s to be done", scan)
 				}
+				// E2e tests have been flaky because of the file_permissions_var_log_kube_audit
+				// rule. This is because there is a bug in the API-server in old versions of OCP[1][2].
+				// For now, we'll just check that the scan is not inconsistent until we upgrade
+				// to a version that has the fix.
+				// [1]https://bugzilla.redhat.com/show_bug.cgi?id=2001442
+				// [2]https://github.com/ComplianceAsCode/content/commit/6343659d1d25e97c66a5c1eaf8eb2ee20d1af920
+				if s.Result == compv1alpha1.ResultInconsistent {
+					// check if the scan is "ocp4-moderate-node-master"
+					if scan != "ocp4-moderate-node-master" {
+						t.Fatalf("expected scan %s not to be inconsistent", scan)
+					}
+				} else if s.Result != compv1alpha1.ResultCompliant && s.Result != compv1alpha1.ResultNonCompliant {
+					t.Fatalf("expected scan %s to be compliant or non-compliant", scan)
+				}
 				break
 			}
 		}
