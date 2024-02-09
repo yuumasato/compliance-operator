@@ -229,6 +229,7 @@ func (r *ReconcileComplianceSuite) issueValidationError(suite *compv1alpha1.Comp
 }
 
 func (r *ReconcileComplianceSuite) reconcileScans(suite *compv1alpha1.ComplianceSuite, logger logr.Logger) (bool, error) {
+	requiredScansNames := make(map[string]bool)
 	for idx := range suite.Spec.Scans {
 		scanWrap := &suite.Spec.Scans[idx]
 		scan := &compv1alpha1.ComplianceScan{}
@@ -257,8 +258,30 @@ func (r *ReconcileComplianceSuite) reconcileScans(suite *compv1alpha1.Compliance
 		if rescheduleWithDelay || err != nil {
 			return rescheduleWithDelay, err
 		}
+		requiredScansNames[scan.Name] = true
+	}
 
-		// FIXME: delete scans that went away
+	// check all the scans owned by the suite and see if they are still in the spec
+	// if not, delete them
+	scanList := &compv1alpha1.ComplianceScanList{}
+	listOpts := client.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labels.Set{compv1alpha1.SuiteLabel: suite.Name}),
+	}
+	if err := r.Client.List(context.TODO(), scanList, &listOpts); err != nil {
+		return false, err
+	}
+
+	for _, scan := range scanList.Items {
+		if _, ok := requiredScansNames[scan.Name]; !ok {
+			logger.Info("Deleting scan due to it no longer being in the suite", "ComplianceScan.Name", scan.Name)
+			r.Recorder.Eventf(
+				suite, corev1.EventTypeNormal, "SuiteScanDeleted",
+				"Scan %s is being deleted due to it no longer being in the suite", scan.Name)
+			// delete the scan
+			if err := r.Client.Delete(context.TODO(), &scan); err != nil {
+				return false, err
+			}
+		}
 	}
 
 	return false, nil
