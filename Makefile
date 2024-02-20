@@ -56,6 +56,7 @@ GIT_OPTS?=
 # We rely on a bash script for this since it's simplier than interating over a
 # list with conditionals in GNU make.
 GIT_REMOTE?=$(shell ./utils/git-remote.sh)
+PREVIOUS_VERSION?=$(shell ./utils/get-current-version.sh)
 
 # Image variables
 # ===============
@@ -384,7 +385,6 @@ endif
 
 .PHONY: update-skip-range
 update-skip-range: check-operator-version ## Set olm.skipRange attribute in the operator CSV to $VERSION. This assumes upgrades can skip versions (0.1.47 can be upgraded to 0.1.53).
-	sed -i '/replaces:/d' config/manifests/bases/compliance-operator.clusterserviceversion.yaml
 	sed -i "s/\(olm.skipRange: '>=.*\)<.*'/\1<$(VERSION)'/" config/manifests/bases/compliance-operator.clusterserviceversion.yaml
 	sed -i "s/\(\"name\": \"compliance-operator.v\).*\"/\1$(VERSION)\"/" catalog/preamble.json
 	sed -i "s/\(\"skipRange\": \">=.*\)<.*\"/\1<$(VERSION)\"/" catalog/preamble.json
@@ -660,6 +660,7 @@ package-version-to-tag: check-operator-version ## Explicitly override $TAG with 
 .PHONY: git-release
 git-release: fetch-git-tags package-version-to-tag changelog ## Update project files with new version information.
 	git checkout -b "release-v$(TAG)"
+	sed -i "s/\(replaces: \).*/\1$(PREVIOUS_VERSION)/" $(BUNDLE_CSV_FILE)
 	sed -i "s/\(.*Version = \"\).*/\1$(TAG)\"/" version/version.go
 	sed -i "s/\(.*VERSION?=\).*/\1$(TAG)/" version.Makefile
 	git add version* bundle CHANGELOG.md config/manifests/bases
@@ -673,7 +674,7 @@ fetch-git-tags: ## Fetch tags for the repository. This is a useful utility for o
 	git fetch -t
 
 .PHONY: prepare-release
-prepare-release: package-version-to-tag images git-release ## Make local changes to release a new version of the operator. Changes are staged locally for review.
+prepare-release: set-current-version package-version-to-tag images git-release ## Make local changes to release a new version of the operator. Changes are staged locally for review.
 
 .PHONY: push-release
 push-release: package-version-to-tag ## Create a commit for the release change, tag the new version, and push the change for review using a dedicated release branch. Requires a ComplianceAsCode/compliance-operator maintainer.
@@ -697,3 +698,7 @@ release-images: package-version-to-tag push catalog ## Build container images, b
 .PHONY: changelog
 changelog: ## Move all unreleased notes in the CHANGELOG to a section dedicated to $TAG. This is a useful utility for other release targets.
 	@utils/update_changelog.sh "$(TAG)"
+
+.PHONY: set-current-version
+set-current-version:
+	@echo "Using $(PREVIOUS_VERSION) as previous version"
