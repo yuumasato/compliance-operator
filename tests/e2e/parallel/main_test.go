@@ -2712,7 +2712,7 @@ func TestManualRulesTailoredProfile(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      suiteName,
 			Namespace: f.OperatorNamespace,
-			Labels: map[string]string{
+			Annotations: map[string]string{
 				compv1alpha1.DisableOutdatedReferenceValidation: "true",
 			},
 		},
