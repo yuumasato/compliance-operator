@@ -289,6 +289,8 @@ func newScanPodForNode(scanInstance *compv1alpha1.ComplianceScan, node *corev1.N
 			NodeSelector: map[string]string{
 				corev1.LabelHostname: node.Labels[corev1.LabelHostname],
 			},
+			HostNetwork: true,
+			DNSPolicy: "ClusterFirstWithHostNet",
 			RestartPolicy: corev1.RestartPolicyOnFailure,
 			Volumes: []corev1.Volume{
 				{
