@@ -1612,6 +1612,134 @@ func TestSuspendScanSetting(t *testing.T) {
 	}
 }
 
+func TestRemoveProfileScan(t *testing.T) {
+	f := framework.Global
+	// Bind the new ScanSetting to a Profile
+	bindingName := framework.GetObjNameFromTest(t) + "-binding"
+	scanSettingBinding := compv1alpha1.ScanSettingBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      bindingName,
+			Namespace: f.OperatorNamespace,
+		},
+		Profiles: []compv1alpha1.NamedObjectReference{
+			{
+				Name:     "ocp4-cis",
+				Kind:     "Profile",
+				APIGroup: "compliance.openshift.io/v1alpha1",
+			},
+			{
+				Name:     "ocp4-moderate",
+				Kind:     "Profile",
+				APIGroup: "compliance.openshift.io/v1alpha1",
+			},
+			{
+				Name:     "ocp4-cis-node",
+				Kind:     "Profile",
+				APIGroup: "compliance.openshift.io/v1alpha1",
+			},
+		},
+		SettingsRef: &compv1alpha1.NamedObjectReference{
+			Name:     "default",
+			Kind:     "ScanSetting",
+			APIGroup: "compliance.openshift.io/v1alpha1",
+		},
+	}
+	if err := f.Client.Create(context.TODO(), &scanSettingBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), &scanSettingBinding)
+
+	if err := f.WaitForSuiteScansStatus(f.OperatorNamespace, bindingName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant); err != nil {
+		t.Fatal(err)
+	}
+
+	// AssertScanExists check if the scan exists for both profiles
+	if err := f.AssertScanExists("ocp4-cis", f.OperatorNamespace); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := f.AssertScanExists("ocp4-moderate", f.OperatorNamespace); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := f.AssertScanExists("ocp4-cis-node-master", f.OperatorNamespace); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := f.AssertScanExists("ocp4-cis-node-worker", f.OperatorNamespace); err != nil {
+		t.Fatal(err)
+	}
+
+	scanName := "ocp4-moderate"
+	checkResult := compv1alpha1.ComplianceCheckResult{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-audit-profile-set", scanName),
+			Namespace: f.OperatorNamespace,
+		},
+		ID:       "xccdf_org.ssgproject.content_rule_audit_profile_set",
+		Status:   compv1alpha1.CheckResultPass,
+		Severity: compv1alpha1.CheckResultSeverityMedium,
+	}
+	err := f.AssertHasCheck(bindingName, scanName, checkResult)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Remove the `ocp4-moderate` and `ocp4-cis-node` profile from the `ScanSettingBinding`
+	scanSettingBindingUpdate := &compv1alpha1.ScanSettingBinding{}
+	if err := f.Client.Get(context.TODO(), types.NamespacedName{Namespace: f.OperatorNamespace, Name: bindingName}, scanSettingBindingUpdate); err != nil {
+		t.Fatalf("failed to get ScanSettingBinding %s", bindingName)
+	}
+
+	scanSettingBindingUpdate.Profiles = []compv1alpha1.NamedObjectReference{
+		{
+			Name:     "ocp4-cis",
+			Kind:     "Profile",
+			APIGroup: "compliance.openshift.io/v1alpha1",
+		},
+	}
+	if err := f.Client.Update(context.TODO(), scanSettingBindingUpdate); err != nil {
+		t.Fatal(err)
+	}
+	var lastErr error
+	timeouterr := wait.Poll(framework.RetryInterval, framework.Timeout, func() (bool, error) {
+		if lastErr := f.AssertScanDoesNotExist("ocp4-moderate", f.OperatorNamespace); lastErr != nil {
+			log.Printf("Retrying: %s\n", lastErr)
+			return false, nil
+		}
+		if lastErr := f.AssertScanDoesNotExist("ocp4-cis-node-master", f.OperatorNamespace); lastErr != nil {
+			log.Printf("Retrying: %s\n", lastErr)
+			return false, nil
+		}
+		if lastErr := f.AssertScanDoesNotExist("ocp4-cis-node-worker", f.OperatorNamespace); lastErr != nil {
+			log.Printf("Retrying: %s\n", lastErr)
+			return false, nil
+		}
+		if lastErr := f.AssertScanDoesNotContainCheck(scanName, checkResult.Name, f.OperatorNamespace); lastErr != nil {
+			log.Printf("Retrying: %s\n", lastErr)
+			// print more info about the found check
+			ccr := &compv1alpha1.ComplianceCheckResult{}
+			if err := f.Client.Get(context.TODO(), types.NamespacedName{Namespace: f.OperatorNamespace, Name: checkResult.Name}, ccr); err != nil {
+				log.Printf("failed to get check %s: %s\n", checkResult.Name, err)
+			} else {
+				log.Printf("Object: %v\n", ccr)
+			}
+			return false, nil
+		}
+		log.Print("Scan ocp4-moderate, ocp4-cis-node-master and ocp4-cis-node-worker do not exist anymore\n")
+		log.Printf("Check %s doesn't exist anymore\n", checkResult.Name)
+		return true, nil
+	})
+
+	if lastErr != nil {
+		t.Fatalf("failed to remove profile from ScanSettingBinding: %s", lastErr)
+	}
+
+	if timeouterr != nil {
+		t.Fatalf("timed out waiting for scan and check to be removed: %s", timeouterr)
+	}
+}
+
 func TestSuspendScanSettingDoesNotCreateScan(t *testing.T) {
 	f := framework.Global
 

@@ -1125,6 +1125,16 @@ func (f *Framework) AssertScanHasValidPVCReferenceWithSize(scanName, size, names
 	return nil
 }
 
+func (f *Framework) AssertScanExists(name, namespace string) error {
+	cs := &compv1alpha1.ComplianceScan{}
+	defer f.logContainerOutput(namespace, name)
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, cs)
+	if apierrors.IsNotFound(err) {
+		return fmt.Errorf("Failed to assert ComplianceScan %s exists: %w", name, err)
+	}
+	return err
+}
+
 func (f *Framework) AssertScanDoesNotExist(name, namespace string) error {
 	cs := &compv1alpha1.ComplianceScan{}
 	defer f.logContainerOutput(namespace, name)
