@@ -822,6 +822,10 @@ func newStandardParser() *referenceParser {
 	if pcidssperr != nil {
 		log.Error(nciperr, "Could not register PCI-DSS reference parser") // not much we can do here..
 	}
+	stigperr := p.registerStandard("STIG", `^https://public\.cyber\.mil/stigs/downloads/\?_dl_facet_stigs=container-platform`)
+	if stigperr != nil {
+		log.Error(stigperr, "Could not register STIG reference parser") // not much we can do here..
+	}
 
 	p.registerFormatter(profileOperatorFormatter)
 	p.registerFormatter(rhacmFormatter)
