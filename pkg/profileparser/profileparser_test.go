@@ -448,7 +448,6 @@ var _ = Describe("Testing parse profiles", func() {
 
 		BeforeEach(func() {
 			const expectedID = "xccdf_org.ssgproject.content_profile_moderate"
-
 			moderateProfile = getProfileById(expectedID, profileList)
 			Expect(moderateProfile).ToNot(BeNil())
 		})
@@ -472,9 +471,11 @@ var _ = Describe("Testing parse profiles", func() {
 		})
 
 		It("Has the platform annotations", func() {
+			const expectedUUID = "d625badc-92a1-5438-afd7-19526c26b03c"
 			Expect(moderateProfile.Annotations).ToNot(BeNil())
 			Expect(moderateProfile.Annotations).To(HaveKeyWithValue(cmpv1alpha1.ProductTypeAnnotation, string(cmpv1alpha1.ScanTypePlatform)))
 			Expect(moderateProfile.Annotations).To(HaveKeyWithValue(cmpv1alpha1.ProductAnnotation, "redhat_openshift_container_platform_4.1"))
+			Expect(moderateProfile.Annotations).To(HaveKeyWithValue(cmpv1alpha1.ProfileUniqueIDAnnotation, expectedUUID))
 		})
 	})
 })

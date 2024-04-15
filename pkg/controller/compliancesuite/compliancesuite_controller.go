@@ -9,6 +9,7 @@ import (
 	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/common"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/metrics"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/utils"
+	"github.com/ComplianceAsCode/compliance-operator/pkg/xccdf"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/go-logr/logr"
@@ -421,7 +422,20 @@ func (r *ReconcileComplianceSuite) addScanStatus(suite *compv1alpha1.ComplianceS
 }
 
 func launchScanForSuite(r *ReconcileComplianceSuite, suite *compv1alpha1.ComplianceSuite, scanWrap *compv1alpha1.ComplianceScanSpecWrapper, logger logr.Logger) error {
-	scan := newScanForSuite(suite, scanWrap)
+	scanProfile := scanWrap.Profile
+	profiles := &compv1alpha1.ProfileList{}
+	// list all profiles in namespace
+	if err := r.Client.List(context.TODO(), profiles, client.InNamespace(suite.Namespace)); err != nil {
+		return err
+	}
+	profileProduct := ""
+	for _, profile := range profiles.Items {
+		if profile.ID == scanProfile {
+			profileProduct = profile.GetAnnotations()[compv1alpha1.ProductAnnotation]
+			break
+		}
+	}
+	scan := newScanForSuite(suite, scanWrap, profileProduct)
 	if scan == nil {
 		return fmt.Errorf("cannot create ComplianceScan for %s:%s", suite.Name, scanWrap.Name)
 	}
@@ -443,11 +457,13 @@ func launchScanForSuite(r *ReconcileComplianceSuite, suite *compv1alpha1.Complia
 	return nil
 }
 
-func newScanForSuite(suite *compv1alpha1.ComplianceSuite, scanWrap *compv1alpha1.ComplianceScanSpecWrapper) *compv1alpha1.ComplianceScan {
+func newScanForSuite(suite *compv1alpha1.ComplianceSuite, scanWrap *compv1alpha1.ComplianceScanSpecWrapper, product string) *compv1alpha1.ComplianceScan {
 	scan := compv1alpha1.ComplianceScanFromWrapper(scanWrap)
 	scan.SetLabels(map[string]string{
-		compv1alpha1.SuiteLabel: suite.Name,
+		compv1alpha1.SuiteLabel:           suite.Name,
+		compv1alpha1.ProfileUniqueIDLable: xccdf.GetProfileUniqueID(product, scanWrap.Profile),
 	})
+
 	scan.SetNamespace(suite.Namespace)
 	return scan
 }

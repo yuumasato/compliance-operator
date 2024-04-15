@@ -3124,3 +3124,77 @@ func TestScanCleansUpComplianceCheckResults(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestScanHaveProfileUUID(t *testing.T) {
+	t.Parallel()
+	f := framework.Global
+	bindingName := framework.GetObjNameFromTest(t)
+	tpName := framework.GetObjNameFromTest(t)
+	// This is the profileUUID for the redhat_openshift_container_platform_4.1 product and xccdf_org.ssgproject.content_profile_moderate profile
+	const profileUUID = "d625badc-92a1-5438-afd7-19526c26b03c"
+
+	// check if the profileUUID is correct in ocp4-moderate profile
+	profile := &compv1alpha1.Profile{}
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: "ocp4-moderate", Namespace: f.OperatorNamespace}, profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.Annotations[compv1alpha1.ProfileUniqueIDAnnotation] != profileUUID {
+		t.Fatalf("expected profileUUID %s, got %s", profileUUID, profile.Annotations[compv1alpha1.ProfileUniqueIDAnnotation])
+	}
+
+	tp := &compv1alpha1.TailoredProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      tpName,
+			Namespace: f.OperatorNamespace,
+		},
+		Spec: compv1alpha1.TailoredProfileSpec{
+			Title:       "TestScanHaveProfileUUID",
+			Description: "TestScanHaveProfileUUID",
+			Extends:     "ocp4-moderate",
+		},
+	}
+
+	createTPErr := f.Client.Create(context.TODO(), tp, nil)
+	if createTPErr != nil {
+		t.Fatal(createTPErr)
+	}
+	defer f.Client.Delete(context.TODO(), tp)
+	scanSettingBinding := compv1alpha1.ScanSettingBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      bindingName,
+			Namespace: f.OperatorNamespace,
+		},
+		Profiles: []compv1alpha1.NamedObjectReference{
+			{
+				Name:     tpName,
+				Kind:     "TailoredProfile",
+				APIGroup: "compliance.openshift.io/v1alpha1",
+			},
+		},
+		SettingsRef: &compv1alpha1.NamedObjectReference{
+			Name:     "default",
+			Kind:     "ScanSetting",
+			APIGroup: "compliance.openshift.io/v1alpha1",
+		},
+	}
+	// use Context's create helper to create the object and add a cleanup function for the new object
+	err = f.Client.Create(context.TODO(), &scanSettingBinding, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Client.Delete(context.TODO(), &scanSettingBinding)
+	if err := f.WaitForSuiteScansStatus(f.OperatorNamespace, bindingName, compv1alpha1.PhaseDone, compv1alpha1.ResultNonCompliant); err != nil {
+		t.Fatal(err)
+	}
+
+	// check if the profileUUID is correct in the scan's label
+	scan := &compv1alpha1.ComplianceScan{}
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: "ocp4-moderate", Namespace: f.OperatorNamespace}, scan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scan.Labels[compv1alpha1.ProfileUniqueIDAnnotation] != profileUUID {
+		t.Fatalf("expected profileUUID %s, got %s", profileUUID, scan.Labels[compv1alpha1.ProfileUniqueIDAnnotation])
+	}
+}
