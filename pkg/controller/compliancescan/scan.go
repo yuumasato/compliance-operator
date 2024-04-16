@@ -134,7 +134,7 @@ func newScanPodForNode(scanInstance *compv1alpha1.ComplianceScan, node *corev1.N
 					Command: []string{
 						"sh",
 						"-c",
-						fmt.Sprintf("rm -rf %s && mkdir -p %s && ln -s %s %s | /bin/true", KubeletConfigLinkPath, KubeletConfigLinkFolder, KubeletConfigMapPath, KubeletConfigLinkPath),
+						fmt.Sprintf("mkdir -p %s && ln -s %s %s | /bin/true", KubeletConfigLinkFolder, KubeletConfigMapPath, KubeletConfigLinkPath),
 					},
 					ImagePullPolicy: corev1.PullAlways,
 					SecurityContext: &corev1.SecurityContext{
