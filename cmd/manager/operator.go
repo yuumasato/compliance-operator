@@ -77,11 +77,13 @@ func init() {
 type PlatformType string
 
 const (
-	PlatformOpenShift  PlatformType = "OpenShift"
-	PlatformEKS        PlatformType = "EKS"
-	PlatformGeneric    PlatformType = "Generic"
-	PlatformHyperShift PlatformType = "HyperShift"
-	PlatformUnknown    PlatformType = "Unknown"
+	PlatformOpenShift        PlatformType = "OpenShift"
+	PlatformEKS              PlatformType = "EKS"
+	PlatformGeneric          PlatformType = "Generic"
+	PlatformHyperShift       PlatformType = "HyperShift"
+	PlatformOpenShiftOnPower PlatformType = "OpenShiftOnPower"
+	PlatformOpenShiftOnZ     PlatformType = "OpenShiftOnZ"
+	PlatformUnknown          PlatformType = "Unknown"
 )
 
 // Change below variables to serve metrics on different host or port.
@@ -98,6 +100,8 @@ var (
 			"rhcos4",
 			"ocp4",
 		},
+		PlatformOpenShiftOnPower: {"ocp4"},
+		PlatformOpenShiftOnZ:     {"ocp4"},
 		PlatformEKS: {
 			"eks",
 		},
@@ -106,6 +110,7 @@ var (
 			"ocp4",
 		},
 	}
+
 	defaultRolesPerPlatform = map[PlatformType][]string{
 		PlatformOpenShift: {
 			"master",
@@ -341,9 +346,17 @@ func RunOperator(cmd *cobra.Command, args []string) {
 }
 
 func getValidPlatform(p string) PlatformType {
+	arch := goruntime.GOARCH
 	switch {
 	case strings.EqualFold(p, string(PlatformOpenShift)):
-		return PlatformOpenShift
+		switch {
+		case strings.EqualFold(arch, "ppc64le"):
+			return PlatformOpenShiftOnPower
+		case strings.EqualFold(arch, "s390x"):
+			return PlatformOpenShiftOnZ
+		default:
+			return PlatformOpenShift
+		}
 	case strings.EqualFold(p, string(PlatformEKS)):
 		return PlatformEKS
 	case strings.EqualFold(p, string(PlatformHyperShift)):
