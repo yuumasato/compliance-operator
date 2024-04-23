@@ -15,8 +15,8 @@ const ProductAnnotation = "compliance.openshift.io/product"
 // ProfileUniqueIDAnnotation specifies the unique identifier of the Profile
 const ProfileUniqueIDAnnotation = "compliance.openshift.io/unique-id"
 
-// ProfileUniqueIDLable specifies the unique identifier of the Profile
-const ProfileUniqueIDLable = "compliance.openshift.io/unique-id"
+// ProfileUniqueIDLabel specifies the unique identifier of the Profile
+const ProfileUniqueIDLabel = "compliance.openshift.io/unique-id"
 
 // ProfileRule defines the name of a specific rule in the profile
 type ProfileRule string

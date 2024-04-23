@@ -423,19 +423,24 @@ func (r *ReconcileComplianceSuite) addScanStatus(suite *compv1alpha1.ComplianceS
 
 func launchScanForSuite(r *ReconcileComplianceSuite, suite *compv1alpha1.ComplianceSuite, scanWrap *compv1alpha1.ComplianceScanSpecWrapper, logger logr.Logger) error {
 	scanProfile := scanWrap.Profile
-	profiles := &compv1alpha1.ProfileList{}
-	// list all profiles in namespace
-	if err := r.Client.List(context.TODO(), profiles, client.InNamespace(suite.Namespace)); err != nil {
-		return err
-	}
-	profileProduct := ""
-	for _, profile := range profiles.Items {
-		if profile.ID == scanProfile {
-			profileProduct = profile.GetAnnotations()[compv1alpha1.ProductAnnotation]
-			break
+	profileUniqueID := ""
+	if scanWrap.TailoringConfigMap != nil {
+		profileUniqueID = xccdf.GetProfileUniqueIDFromTP(scanWrap.Profile)
+	} else {
+		profiles := &compv1alpha1.ProfileList{}
+		// list all profiles in namespace
+		if err := r.Client.List(context.TODO(), profiles, client.InNamespace(suite.Namespace)); err != nil {
+			return err
+		}
+		for _, profile := range profiles.Items {
+			if profile.ID == scanProfile {
+				profileUniqueID = profile.GetAnnotations()[compv1alpha1.ProfileUniqueIDAnnotation]
+				break
+			}
 		}
 	}
-	scan := newScanForSuite(suite, scanWrap, profileProduct)
+
+	scan := newScanForSuite(suite, scanWrap, profileUniqueID)
 	if scan == nil {
 		return fmt.Errorf("cannot create ComplianceScan for %s:%s", suite.Name, scanWrap.Name)
 	}
@@ -457,11 +462,11 @@ func launchScanForSuite(r *ReconcileComplianceSuite, suite *compv1alpha1.Complia
 	return nil
 }
 
-func newScanForSuite(suite *compv1alpha1.ComplianceSuite, scanWrap *compv1alpha1.ComplianceScanSpecWrapper, product string) *compv1alpha1.ComplianceScan {
+func newScanForSuite(suite *compv1alpha1.ComplianceSuite, scanWrap *compv1alpha1.ComplianceScanSpecWrapper, profileUniqueID string) *compv1alpha1.ComplianceScan {
 	scan := compv1alpha1.ComplianceScanFromWrapper(scanWrap)
 	scan.SetLabels(map[string]string{
 		compv1alpha1.SuiteLabel:           suite.Name,
-		compv1alpha1.ProfileUniqueIDLable: xccdf.GetProfileUniqueID(product, scanWrap.Profile),
+		compv1alpha1.ProfileUniqueIDLabel: profileUniqueID,
 	})
 
 	scan.SetNamespace(suite.Namespace)

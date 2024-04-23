@@ -3129,10 +3129,10 @@ func TestScanHaveProfileUUID(t *testing.T) {
 	t.Parallel()
 	f := framework.Global
 	bindingName := framework.GetObjNameFromTest(t)
-	tpName := framework.GetObjNameFromTest(t)
+	tpName := "test-scan-have-profile-uuid-tp"
 	// This is the profileUUID for the redhat_openshift_container_platform_4.1 product and xccdf_org.ssgproject.content_profile_moderate profile
 	const profileUUID = "d625badc-92a1-5438-afd7-19526c26b03c"
-
+	const profileUUIDTP = "d1359d86-c04f-5aa7-bcbc-e75a40844734"
 	// check if the profileUUID is correct in ocp4-moderate profile
 	profile := &compv1alpha1.Profile{}
 	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: "ocp4-moderate", Namespace: f.OperatorNamespace}, profile)
@@ -3171,6 +3171,11 @@ func TestScanHaveProfileUUID(t *testing.T) {
 				Kind:     "TailoredProfile",
 				APIGroup: "compliance.openshift.io/v1alpha1",
 			},
+			{
+				Name:     "ocp4-moderate",
+				Kind:     "Profile",
+				APIGroup: "compliance.openshift.io/v1alpha1",
+			},
 		},
 		SettingsRef: &compv1alpha1.NamedObjectReference{
 			Name:     "default",
@@ -3189,12 +3194,8 @@ func TestScanHaveProfileUUID(t *testing.T) {
 	}
 
 	// check if the profileUUID is correct in the scan's label
-	scan := &compv1alpha1.ComplianceScan{}
-	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: "ocp4-moderate", Namespace: f.OperatorNamespace}, scan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if scan.Labels[compv1alpha1.ProfileUniqueIDAnnotation] != profileUUID {
-		t.Fatalf("expected profileUUID %s, got %s", profileUUID, scan.Labels[compv1alpha1.ProfileUniqueIDAnnotation])
-	}
+	f.AssertScanUUIDMatches("ocp4-moderate", f.OperatorNamespace, profileUUID)
+	// check if the profileUUID is correct in the tailored profile's label
+	f.AssertScanUUIDMatches(tpName, f.OperatorNamespace, profileUUIDTP)
+
 }

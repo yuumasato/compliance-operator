@@ -1049,6 +1049,20 @@ func (f *Framework) AssertScanIsCompliant(name, namespace string) error {
 	return nil
 }
 
+// AssertScanUUIDMatches checks if the scan has the expected UUID
+func (f *Framework) AssertScanUUIDMatches(name, namespace, expectedUUID string) error {
+	cs := &compv1alpha1.ComplianceScan{}
+	defer f.logContainerOutput(namespace, name)
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, cs)
+	if err != nil {
+		return err
+	}
+	if cs.Labels[compv1alpha1.ProfileUniqueIDLabel] != expectedUUID {
+		return fmt.Errorf("Expected UUID %s for scan %s, got %s", expectedUUID, name, cs.Labels[compv1alpha1.ProfileUniqueIDLabel])
+	}
+	return nil
+}
+
 func (f *Framework) AssertScanIsNonCompliant(name, namespace string) error {
 	cs := &compv1alpha1.ComplianceScan{}
 	defer f.logContainerOutput(namespace, name)

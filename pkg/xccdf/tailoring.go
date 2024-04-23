@@ -89,9 +89,14 @@ func GetProfileNameFromID(id string) string {
 
 // GetProfileUniqueIDFromBundleName returns the unique identifier of the Profile
 func GetProfileUniqueIDFromBundleName(pbName, profileID string) string {
+	name := fmt.Sprintf("%s-%s", pbName, profileID)
+	return GenerateUniqueIDFromDNS(name)
+}
+
+// GenerateUniqueIDFromDNS generates a unique identifier from a name using the DNS namespace
+func GenerateUniqueIDFromDNS(name string) string {
 	// Use a DNS namespace UUID
 	namespace := uuid.Must(uuid.Parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
-	name := fmt.Sprintf("%s-%s", pbName, profileID)
 	uuid := uuid.NewSHA1(namespace, []byte(name))
 	return uuid.String()
 }
@@ -99,6 +104,11 @@ func GetProfileUniqueIDFromBundleName(pbName, profileID string) string {
 // GetProfileUniqueID gets the unique identifier of the Profile from the platform name and the profile ID
 func GetProfileUniqueID(platform string, profileID string) string {
 	return GetProfileUniqueIDFromBundleName(platform, profileID)
+}
+
+// GetProfileUniqueIDFromTP gets the unique identifier for a TailoredProfileID
+func GetProfileUniqueIDFromTP(tpID string) string {
+	return GenerateUniqueIDFromDNS(tpID)
 }
 
 // GetRuleNameFromID gets a rule name from the xccdf ID
