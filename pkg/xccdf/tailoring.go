@@ -88,7 +88,7 @@ func GetProfileNameFromID(id string) string {
 }
 
 // GetProfileUniqueIDFromBundleName returns the unique identifier of the Profile
-func GetProfileUniqueIDFromBundleName(pbName, profileID string) string {
+func GetProfileUniqueIDFromBundleName(pbName, profileName string) string {
 	name := fmt.Sprintf("%s-%s", pbName, profileID)
 	return GenerateUniqueIDFromDNS(name)
 }
