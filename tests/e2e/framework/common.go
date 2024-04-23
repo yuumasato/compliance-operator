@@ -1057,8 +1057,8 @@ func (f *Framework) AssertScanUUIDMatches(name, namespace, expectedUUID string) 
 	if err != nil {
 		return err
 	}
-	if cs.Labels[compv1alpha1.ProfileUniqueIDLabel] != expectedUUID {
-		return fmt.Errorf("Expected UUID %s for scan %s, got %s", expectedUUID, name, cs.Labels[compv1alpha1.ProfileUniqueIDLabel])
+	if cs.Labels[compv1alpha1.ProfileGuidLabel] != expectedUUID {
+		return fmt.Errorf("Expected UUID %s for scan %s, got %s", expectedUUID, name, cs.Labels[compv1alpha1.ProfileGuidLabel])
 	}
 	return nil
 }

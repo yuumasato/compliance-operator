@@ -475,7 +475,7 @@ var _ = Describe("Testing parse profiles", func() {
 			Expect(moderateProfile.Annotations).ToNot(BeNil())
 			Expect(moderateProfile.Annotations).To(HaveKeyWithValue(cmpv1alpha1.ProductTypeAnnotation, string(cmpv1alpha1.ScanTypePlatform)))
 			Expect(moderateProfile.Annotations).To(HaveKeyWithValue(cmpv1alpha1.ProductAnnotation, "redhat_openshift_container_platform_4.1"))
-			Expect(moderateProfile.Annotations).To(HaveKeyWithValue(cmpv1alpha1.ProfileUniqueIDAnnotation, expectedUUID))
+			Expect(moderateProfile.Annotations).To(HaveKeyWithValue(cmpv1alpha1.ProfileGuidAnnotation, expectedUUID))
 		})
 	})
 })

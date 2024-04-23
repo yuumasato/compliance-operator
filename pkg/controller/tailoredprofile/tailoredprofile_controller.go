@@ -142,7 +142,7 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 
 			scanType := utils.GetScanType(p.GetAnnotations())
 			anns[cmpv1alpha1.ProductTypeAnnotation] = string(scanType)
-			anns[cmpv1alpha1.ProfileUniqueIDAnnotation] = xccdf.GetProfileUniqueIDFromTP(xccdf.GetXCCDFProfileID(instance))
+			anns[cmpv1alpha1.ProfileGuidAnnotation] = xccdf.GetProfileUniqueIDFromTP(xccdf.GetXCCDFProfileID(instance))
 			tpCopy.SetAnnotations(anns)
 
 			// Set labels for the TailoredProfile
@@ -151,7 +151,7 @@ func (r *ReconcileTailoredProfile) Reconcile(ctx context.Context, request reconc
 				labels = make(map[string]string)
 			}
 
-			labels[cmpv1alpha1.ExtendedProfileUniqueIDLable] = p.GetAnnotations()[cmpv1alpha1.ProfileUniqueIDAnnotation]
+			labels[cmpv1alpha1.ExtendedProfileGuidLabel] = p.GetAnnotations()[cmpv1alpha1.ProfileGuidAnnotation]
 			tpCopy.SetLabels(labels)
 			// Make TailoredProfile be owned by the Profile it extends. This way
 			// we can ensure garbage collection happens.

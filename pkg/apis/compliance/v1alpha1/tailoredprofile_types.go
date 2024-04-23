@@ -15,8 +15,8 @@ const PruneOutdatedReferencesAnnotationKey = "compliance.openshift.io/prune-outd
 // RuleLastCheckTypeChangedAnnotationKey is the annotation key used to indicate that the rule check type has changed, store its previous check type
 const RuleLastCheckTypeChangedAnnotationKey = "compliance.openshift.io/rule-last-check-type"
 
-// ExtendedProfileUniqueIDLable is a label used to store the unique ID of the profile being extends
-const ExtendedProfileUniqueIDLable = "compliance.openshift.io/extended-profile-unique-id"
+// ExtendedProfileGuidLabel is a label used to store the unique ID of the profile being extends
+const ExtendedProfileGuidLabel = "compliance.openshift.io/extended-profile-unique-id"
 
 // RuleReferenceSpec specifies a rule to be selected/deselected, as well as the reason why
 type RuleReferenceSpec struct {

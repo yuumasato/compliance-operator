@@ -509,7 +509,7 @@ func getRemediationLabels(scan *compv1alpha1.ComplianceScan, obj runtime.Object)
 func getCheckResultLabels(pr *utils.ParseResult, resultLabels map[string]string, scan *compv1alpha1.ComplianceScan) map[string]string {
 	labels := make(map[string]string)
 	labels[compv1alpha1.ComplianceScanLabel] = scan.Name
-	labels[compv1alpha1.ProfileUniqueIDLabel] = scan.Labels[compv1alpha1.ProfileUniqueIDLabel]
+	labels[compv1alpha1.ProfileGuidLabel] = scan.Labels[compv1alpha1.ProfileGuidLabel]
 	labels[compv1alpha1.SuiteLabel] = scan.Labels[compv1alpha1.SuiteLabel]
 	labels[compv1alpha1.ComplianceCheckResultStatusLabel] = string(pr.CheckResult.Status)
 	labels[compv1alpha1.ComplianceCheckResultSeverityLabel] = string(pr.CheckResult.Severity)

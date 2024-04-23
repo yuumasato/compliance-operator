@@ -434,7 +434,7 @@ func launchScanForSuite(r *ReconcileComplianceSuite, suite *compv1alpha1.Complia
 		}
 		for _, profile := range profiles.Items {
 			if profile.ID == scanProfile {
-				profileUniqueID = profile.GetAnnotations()[compv1alpha1.ProfileUniqueIDAnnotation]
+				profileUniqueID = profile.GetAnnotations()[compv1alpha1.ProfileGuidAnnotation]
 				break
 			}
 		}
@@ -465,8 +465,8 @@ func launchScanForSuite(r *ReconcileComplianceSuite, suite *compv1alpha1.Complia
 func newScanForSuite(suite *compv1alpha1.ComplianceSuite, scanWrap *compv1alpha1.ComplianceScanSpecWrapper, profileUniqueID string) *compv1alpha1.ComplianceScan {
 	scan := compv1alpha1.ComplianceScanFromWrapper(scanWrap)
 	scan.SetLabels(map[string]string{
-		compv1alpha1.SuiteLabel:           suite.Name,
-		compv1alpha1.ProfileUniqueIDLabel: profileUniqueID,
+		compv1alpha1.SuiteLabel:       suite.Name,
+		compv1alpha1.ProfileGuidLabel: profileUniqueID,
 	})
 
 	scan.SetNamespace(suite.Namespace)

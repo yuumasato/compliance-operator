@@ -3125,7 +3125,7 @@ func TestScanCleansUpComplianceCheckResults(t *testing.T) {
 	}
 }
 
-func TestScanHaveProfileUUID(t *testing.T) {
+func TestScanHasProfileUUID(t *testing.T) {
 	t.Parallel()
 	f := framework.Global
 	bindingName := framework.GetObjNameFromTest(t)
@@ -3139,8 +3139,8 @@ func TestScanHaveProfileUUID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if profile.Annotations[compv1alpha1.ProfileUniqueIDAnnotation] != profileUUID {
-		t.Fatalf("expected profileUUID %s, got %s", profileUUID, profile.Annotations[compv1alpha1.ProfileUniqueIDAnnotation])
+	if profile.Annotations[compv1alpha1.ProfileGuidAnnotation] != profileUUID {
+		t.Fatalf("expected profileUUID %s, got %s", profileUUID, profile.Annotations[compv1alpha1.ProfileGuidAnnotation])
 	}
 
 	tp := &compv1alpha1.TailoredProfile{

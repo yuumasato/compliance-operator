@@ -364,9 +364,9 @@ func parseProfileFromNode(profileRoot *xmlquery.Node, pb *cmpv1alpha1.ProfileBun
 				Name:      xccdf.GetProfileNameFromID(id),
 				Namespace: pb.Namespace,
 				Annotations: map[string]string{
-					cmpv1alpha1.ProductAnnotation:         productName,
-					cmpv1alpha1.ProductTypeAnnotation:     string(productType),
-					cmpv1alpha1.ProfileUniqueIDAnnotation: xccdf.GetProfileUniqueID(productName, id),
+					cmpv1alpha1.ProductAnnotation:     productName,
+					cmpv1alpha1.ProductTypeAnnotation: string(productType),
+					cmpv1alpha1.ProfileGuidAnnotation: xccdf.GetProfileUniqueID(productName, id),
 				},
 			},
 			ProfilePayload: cmpv1alpha1.ProfilePayload{
