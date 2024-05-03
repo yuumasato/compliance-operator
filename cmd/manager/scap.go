@@ -52,6 +52,7 @@ const (
 
 var (
 	MoreThanOneObjErr = errors.New("more than one object returned from the filter")
+	NullValErr        = errors.New("no value was returned from the filter")
 )
 
 // resourceFetcherClients just gathers several needed structs together so we can
@@ -520,6 +521,8 @@ func fetch(ctx context.Context, streamDispatcher streamerDispatcherFn, rfClients
 				filteredBody, filterErr := filter(ctx, body, rpath.Filter)
 				if errors.Is(filterErr, MoreThanOneObjErr) {
 					warnings = append(warnings, filterErr.Error())
+				} else if errors.Is(filterErr, NullValErr) {
+					warnings = append(warnings, fmt.Sprintf("couldn't filter '%s': %s", body, filterErr.Error()))
 				} else if filterErr != nil {
 					return fmt.Errorf("couldn't filter '%s': %w", body, filterErr)
 				}
@@ -554,6 +557,11 @@ func filter(ctx context.Context, rawobj []byte, filter string) ([]byte, error) {
 	}
 	if err, ok := v.(error); ok {
 		DBG("Error while filtering: %s", err)
+		// gojq may return a diverse set of internal errors caused by null values.
+		// These errors are happen when a piped filter ends up acting on a null value.
+		if strings.HasSuffix(err.Error(), ": null") {
+			return nil, fmt.Errorf("Skipping empty filter result from '%s': %w", filter, NullValErr)
+		}
 		return nil, err
 	}
 

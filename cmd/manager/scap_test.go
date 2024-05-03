@@ -316,6 +316,20 @@ var _ = Describe("Testing filtering", func() {
 				Expect(filterErr).Should(MatchError(MoreThanOneObjErr))
 			})
 		})
+		Context("Piped Filtering", func() {
+			var rawmc []byte
+			BeforeEach(func() {
+				nsFile, err := os.Open("../../tests/data/empty_machineconfig.json")
+				Expect(err).To(BeNil())
+				var readErr error
+				rawmc, readErr = io.ReadAll(nsFile)
+				Expect(readErr).To(BeNil())
+			})
+			It("skips filter piping errors", func() {
+				_, filterErr := filter(context.TODO(), rawmc, `[.items[] | select(.metadata.name | test("^rendered-worker-[0-9a-z]+$|^rendered-master-[0-9a-z]+$"))] | map(.spec.fips == true)`)
+				Expect(filterErr).Should(MatchError(NullValErr))
+			})
+		})
 	})
 })
 
