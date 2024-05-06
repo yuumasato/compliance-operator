@@ -52,6 +52,7 @@ import (
 	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/common"
 	ctrlMetrics "github.com/ComplianceAsCode/compliance-operator/pkg/controller/metrics"
 	"github.com/ComplianceAsCode/compliance-operator/pkg/utils"
+	"github.com/ComplianceAsCode/compliance-operator/pkg/xccdf"
 	"github.com/ComplianceAsCode/compliance-operator/version"
 )
 
@@ -515,7 +516,7 @@ func ensureDefaultProfileBundles(
 				},
 				Spec: compv1alpha1.ProfileBundleSpec{
 					ContentImage: pbimg,
-					ContentFile:  fmt.Sprintf("ssg-%s-ds.xml", prod),
+					ContentFile:  xccdf.GetContentFileName(prod),
 				},
 			}
 			setupLog.Info("Ensuring ProfileBundle is available",

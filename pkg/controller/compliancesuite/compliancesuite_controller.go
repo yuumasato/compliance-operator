@@ -434,8 +434,10 @@ func launchScanForSuite(r *ReconcileComplianceSuite, suite *compv1alpha1.Complia
 		}
 		for _, profile := range profiles.Items {
 			if profile.ID == scanProfile {
-				profileUniqueID = profile.GetAnnotations()[compv1alpha1.ProfileGuidAnnotation]
-				break
+				if scanWrap.Name == utils.GetScanNameFromProfile(profile.Name, scanWrap.NodeSelector) {
+					profileUniqueID = profile.GetAnnotations()[compv1alpha1.ProfileGuidAnnotation]
+					break
+				}
 			}
 		}
 	}

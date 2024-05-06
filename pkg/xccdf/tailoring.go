@@ -20,8 +20,10 @@ const (
 	varIDPrefix     string = "xccdf_org.ssgproject.content_value_"
 	// XCCDFNamespace is the XCCDF namespace of this project. Per the XCCDF
 	// specification, this assiciates the content with the author
-	XCCDFNamespace string = "compliance.openshift.io"
-	XCCDFURI       string = "http://checklists.nist.gov/xccdf/1.2"
+	XCCDFNamespace        string = "compliance.openshift.io"
+	XCCDFURI              string = "http://checklists.nist.gov/xccdf/1.2"
+	ContentFileNamePrefix string = "ssg-"
+	ContentFileNameSuffix string = "-ds.xml"
 )
 
 type TailoringElement struct {
@@ -74,6 +76,11 @@ type SetValueElement struct {
 	XMLName xml.Name `xml:"xccdf-1.2:set-value"`
 	IDRef   string   `xml:"idref,attr"`
 	Value   string   `xml:",chardata"`
+}
+
+// GetContentFileName gets the file name for a profile bundle
+func GetContentFileName(productName string) string {
+	return fmt.Sprintf("%s%s%s", ContentFileNamePrefix, productName, ContentFileNameSuffix)
 }
 
 // GetXCCDFProfileID gets a profile xccdf ID from the TailoredProfile object

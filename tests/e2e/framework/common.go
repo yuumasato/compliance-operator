@@ -1049,16 +1049,30 @@ func (f *Framework) AssertScanIsCompliant(name, namespace string) error {
 	return nil
 }
 
-// AssertScanUUIDMatches checks if the scan has the expected UUID
-func (f *Framework) AssertScanUUIDMatches(name, namespace, expectedUUID string) error {
+// AssertScanGUIDMatches checks if the scan has the expected GUID
+func (f *Framework) AssertScanGUIDMatches(name, namespace, expectedGUID string) error {
 	cs := &compv1alpha1.ComplianceScan{}
 	defer f.logContainerOutput(namespace, name)
 	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, cs)
 	if err != nil {
 		return err
 	}
-	if cs.Labels[compv1alpha1.ProfileGuidLabel] != expectedUUID {
-		return fmt.Errorf("Expected UUID %s for scan %s, got %s", expectedUUID, name, cs.Labels[compv1alpha1.ProfileGuidLabel])
+	if cs.Labels[compv1alpha1.ProfileGuidLabel] != expectedGUID {
+		return fmt.Errorf("Expected GUID %s for scan %s, got %s", expectedGUID, name, cs.Labels[compv1alpha1.ProfileGuidLabel])
+	}
+	return nil
+}
+
+// AssertProfileGUIDMatches checks if the profile has the expected GUID
+func (f *Framework) AssertProfileGUIDMatches(name, namespace, expectedGUID string) error {
+	profile := &compv1alpha1.Profile{}
+	defer f.logContainerOutput(namespace, name)
+	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, profile)
+	if err != nil {
+		return err
+	}
+	if profile.Annotations[compv1alpha1.ProfileGuidAnnotation] != expectedGUID {
+		return fmt.Errorf("Expected GUID %s for profile %s, got %s", expectedGUID, name, profile.Annotations[compv1alpha1.ProfileGuidAnnotation])
 	}
 	return nil
 }
