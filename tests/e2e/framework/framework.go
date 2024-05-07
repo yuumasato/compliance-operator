@@ -60,6 +60,7 @@ type Framework struct {
 	NamespacedManPath *string
 	OperatorNamespace string
 	WatchNamespace    string
+	Platform          string
 
 	restMapper *restmapper.DeferredDiscoveryRESTMapper
 
@@ -82,6 +83,7 @@ type frameworkOpts struct {
 	testType          string
 	isLocalOperator   bool
 	cleanupOnError    bool
+	platform          string
 }
 
 const (
@@ -99,6 +101,7 @@ const (
 	LocalOperatorArgs     = "localOperatorArgs"
 	CleanupOnErrorFlag    = "cleanupOnError"
 	TestTypeFlag          = "testType"
+	PlatformFlag          = "platform"
 
 	TestOperatorNamespaceEnv = "TEST_OPERATOR_NAMESPACE"
 	TestWatchNamespaceEnv    = "TEST_WATCH_NAMESPACE"
@@ -119,6 +122,8 @@ func (opts *frameworkOpts) addToFlagSet(flagset *flag.FlagSet) {
 			"in which case test resources are automatically cleaned up.")
 	flagset.StringVar(&opts.testType, TestTypeFlag, TestTypeAll,
 		"Defines the type of tests to run. (Options: all, serial, parallel)")
+	flagset.StringVar(&opts.platform, PlatformFlag, "openshift",
+		"The type of deployment hosting the tests. Options include \"openshift\" and \"rosa\".")
 }
 
 func newFramework(opts *frameworkOpts) (*Framework, error) {
@@ -163,6 +168,7 @@ func newFramework(opts *frameworkOpts) (*Framework, error) {
 		Scheme:            scheme,
 		NamespacedManPath: &opts.namespacedManPath,
 		OperatorNamespace: operatorNamespace,
+		Platform:          opts.platform,
 		LocalOperator:     opts.isLocalOperator,
 
 		projectRoot:       opts.projectRoot,
