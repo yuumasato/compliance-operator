@@ -253,13 +253,22 @@ func TestScanHasProfileGUID(t *testing.T) {
 	tpName := "test-scan-have-profile-guid-tp"
 	// This is the profileGUID for the redhat_openshift_container_platform_4.1 product and xccdf_org.ssgproject.content_profile_moderate profile
 	const profileGUIDOCPModerate = "d625badc-92a1-5438-afd7-19526c26b03c"
-	const profileGUIDTP = "d1359d86-c04f-5aa7-bcbc-e75a40844734"
+	const profileGUIDTP = "04a11c78-7c77-545e-8341-f1b7b743bcb8"
 	const profileGUIDRHCOSModerate = "eceb9af0-17d4-5c59-9b17-07cfd22a3ba1"
 	const profileGUIDOCPCIS = "a230315d-3e4a-5b58-b00f-f96f1553e036"
 
-	f.AssertProfileGUIDMatches("ocp4-moderate", f.OperatorNamespace, profileGUIDOCPModerate)
-	f.AssertProfileGUIDMatches("rhcos4-moderate", f.OperatorNamespace, profileGUIDRHCOSModerate)
-	f.AssertProfileGUIDMatches("ocp4-cis", f.OperatorNamespace, profileGUIDOCPCIS)
+	err := f.AssertProfileGUIDMatches("ocp4-moderate", f.OperatorNamespace, profileGUIDOCPModerate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.AssertProfileGUIDMatches("rhcos4-moderate", f.OperatorNamespace, profileGUIDRHCOSModerate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.AssertProfileGUIDMatches("ocp4-cis", f.OperatorNamespace, profileGUIDOCPCIS)
+	if err != nil {
+		t.Fatal(err)
+	}
 	tp := &compv1alpha1.TailoredProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      tpName,
@@ -311,7 +320,7 @@ func TestScanHasProfileGUID(t *testing.T) {
 		},
 	}
 	// use Context's create helper to create the object and add a cleanup function for the new object
-	err := f.Client.Create(context.TODO(), &scanSettingBinding, nil)
+	err = f.Client.Create(context.TODO(), &scanSettingBinding, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,12 +330,27 @@ func TestScanHasProfileGUID(t *testing.T) {
 	}
 
 	// check if the profileGUID is correct in the scan's label
-	f.AssertScanGUIDMatches("ocp4-moderate", f.OperatorNamespace, profileGUIDOCPModerate)
-	f.AssertScanGUIDMatches("rhcos4-moderate", f.OperatorNamespace, profileGUIDRHCOSModerate)
-	f.AssertScanGUIDMatches("ocp4-cis-node-master", f.OperatorNamespace, profileGUIDOCPCIS)
-	f.AssertScanGUIDMatches("ocp4-cis-node-worker", f.OperatorNamespace, profileGUIDOCPCIS)
+	err = f.AssertScanGUIDMatches("ocp4-moderate", f.OperatorNamespace, profileGUIDOCPModerate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.AssertScanGUIDMatches("rhcos4-moderate-worker", f.OperatorNamespace, profileGUIDRHCOSModerate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.AssertScanGUIDMatches("rhcos4-moderate-master", f.OperatorNamespace, profileGUIDRHCOSModerate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.AssertScanGUIDMatches("ocp4-cis", f.OperatorNamespace, profileGUIDOCPCIS)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// check if the profileGUID is correct in the tailored profile's label
-	f.AssertScanGUIDMatches(tpName, f.OperatorNamespace, profileGUIDTP)
+	err = f.AssertScanGUIDMatches(tpName, f.OperatorNamespace, profileGUIDTP)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 }
 

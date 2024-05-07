@@ -13,10 +13,10 @@ const ProductTypeAnnotation = "compliance.openshift.io/product-type"
 const ProductAnnotation = "compliance.openshift.io/product"
 
 // ProfileGuidAnnotation specifies the unique identifier of the Profile
-const ProfileGuidAnnotation = "compliance.openshift.io/guid"
+const ProfileGuidAnnotation = "compliance.openshift.io/profile-guid"
 
 // ProfileGuidLabel specifies the unique identifier of the Profile
-const ProfileGuidLabel = "compliance.openshift.io/guid"
+const ProfileGuidLabel = "compliance.openshift.io/profile-guid"
 
 // ProfileRule defines the name of a specific rule in the profile
 type ProfileRule string
