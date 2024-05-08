@@ -116,6 +116,14 @@ var (
 			"master",
 			"worker",
 		},
+		PlatformOpenShiftOnPower: {
+			"master",
+			"worker",
+		},
+		PlatformOpenShiftOnZ: {
+			"master",
+			"worker",
+		},
 		PlatformGeneric: {
 			compv1alpha1.AllRoles,
 		},
