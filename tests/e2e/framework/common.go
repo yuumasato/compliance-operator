@@ -1071,8 +1071,8 @@ func (f *Framework) AssertProfileGUIDMatches(name, namespace, expectedGUID strin
 	if err != nil {
 		return err
 	}
-	if profile.Annotations[compv1alpha1.ProfileGuidAnnotation] != expectedGUID {
-		return fmt.Errorf("Expected GUID %s for profile %s, got %s", expectedGUID, name, profile.Annotations[compv1alpha1.ProfileGuidAnnotation])
+	if profile.Labels[compv1alpha1.ProfileGuidLabel] != expectedGUID {
+		return fmt.Errorf("Expected GUID %s for profile %s, got %s", expectedGUID, name, profile.Labels[compv1alpha1.ProfileGuidLabel])
 	}
 	return nil
 }

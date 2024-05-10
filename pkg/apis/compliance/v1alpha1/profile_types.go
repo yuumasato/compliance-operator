@@ -12,9 +12,6 @@ const ProductTypeAnnotation = "compliance.openshift.io/product-type"
 // or TailoredProfile is targetting. Example: ocp4, rhcos4, ...
 const ProductAnnotation = "compliance.openshift.io/product"
 
-// ProfileGuidAnnotation specifies the unique identifier of the Profile
-const ProfileGuidAnnotation = "compliance.openshift.io/profile-guid"
-
 // ProfileGuidLabel specifies the unique identifier of the Profile
 const ProfileGuidLabel = "compliance.openshift.io/profile-guid"
 
