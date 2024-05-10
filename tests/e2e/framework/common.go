@@ -209,14 +209,16 @@ func (f *Framework) addFrameworks() error {
 	}
 
 	// MCO objects
-	mcoObjs := [2]dynclient.ObjectList{
-		&mcfgv1.MachineConfigPoolList{},
-		&mcfgv1.MachineConfigList{},
-	}
-	for _, obj := range mcoObjs {
-		err := AddToFrameworkScheme(mcfgapi.Install, obj)
-		if err != nil {
-			return fmt.Errorf("failed to add custom resource scheme to framework: %v", err)
+	if f.Platform != "rosa" {
+		mcoObjs := [2]dynclient.ObjectList{
+			&mcfgv1.MachineConfigPoolList{},
+			&mcfgv1.MachineConfigList{},
+		}
+		for _, obj := range mcoObjs {
+			err := AddToFrameworkScheme(mcfgapi.Install, obj)
+			if err != nil {
+				return fmt.Errorf("failed to add custom resource scheme to framework: %v", err)
+			}
 		}
 	}
 
@@ -476,6 +478,10 @@ func (f *Framework) deleteScanSettings(name string) error {
 }
 
 func (f *Framework) createMachineConfigPool(n string) error {
+	if f.Platform == "rosa" {
+		fmt.Printf("bypassing MachineConfigPool test setup because it's not supported on %s\n", f.Platform)
+		return nil
+	}
 	// get the worker pool
 	w := "worker"
 	p := &mcfgv1.MachineConfigPool{}
@@ -594,6 +600,10 @@ func (f *Framework) createMachineConfigPool(n string) error {
 }
 
 func (f *Framework) createInvalidMachineConfigPool(n string) error {
+	if f.Platform == "rosa" {
+		fmt.Printf("bypassing MachineConfigPool test setup because it's not supported on %s\n", f.Platform)
+		return nil
+	}
 	p := &mcfgv1.MachineConfigPool{
 		ObjectMeta: metav1.ObjectMeta{Name: n},
 		Spec: mcfgv1.MachineConfigPoolSpec{
@@ -621,6 +631,10 @@ func (f *Framework) createInvalidMachineConfigPool(n string) error {
 }
 
 func (f *Framework) cleanUpMachineConfigPool(n string) error {
+	if f.Platform == "rosa" {
+		fmt.Printf("bypassing MachineConfigPool cleanup because it's not supported on %s\n", f.Platform)
+		return nil
+	}
 	p := &mcfgv1.MachineConfigPool{}
 	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: n}, p)
 	if err != nil {
@@ -635,6 +649,10 @@ func (f *Framework) cleanUpMachineConfigPool(n string) error {
 }
 
 func (f *Framework) restoreNodeLabelsForPool(n string) error {
+	if f.Platform == "rosa" {
+		fmt.Printf("bypassing node label restoration because MachineConfigPools are not supported on %s\n", f.Platform)
+		return nil
+	}
 	p := &mcfgv1.MachineConfigPool{}
 	err := f.Client.Get(context.TODO(), types.NamespacedName{Name: n}, p)
 	if err != nil {
