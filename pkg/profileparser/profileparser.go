@@ -327,6 +327,11 @@ func parseProfileFromNode(profileRoot *xmlquery.Node, pb *cmpv1alpha1.ProfileBun
 
 		// In case the profile sets its own CPE string
 		productType, productName := getProductTypeAndName(profileObj, defType, defName)
+
+		if productType == "Platform" && utils.GetPlatform() == "ROSA" {
+			log.Info("Skipping platform profile creation because it is not supported on this platform", xccdf.GetProfileNameFromID(id))
+			continue
+		}
 		log.Info("Platform info", "type", productType, "name", productName)
 
 		ruleObjs := profileObj.SelectElements("xccdf-1.2:select")

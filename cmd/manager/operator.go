@@ -111,6 +111,10 @@ var (
 			"rhcos4",
 			"ocp4",
 		},
+		PlatformROSA: {
+			"rhcos4",
+			"ocp4",
+		},
 	}
 
 	defaultRolesPerPlatform = map[PlatformType][]string{
@@ -386,6 +390,8 @@ func getValidPlatform(p string) PlatformType {
 		default:
 			return PlatformOpenShift
 		}
+	case strings.EqualFold(p, string(PlatformROSA)):
+		return PlatformROSA
 	case strings.EqualFold(p, string(PlatformEKS)):
 		return PlatformEKS
 	case strings.EqualFold(p, string(PlatformHyperShift)):
