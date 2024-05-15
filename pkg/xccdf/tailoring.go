@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	cmpv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
 )
 
@@ -18,8 +20,10 @@ const (
 	varIDPrefix     string = "xccdf_org.ssgproject.content_value_"
 	// XCCDFNamespace is the XCCDF namespace of this project. Per the XCCDF
 	// specification, this assiciates the content with the author
-	XCCDFNamespace string = "compliance.openshift.io"
-	XCCDFURI       string = "http://checklists.nist.gov/xccdf/1.2"
+	XCCDFNamespace        string = "compliance.openshift.io"
+	XCCDFURI              string = "http://checklists.nist.gov/xccdf/1.2"
+	ContentFileNamePrefix string = "ssg-"
+	ContentFileNameSuffix string = "-ds.xml"
 )
 
 type TailoringElement struct {
@@ -74,6 +78,11 @@ type SetValueElement struct {
 	Value   string   `xml:",chardata"`
 }
 
+// GetContentFileName gets the file name for a profile bundle
+func GetContentFileName(productName string) string {
+	return fmt.Sprintf("%s%s%s", ContentFileNamePrefix, productName, ContentFileNameSuffix)
+}
+
 // GetXCCDFProfileID gets a profile xccdf ID from the TailoredProfile object
 func GetXCCDFProfileID(tp *cmpv1alpha1.TailoredProfile) string {
 	return fmt.Sprintf("xccdf_%s_profile_%s", XCCDFNamespace, tp.Name)
@@ -83,6 +92,30 @@ func GetXCCDFProfileID(tp *cmpv1alpha1.TailoredProfile) string {
 func GetProfileNameFromID(id string) string {
 	trimedName := strings.TrimPrefix(id, profileIDPrefix)
 	return strings.ToLower(strings.ReplaceAll(trimedName, "_", "-"))
+}
+
+// GetProfileUniqueIDFromBundleName returns the unique identifier of the Profile
+func GetProfileUniqueIDFromBundleName(pbName, profileName string) string {
+	name := fmt.Sprintf("%s-%s", pbName, profileName)
+	return GenerateUniqueIDFromDNS(name)
+}
+
+// GenerateUniqueIDFromDNS generates a unique identifier from a name using the DNS namespace
+func GenerateUniqueIDFromDNS(name string) string {
+	// Use a DNS namespace UUID
+	namespace := uuid.Must(uuid.Parse("6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
+	uuid := uuid.NewSHA1(namespace, []byte(name))
+	return uuid.String()
+}
+
+// GetProfileUniqueID gets the unique identifier of the Profile from the platform name and the profile ID
+func GetProfileUniqueID(platform string, profileID string) string {
+	return GetProfileUniqueIDFromBundleName(platform, profileID)
+}
+
+// GetProfileUniqueIDFromTP gets the unique identifier for a TailoredProfileID
+func GetProfileUniqueIDFromTP(tpID string) string {
+	return GenerateUniqueIDFromDNS(tpID)
 }
 
 // GetRuleNameFromID gets a rule name from the xccdf ID

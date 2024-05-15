@@ -73,6 +73,15 @@ func GetFirstNodeRole(nodeSelector map[string]string) string {
 	return ""
 }
 
+func GetScanNameFromProfile(profileName string, nodeSelector map[string]string) string {
+	role := GetFirstNodeRole(nodeSelector)
+	if role == "" {
+		return profileName
+	}
+
+	return fmt.Sprintf("%s-%s", profileName, role)
+}
+
 func GetNodeRoles(nodeSelector map[string]string) []string {
 	roles := []string{}
 	if nodeSelector == nil {
