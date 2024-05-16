@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -21,17 +22,21 @@ import (
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/rbac/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	psapi "k8s.io/pod-security-admission/api"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	dynclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
@@ -115,6 +120,49 @@ func (f *Framework) cleanUpFromYAMLFile(p *string) error {
 		}
 	}
 	return nil
+}
+
+func (f *Framework) PrintROSADebugInfo(t *testing.T) {
+	// List cluster claims
+	clusterClaimList := clusterv1alpha1.ClusterClaimList{}
+	err := f.Client.List(context.TODO(), &clusterClaimList)
+	if err != nil {
+		t.Fatalf("Failed to list cluster claims: %v", err)
+	}
+	for _, clusterClaim := range clusterClaimList.Items {
+		t.Logf("ClusterClaim: %s", clusterClaim.Name)
+		t.Logf("ClusterClaim.Spec.Value: %v", clusterClaim.Spec.Value)
+
+	}
+
+	// print out logs for compliance-operator deployment
+	podList := corev1.PodList{}
+	err = f.Client.List(context.TODO(), &podList, client.InNamespace(f.OperatorNamespace))
+	if err != nil {
+		t.Fatalf("Failed to list pods: %v", err)
+	}
+	for _, pod := range podList.Items {
+		// find pod named contains compliance-operator substring
+		if strings.Contains(pod.Name, "compliance-operator") {
+			log.Printf("Pod: %s", pod.Name)
+			log.Printf("Pod.Status: %v", pod.Status)
+			// print out logs for compliance-operator pod
+			req := f.KubeClient.CoreV1().Pods(f.OperatorNamespace).GetLogs(pod.Name, &corev1.PodLogOptions{})
+			log.Printf("Request: %v", req)
+			reader, err := req.Stream(context.Background())
+			if err != nil {
+				t.Fatalf("Failed to get logs: %v", err)
+			}
+			buf := make([]byte, 1024)
+			for {
+				n, err := reader.Read(buf)
+				if err != nil {
+					break
+				}
+				log.Printf("Logs: %s", string(buf[:n]))
+			}
+		}
+	}
 }
 
 func (f *Framework) cleanUpProfileBundle(p string) error {
@@ -216,6 +264,19 @@ func (f *Framework) addFrameworks() error {
 		}
 		for _, obj := range mcoObjs {
 			err := AddToFrameworkScheme(mcfgapi.Install, obj)
+			if err != nil {
+				return fmt.Errorf("failed to add custom resource scheme to framework: %v", err)
+			}
+		}
+	}
+
+	// ClusterClaim objects
+	if f.Platform == "rosa" {
+		ccObjs := [1]dynclient.ObjectList{
+			&clusterv1alpha1.ClusterClaimList{},
+		}
+		for _, obj := range ccObjs {
+			err := AddToFrameworkScheme(clusterv1alpha1.Install, obj)
 			if err != nil {
 				return fmt.Errorf("failed to add custom resource scheme to framework: %v", err)
 			}
@@ -420,6 +481,10 @@ func (f *Framework) GetReadyProfileBundle(name, namespace string) (*compv1alpha1
 }
 
 func (f *Framework) updateScanSettingsForDebug() error {
+	if f.Platform == "rosa" {
+		fmt.Printf("bypassing ScanSettings test setup because it's not supported on %s\n", f.Platform)
+		return nil
+	}
 	for _, ssName := range []string{"default", "default-auto-apply"} {
 		ss := &compv1alpha1.ScanSetting{}
 		sskey := types.NamespacedName{Name: ssName, Namespace: f.OperatorNamespace}
@@ -438,6 +503,10 @@ func (f *Framework) updateScanSettingsForDebug() error {
 }
 
 func (f *Framework) ensureE2EScanSettings() error {
+	if f.Platform == "rosa" {
+		fmt.Printf("bypassing ScanSettings test setup because it's not supported on %s\n", f.Platform)
+		return nil
+	}
 	for _, ssName := range []string{"default", "default-auto-apply"} {
 		ss := &compv1alpha1.ScanSetting{}
 		sskey := types.NamespacedName{Name: ssName, Namespace: f.OperatorNamespace}
@@ -464,6 +533,10 @@ func (f *Framework) ensureE2EScanSettings() error {
 }
 
 func (f *Framework) deleteScanSettings(name string) error {
+	if f.Platform == "rosa" {
+		fmt.Printf("bypassing ScanSettings test setup because it's not supported on %s\n", f.Platform)
+		return nil
+	}
 	ss := &compv1alpha1.ScanSetting{}
 	sskey := types.NamespacedName{Name: name, Namespace: f.OperatorNamespace}
 	if err := f.Client.Get(context.TODO(), sskey, ss); err != nil {

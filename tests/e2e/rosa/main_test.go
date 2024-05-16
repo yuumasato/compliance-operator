@@ -50,3 +50,28 @@ func TestInstallOnlyParsesNodeProfiles(t *testing.T) {
 	}
 
 }
+
+func TestScanSetting(t *testing.T) {
+	f := framework.Global
+	// prinout all scan settings
+	scanSettingList := compv1alpha1.ScanSettingList{}
+	err := f.Client.List(context.TODO(), &scanSettingList)
+	if err != nil {
+		t.Fatalf("Failed to list scan settings: %v", err)
+	}
+	for _, scanSetting := range scanSettingList.Items {
+		if scanSetting.Name == "default-auto-apply" {
+			f.PrintROSADebugInfo(t)
+			t.Fatalf("ScanSetting: %s is not expected", scanSetting.Name)
+		}
+		t.Logf("ScanSetting: %s", scanSetting.Name)
+		for _, role := range scanSetting.Roles {
+			if role == "master" {
+				f.PrintROSADebugInfo(t)
+				t.Fatalf("Role: %s is not expected", role)
+			}
+			t.Logf("Role: %s", role)
+
+		}
+	}
+}

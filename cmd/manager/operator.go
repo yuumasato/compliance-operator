@@ -141,6 +141,15 @@ var (
 		},
 	}
 
+	defaultAutoRemediationPerPlatform = map[PlatformType]bool{
+		PlatformOpenShift:        true,
+		PlatformOpenShiftOnPower: true,
+		PlatformOpenShiftOnZ:     true,
+		PlatformEKS:              false,
+		PlatformGeneric:          false,
+		PlatformHyperShift:       true,
+		PlatformROSA:             false,
+	}
 	serviceMonitorBearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	serviceMonitorTLSCAFile       = "/etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt"
 	alertName                     = "compliance"
@@ -599,6 +608,7 @@ func ensureDefaultScanSettings(
 	var lastErr error
 	for _, ns := range namespaceList {
 		roles := getDefaultRoles(platform)
+		autoRemediationEnabled := defaultAutoRemediationPerPlatform[platform]
 		d := &compv1alpha1.ScanSetting{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      defaultScanSettingsName,
@@ -622,31 +632,32 @@ func ensureDefaultScanSettings(
 		if !k8serrors.IsAlreadyExists(derr) {
 			lastErr = derr
 		}
-
-		a := &compv1alpha1.ScanSetting{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      defaultAutoApplyScanSettingsName,
-				Namespace: ns,
-			},
-			ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
-				RawResultStorage: compv1alpha1.RawResultStorageSettings{
-					NodeSelector: si.Selector,
-					Tolerations:  si.Tolerations,
+		if autoRemediationEnabled {
+			a := &compv1alpha1.ScanSetting{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      defaultAutoApplyScanSettingsName,
+					Namespace: ns,
 				},
-			},
-			ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
-				AutoApplyRemediations:  true,
-				AutoUpdateRemediations: true,
-				Schedule:               defaultScanSettingsSchedule,
-			},
-			Roles: roles,
-		}
-		setupLog.Info("Ensuring ScanSetting is available",
-			"ScanSetting.Name", d.GetName(),
-			"ScanSetting.Namespace", d.GetNamespace())
-		aerr := crclient.Create(ctx, a)
-		if !k8serrors.IsAlreadyExists(aerr) {
-			lastErr = aerr
+				ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+					RawResultStorage: compv1alpha1.RawResultStorageSettings{
+						NodeSelector: si.Selector,
+						Tolerations:  si.Tolerations,
+					},
+				},
+				ComplianceSuiteSettings: compv1alpha1.ComplianceSuiteSettings{
+					AutoApplyRemediations:  true,
+					AutoUpdateRemediations: true,
+					Schedule:               defaultScanSettingsSchedule,
+				},
+				Roles: roles,
+			}
+			setupLog.Info("Ensuring ScanSetting is available",
+				"ScanSetting.Name", d.GetName(),
+				"ScanSetting.Namespace", d.GetNamespace())
+			aerr := crclient.Create(ctx, a)
+			if !k8serrors.IsAlreadyExists(aerr) {
+				lastErr = aerr
+			}
 		}
 	}
 	return lastErr
