@@ -488,6 +488,9 @@ func (r *ReconcileProfileBundle) newWorkloadForBundle(pb *compliancev1alpha1.Pro
 								"--namespace", pb.Namespace,
 								"--ds-path", path.Join("/content", pb.Spec.ContentFile),
 							},
+							Env: []corev1.EnvVar{
+								corev1.EnvVar{Name: "PLATFORM", Value: utils.GetPlatform()},
+							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "content-dir",
