@@ -329,7 +329,7 @@ func parseProfileFromNode(profileRoot *xmlquery.Node, pb *cmpv1alpha1.ProfileBun
 		productType, productName := getProductTypeAndName(profileObj, defType, defName)
 
 		if productType == "Platform" && utils.GetPlatform() == "ROSA" {
-			log.Info("Skipping platform profile creation because it is not supported on this platform", xccdf.GetProfileNameFromID(id))
+			log.Info("Skipping platform profile creation because it is not supported on this platform", "id", xccdf.GetProfileNameFromID(id))
 			continue
 		}
 		log.Info("Platform info", "type", productType, "name", productName)
