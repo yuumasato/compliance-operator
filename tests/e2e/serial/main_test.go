@@ -369,6 +369,9 @@ func TestMixProductScan(t *testing.T) {
 			Schedule:              "0 1 * * *",
 			Suspend:               false,
 		},
+		ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+			Timeout: "10m",
+		},
 		Roles: []string{"master", "worker"},
 	}
 	if err := f.Client.Create(context.TODO(), &scanSetting, nil); err != nil {
@@ -1626,6 +1629,9 @@ func TestSuspendScanSetting(t *testing.T) {
 			Schedule:              "0 1 * * *",
 			Suspend:               false,
 		},
+		ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+			Timeout: "10m",
+		},
 		Roles: []string{"master", "worker"},
 	}
 	if err := f.Client.Create(context.TODO(), &scanSetting, nil); err != nil {
@@ -1861,6 +1867,9 @@ func TestSuspendScanSettingDoesNotCreateScan(t *testing.T) {
 			AutoApplyRemediations: false,
 			Schedule:              "0 1 * * *",
 			Suspend:               true,
+		},
+		ComplianceScanSettings: compv1alpha1.ComplianceScanSettings{
+			Timeout: "10m",
 		},
 		Roles: []string{"master", "worker"},
 	}
