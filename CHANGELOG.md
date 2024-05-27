@@ -32,6 +32,17 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 -
 
 
+## [1.4.1] - 2024-04-17
+
+### Fixes
+
+- [CMP-29272](https://issues.redhat.com/browse/OCPBUGS-29272) The Compliance
+  Operator will now clean up scan results when they're removed from a
+  `ScanSettingBinding`.
+- The Compliance Operator nows supports running multiple node profiles in the
+  same `ScanSettingBinding`. This makes it easier to have a single
+  `ScanSettingBinding` that contains all profiles for a benchmark.
+
 ## [1.4.0] - 2023-12-01
 
 ### Enhancements
