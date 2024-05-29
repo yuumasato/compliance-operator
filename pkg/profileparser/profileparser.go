@@ -328,7 +328,7 @@ func parseProfileFromNode(profileRoot *xmlquery.Node, pb *cmpv1alpha1.ProfileBun
 		// In case the profile sets its own CPE string
 		productType, productName := getProductTypeAndName(profileObj, defType, defName)
 
-		if strings.EqualFold(string(productType), "Platform") && strings.EqualFold(utils.GetPlatform(), "ROSA") {
+		if strings.EqualFold(string(productType), "Platform") && strings.EqualFold(utils.GetPlatform(), "ROSA") && utils.IsHostedControlPlane() {
 			log.Info("Skipping platform profile creation because it is not supported on this platform", "id", xccdf.GetProfileNameFromID(id))
 			continue
 		}
@@ -434,7 +434,6 @@ func parseProductTypeAndName(idref string, defaultType cmpv1alpha1.ComplianceSca
 	case "o":
 		productType = cmpv1alpha1.ScanTypeNode
 	default:
-		fmt.Printf("Unknown CPE part: %s for profile %s\n", cpePieces[partIdx], idref)
 		// We assume anything we don't know is a platform...
 		productType = cmpv1alpha1.ScanTypePlatform
 	}
