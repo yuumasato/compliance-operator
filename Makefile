@@ -674,7 +674,7 @@ package-version-to-tag: check-operator-version ## Explicitly override $TAG with 
 .PHONY: git-release
 git-release: fetch-git-tags package-version-to-tag changelog ## Update project files with new version information.
 	git checkout -b "release-v$(TAG)"
-	sed -i "s/\(replaces: \).*/\1$(PREVIOUS_VERSION)/" $(BUNDLE_CSV_FILE)
+	sed -i "s/\(replaces: \).*/\1$(APP_NAME).$(PREVIOUS_VERSION)/" $(BUNDLE_CSV_FILE)
 	sed -i "s/\(.*Version = \"\).*/\1$(TAG)\"/" version/version.go
 	sed -i "s/\(.*VERSION?=\).*/\1$(TAG)/" version.Makefile
 	git add version* bundle CHANGELOG.md config/manifests/bases

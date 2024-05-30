@@ -1,7 +1,4 @@
 #!/bin/bash
 
-ROOT_DIR=$(git rev-parse --show-toplevel)
-CSV="$ROOT_DIR/bundle/manifests/compliance-operator.clusterserviceversion.yaml"
-
-OLD_VERSION=$(yq '.spec.version' "$CSV")
+OLD_VERSION=$(git describe --tags --abbrev=0)
 echo "$OLD_VERSION"
