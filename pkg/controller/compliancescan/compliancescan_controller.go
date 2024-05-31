@@ -122,6 +122,7 @@ type ReconcileComplianceScan struct {
 //+kubebuilder:rbac:groups=image.openshift.io,resources=imagestreamtags,verbs=get,list,watch
 //+kubebuilder:rbac:groups=scheduling.k8s.io,resources=priorityclasses,verbs=get,list,watch
 //+kubebuilder:rbac:groups=cluster.open-cluster-management.io,resources=clusterclaims,verbs=get,list,watch
+//+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=get,list,watch
 
 // Reconcile reads that state of the cluster for a ComplianceScan object and makes changes based on the state read
 // and what is in the ComplianceScan.Spec

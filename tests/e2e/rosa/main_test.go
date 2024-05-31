@@ -37,6 +37,7 @@ func TestInstallOnlyParsesNodeProfiles(t *testing.T) {
 	l := compv1alpha1.ProfileList{}
 	err := f.Client.List(context.TODO(), &l)
 	if err != nil {
+		f.PrintROSADebugInfo(t)
 		t.Fatalf("failed to get ProfileList: %s", err)
 	}
 
@@ -45,6 +46,7 @@ func TestInstallOnlyParsesNodeProfiles(t *testing.T) {
 	for _, p := range l.Items {
 		pt := p.Annotations[compv1alpha1.ProductTypeAnnotation]
 		if pt != "Node" {
+			f.PrintROSADebugInfo(t)
 			t.Fatalf("found an unexpected profile type: %s of type %s", p.GetName(), pt)
 		}
 	}

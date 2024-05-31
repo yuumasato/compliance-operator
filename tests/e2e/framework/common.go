@@ -135,6 +135,17 @@ func (f *Framework) PrintROSADebugInfo(t *testing.T) {
 
 	}
 
+	// List infrastructures
+	infraList := configv1.InfrastructureList{}
+	err = f.Client.List(context.TODO(), &infraList)
+	if err != nil {
+		t.Fatalf("Failed to list infrastructures: %v", err)
+	}
+	for _, infra := range infraList.Items {
+		t.Logf("Infrastructure: %s", infra.Name)
+		t.Logf("Infrastructure.Status.ControlPlaneTopology: %v", infra.Status.ControlPlaneTopology)
+	}
+
 	// print out logs for compliance-operator deployment
 	podList := corev1.PodList{}
 	err = f.Client.List(context.TODO(), &podList, client.InNamespace(f.OperatorNamespace))

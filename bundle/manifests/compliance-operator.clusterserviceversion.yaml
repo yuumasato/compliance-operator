@@ -1243,6 +1243,14 @@ spec:
           - get
           - list
           - watch
+        - apiGroups:
+            - config.openshift.io
+          resources:
+            - infrastructures
+          verbs:
+            - get
+            - list
+            - watch
         serviceAccountName: compliance-operator
       - rules:
         - apiGroups:

@@ -22,7 +22,7 @@ rules:
   - apiGroups:
       - machineconfiguration.openshift.io
     resources:
-      - machineconfigs  # The compliance remediation controller operates on MachineConfigs
+      - machineconfigs # The compliance remediation controller operates on MachineConfigs
       - machineconfigpools
       - kubeletconfigs
     verbs:
@@ -154,6 +154,14 @@ rules:
       - cluster.open-cluster-management.io
     resources:
       - clusterclaims
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - config.openshift.io
+    resources:
+      - infrastructures
     verbs:
       - get
       - list

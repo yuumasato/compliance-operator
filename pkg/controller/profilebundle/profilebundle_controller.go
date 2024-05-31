@@ -490,6 +490,7 @@ func (r *ReconcileProfileBundle) newWorkloadForBundle(pb *compliancev1alpha1.Pro
 							},
 							Env: []corev1.EnvVar{
 								corev1.EnvVar{Name: "PLATFORM", Value: utils.GetPlatform()},
+								corev1.EnvVar{Name: "CONTROL_PLANE_TOPOLOGY", Value: utils.GetControlPlaneTopology()},
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{

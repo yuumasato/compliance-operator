@@ -12,13 +12,13 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	configv1 "github.com/openshift/api/config/v1"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/zap/zapcore"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	"github.com/ComplianceAsCode/compliance-operator/pkg/apis"
 	compv1alpha1 "github.com/ComplianceAsCode/compliance-operator/pkg/apis/compliance/v1alpha1"
@@ -338,6 +338,16 @@ func RunOperator(cmd *cobra.Command, args []string) {
 		setupLog.Error(err, "")
 		os.Exit(1)
 	}
+
+	infra := &configv1.Infrastructure{}
+	if err := kubeClient.RESTClient().Get().RequestURI("/apis/config.openshift.io/v1/infrastructures/cluster").Do(ctx).Into(infra); err != nil {
+		setupLog.Info("Couldn't get Infrastructure. This is not fatal though.")
+		setupLog.Error(err, "")
+	} else {
+		// Set environment variables for the controlPlaneTopology
+		os.Setenv("CONTROL_PLANE_TOPOLOGY", string(infra.Status.ControlPlaneTopology))
+	}
+
 	// We need to set PLATFORM env var if the PLATFORM flag is set
 	pflag := os.Getenv("PLATFORM")
 	if pflag == "" {
