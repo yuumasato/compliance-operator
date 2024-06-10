@@ -2,17 +2,11 @@ name: Release latest
 
 on:
   push:
-    branches: [ 'master' ]
+    branches: ["master"]
 
 jobs:
   # Push to latest
   operator-container-push-latest:
-    strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/ppc64le
-          - linux/s390x
     permissions:
       contents: read
       id-token: write
@@ -23,16 +17,10 @@ jobs:
       registry_org: complianceascode
       tag: latest
       dockerfile_path: build/Dockerfile
-      vendor: 'Compliance Operator Authors'
-      platforms: ${{ matrix.platform }}
+      vendor: "Compliance Operator Authors"
+      platforms: "linux/amd64,linux/ppc64le,linux/s390x"
 
   bundle-container-push-latest:
-    strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/ppc64le
-          - linux/s390x
     permissions:
       contents: read
       id-token: write
@@ -43,16 +31,10 @@ jobs:
       registry_org: complianceascode
       tag: latest
       dockerfile_path: bundle.Dockerfile
-      vendor: 'Compliance Operator Authors'
-      platforms: ${{ matrix.platform }}
+      vendor: "Compliance Operator Authors"
+      platforms: "linux/amd64,linux/ppc64le,linux/s390x"
 
   openscap-container-push-latest:
-    strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/ppc64le
-          - linux/s390x
     permissions:
       contents: read
       id-token: write
@@ -63,16 +45,10 @@ jobs:
       registry_org: complianceascode
       tag: latest
       dockerfile_path: images/openscap/Dockerfile
-      vendor: 'Compliance Operator Authors'
-      platforms: ${{ matrix.platform }}
+      vendor: "Compliance Operator Authors"
+      platforms: "linux/amd64,linux/ppc64le,linux/s390x"
 
   catalog-container-push-pr:
-    strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/ppc64le
-          - linux/s390x
     permissions:
       contents: read
       id-token: write
@@ -83,7 +59,7 @@ jobs:
       registry_org: complianceascode
       tag: latest
       dockerfile_path: catalog.Dockerfile
-      vendor: 'Compliance Operator Authors'
+      vendor: "Compliance Operator Authors"
       prepare_command: |
         make catalog-docker BUNDLE_IMGS=ghcr.io/complianceascode/compliance-operator-bundle:latest
-      platforms: ${{ matrix.platform }}
+      platforms: "linux/amd64,linux/ppc64le,linux/s390x"
