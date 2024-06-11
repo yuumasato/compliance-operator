@@ -91,6 +91,7 @@ jobs:
   catalog-container-push-pr:
     needs:
       - get-pr-number
+      - operator-container-push-pr
       - bundle-container-push-pr
     permissions:
       contents: read
