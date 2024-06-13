@@ -19,6 +19,8 @@ import (
 	"io"
 	"os"
 	"path"
+	goruntime "runtime"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -148,24 +150,30 @@ var _ = Describe("Resultserver testing", func() {
 			Expect(dir3).To(BeADirectory())
 			Expect(lostFoundDir).To(BeADirectory())
 		})
+		// If os arch is s390x skip following test, there is an issue on that platform
+		// See https://github.com/ComplianceAsCode/compliance-operator/issues/534
+		arch := goruntime.GOARCH
+		if !strings.EqualFold(arch, "s390x") {
+			It("Rotates directories according to the rotation policy (3 directories with one lost+found and policy=2)", func() {
+				err := rotateResultDirectories(rootDir, 2)
+				Expect(err).To(BeNil())
 
-		It("Rotates directories according to the rotation policy (3 directories with one lost+found and policy=2)", func() {
-			err := rotateResultDirectories(rootDir, 2)
-			Expect(err).To(BeNil())
+				files := _readDirNames(rootDir)
 
-			files := _readDirNames(rootDir)
+				By("Verifying that the expected files are in the directory hierarchy")
+				Expect(len(files)).To(Equal(3))
 
-			By("Verifying that the expected files are in the directory hierarchy")
-			Expect(len(files)).To(Equal(3))
-			Expect(path.Base(dir1)).ToNot(BeElementOf(files))
-			Expect(path.Base(dir2)).To(BeElementOf(files))
-			Expect(path.Base(dir3)).To(BeElementOf(files))
-			Expect(path.Base(lostFoundDir)).To(BeElementOf(files))
+				Expect(path.Base(dir1)).ToNot(BeElementOf(files))
+				Expect(path.Base(dir2)).To(BeElementOf(files))
+				Expect(path.Base(dir3)).To(BeElementOf(files))
+				Expect(path.Base(lostFoundDir)).To(BeElementOf(files))
 
-			By("Verifying that the expected files are indeed directories")
-			Expect(dir3).To(BeADirectory())
-			Expect(dir2).To(BeADirectory())
-			Expect(lostFoundDir).To(BeADirectory())
-		})
+				By("Verifying that the expected files are indeed directories")
+				Expect(dir3).To(BeADirectory())
+				Expect(dir2).To(BeADirectory())
+				Expect(lostFoundDir).To(BeADirectory())
+
+			})
+		}
 	})
 })
