@@ -89,6 +89,8 @@ jobs:
       platforms: "linux/amd64,linux/ppc64le,linux/s390x"
 
   catalog-container-push-pr:
+    # Temporary workaround for SBOM issue https://github.com/metal-toolbox/container-push/pull/77
+    if: always()
     needs:
       - get-pr-number
       - operator-container-push-pr
@@ -110,6 +112,8 @@ jobs:
       platforms: "linux/amd64,linux/ppc64le,linux/s390x"
 
   comment-pr:
+    # Temporary workaround for SBOM issue https://github.com/metal-toolbox/container-push/pull/77
+    if: always()
     needs:
       - operator-container-push-pr
       - bundle-container-push-pr

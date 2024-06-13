@@ -49,6 +49,8 @@ jobs:
       platforms: "linux/amd64,linux/ppc64le,linux/s390x"
 
   catalog-container-push-pr:
+    # Temporary workaround for SBOM issue https://github.com/metal-toolbox/container-push/pull/77
+    if: always()
     needs:
       - operator-container-push-latest
       - bundle-container-push-latest
