@@ -7,12 +7,6 @@ on:
 
 jobs:
   container-main:
-    strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/ppc64le
-          - linux/s390x
     permissions:
       contents: read
       id-token: write
@@ -23,16 +17,24 @@ jobs:
       registry_org: complianceascode
       tag: ${GITHUB_REF_NAME}
       dockerfile_path: build/Dockerfile
-      vendor: 'Compliance Operator Authors'
-      platforms: ${{ matrix.platform }}
+      vendor: "Compliance Operator Authors"
+      platforms: "linux/amd64,linux/ppc64le,linux/s390x"
+
+  openscap-container:
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    uses: metal-toolbox/container-push/.github/workflows/container-push.yml@main
+    with:
+      name: openscap-ocp
+      registry_org: complianceascode
+      tag: ${GITHUB_REF_NAME}
+      dockerfile_path: images/openscap/Dockerfile
+      vendor: "Compliance Operator Authors"
+      platforms: "linux/amd64,linux/ppc64le,linux/s390x"
 
   bundle-container:
-    strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/ppc64le
-          - linux/s390x
     permissions:
       contents: read
       id-token: write
@@ -43,16 +45,16 @@ jobs:
       registry_org: complianceascode
       tag: ${GITHUB_REF_NAME}
       dockerfile_path: bundle.Dockerfile
-      vendor: 'Compliance Operator Authors'
-      platforms: ${{ matrix.platform }}
+      vendor: "Compliance Operator Authors"
+      platforms: "linux/amd64,linux/ppc64le,linux/s390x"
 
   catalog-container-push-pr:
-    strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/ppc64le
-          - linux/s390x
+    # Temporary workaround for SBOM issue https://github.com/metal-toolbox/container-push/pull/77
+    if: always()
+    needs:
+      - container-main
+      - openscap-container
+      - bundle-container
     permissions:
       contents: read
       id-token: write
@@ -63,7 +65,7 @@ jobs:
       registry_org: complianceascode
       tag: ${GITHUB_REF_NAME}
       dockerfile_path: catalog.Dockerfile
-      vendor: 'Compliance Operator Authors'
+      vendor: "Compliance Operator Authors"
       prepare_command: |
         make catalog-docker BUNDLE_IMGS=ghcr.io/complianceascode/compliance-operator-bundle:${GITHUB_REF_NAME}
-      platforms: ${{ matrix.platform }}
+      platforms: "linux/amd64,linux/ppc64le,linux/s390x"
