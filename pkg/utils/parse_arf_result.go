@@ -467,12 +467,15 @@ func GetInstructionsForRule(rule *xmlquery.Node, ocilTable NodeByIdHashTable, va
 	}
 
 	// if found, strip the last line
-	textSlice := strings.Split(strings.TrimSpace(textNodeStr), "\n")
+	textSlice := strings.Split(textNodeStr, "\n")
+	for i, line := range textSlice {
+		textSlice[i] = strings.TrimSpace(line)
+	}
 	if len(textSlice) > 1 {
 		textSlice = textSlice[:len(textSlice)-1]
 	}
 
-	return strings.TrimSpace(strings.Join(textSlice, "\n")), valuesRendered
+	return strings.Join(textSlice, "\n"), valuesRendered
 }
 
 // ParseContent parses the DataStream and returns the XML document
