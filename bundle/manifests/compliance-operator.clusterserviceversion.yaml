@@ -1669,5 +1669,7 @@ spec:
     name: operator
   - image: ghcr.io/complianceascode/k8scontent:latest
     name: profile
+  - image: ghcr.io/complianceascode/must-gather-ocp:latest
+    name: must-gather
   replaces: compliance-operator.v1.4.1
   version: 1.5.0
