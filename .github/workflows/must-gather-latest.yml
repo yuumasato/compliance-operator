@@ -1,15 +1,20 @@
 on:
   push:
     paths:
-      - 'utils/must-gather/**'
-      - 'images/must-gather/**'
+      - "utils/must-gather/**"
+      - "images/must-gather/**"
 
 jobs:
   must-gather-latest:
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     uses: metal-toolbox/container-push/.github/workflows/container-push.yml@main
     with:
       name: must-gather-ocp
       registry_org: complianceascode
       tag: latest
       dockerfile_path: images/must-gather/Dockerfile
-      vendor: 'Compliance Operator Authors'
+      vendor: "Compliance Operator Authors"
+      platforms: "linux/amd64,linux/ppc64le,linux/s390x"
