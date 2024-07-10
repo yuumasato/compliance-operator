@@ -450,12 +450,23 @@ including advanced topics such as content building.
 
 ## Must-gather support
 
-An `oc adm must-gather` image for collecting operator information for debugging
-or support is available at `ghcr.io/complianceascode/must-gather-ocp:latest`:
+The Compliance Operator CSV contains a reference to a related container image
+for [must-gather](https://github.com/openshift/must-gather) support. This image
+is built automatically as needed, with the latest version is always tagged
+and available at `ghcr.io/complianceascode/must-gather-ocp:latest`:
 
-```
+```console
 $ oc adm must-gather --image=ghcr.io/complianceascode/must-gather-ocp:latest
 ```
+
+You can also discover the must-gather image using the `relatedImages` attribute of the CSV:
+
+```console
+$ oc adm must-gather --image=$(oc get csv compliance-operator.v1.5.0 -o=jsonpath='{.spec.relatedImages[?(@.name=="must-gather")].image}')
+```
+
+Please consider using this image when filing bug reports as it provides
+additional details about the operator configuration and logs.
 
 ## Metrics
 
