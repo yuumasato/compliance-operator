@@ -1,12 +1,13 @@
 package manager
 
 import (
-	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/metrics"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"reflect"
 	"runtime"
 	"strings"
+
+	"github.com/ComplianceAsCode/compliance-operator/pkg/controller/metrics"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Operator Startup Function tests", func() {
@@ -23,7 +24,7 @@ var _ = Describe("Operator Startup Function tests", func() {
 		When("Installing to non-controlled namespace", func() {
 			It("ServiceMonitor is generated with the proper TLSConfig ServerName", func() {
 				metricService := operatorMetricService("foobar")
-				sm := generateOperatorServiceMonitor(metricService, "foobar")
+				sm := generateOperatorServiceMonitor(metricService, "foobar", "secret")
 				controllerMetricServiceFound := false
 				for _, ep := range sm.Spec.Endpoints {
 					if ep.Port == metrics.ControllerMetricsServiceName && ep.TLSConfig != nil {

@@ -439,7 +439,7 @@ func addMetrics(ctx context.Context, cfg *rest.Config, kClient *kubernetes.Clien
 		os.Exit(1)
 	}
 
-	if err := handleServiceMonitor(ctx, cfg, mClient, operatorNs, metricsService); err != nil {
+	if err := handleServiceMonitor(ctx, cfg, mClient, kClient, operatorNs, metricsService); err != nil {
 		log.Error(err, "Error creating ServiceMonitor")
 		os.Exit(1)
 	}
@@ -681,13 +681,21 @@ func getDefaultRoles(platform PlatformType) []string {
 	return defaultRolesPerPlatform[PlatformGeneric]
 }
 
-func generateOperatorServiceMonitor(service *v1.Service, namespace string) *monitoring.ServiceMonitor {
+func generateOperatorServiceMonitor(service *v1.Service, namespace, secretName string) *monitoring.ServiceMonitor {
 	serviceMonitor := GenerateServiceMonitor(service)
 	for i := range serviceMonitor.Spec.Endpoints {
 		if serviceMonitor.Spec.Endpoints[i].Port == ctrlMetrics.ControllerMetricsServiceName {
 			serviceMonitor.Spec.Endpoints[i].Path = ctrlMetrics.HandlerPath
 			serviceMonitor.Spec.Endpoints[i].Scheme = "https"
-			serviceMonitor.Spec.Endpoints[i].BearerTokenFile = serviceMonitorBearerTokenFile
+			serviceMonitor.Spec.Endpoints[i].Authorization = &monitoring.SafeAuthorization{
+				Type: "Bearer",
+				Credentials: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: "token",
+				},
+			}
 			serviceMonitor.Spec.Endpoints[i].TLSConfig = &monitoring.TLSConfig{
 				SafeTLSConfig: monitoring.SafeTLSConfig{
 					ServerName: "metrics." + namespace + ".svc",
@@ -697,6 +705,25 @@ func generateOperatorServiceMonitor(service *v1.Service, namespace string) *moni
 		}
 	}
 	return serviceMonitor
+}
+
+func getSecretNameForServiceAccount(clientset *kubernetes.Clientset, namespace string, serviceAccountName string) (string, error) {
+	// List all secrets in the specified namespace
+	secrets, err := clientset.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	// Iterate through the secrets to find the one associated with the service account
+	for _, secret := range secrets.Items {
+		if secret.Annotations != nil {
+			if saName, exists := secret.Annotations["kubernetes.io/service-account.name"]; exists && saName == serviceAccountName {
+				return secret.Name, nil
+			}
+		}
+	}
+
+	return "", errors.New("secret for service account not found")
 }
 
 // createOrUpdateServiceMonitor creates or updates the ServiceMonitor if it already exists.
@@ -724,7 +751,7 @@ func createOrUpdateServiceMonitor(ctx context.Context, mClient *monclientv1.Moni
 
 // handleServiceMonitor attempts to create a ServiceMonitor out of service, and updates it to include the controller
 // metrics paths.
-func handleServiceMonitor(ctx context.Context, cfg *rest.Config, mClient *monclientv1.MonitoringV1Client,
+func handleServiceMonitor(ctx context.Context, cfg *rest.Config, mClient *monclientv1.MonitoringV1Client, kubeClient *kubernetes.Clientset,
 	namespace string, service *v1.Service) error {
 	ok, err := ResourceExists(discovery.NewDiscoveryClientForConfigOrDie(cfg),
 		"monitoring.coreos.com/v1", "ServiceMonitor")
@@ -736,7 +763,16 @@ func handleServiceMonitor(ctx context.Context, cfg *rest.Config, mClient *moncli
 		return nil
 	}
 
-	serviceMonitor := generateOperatorServiceMonitor(service, namespace)
+	serviceAccountName := "compliance-operator"
+	secretName, err := getSecretNameForServiceAccount(kubeClient, namespace, serviceAccountName)
+	if err != nil {
+		if kerr.IsNotFound(err) {
+			log.Infof("Unable to find secret associated with %s service account: %s", serviceAccountName, err)
+		} else {
+			log.Errorf("Failed to retrieve secret associated with %s service account for setting up metrics monitor: %s", serviceAccountName, err)
+		}
+	}
+	serviceMonitor := generateOperatorServiceMonitor(service, namespace, secretName)
 
 	return createOrUpdateServiceMonitor(ctx, mClient, namespace, serviceMonitor)
 }
