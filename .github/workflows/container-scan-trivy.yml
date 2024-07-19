@@ -75,6 +75,7 @@ jobs:
         with:
           scan-type: 'fs'
           scan-ref: '.'
+          skip-files: 'vendor/github.com/securego/gosec/v2/rules/hardcoded_credentials.go'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
