@@ -2540,8 +2540,8 @@ func TestScanSettingBindingWatchesTailoredProfile(t *testing.T) {
 			Namespace: f.OperatorNamespace,
 		},
 		Spec: compv1alpha1.TailoredProfileSpec{
-			Title:       "TestScanProducesRemediations",
-			Description: "TestScanProducesRemediations",
+			Title:       "TestScanSettingBindingWatchesTailoredProfile",
+			Description: "TestScanSettingBindingWatchesTailoredProfile",
 			DisableRules: []compv1alpha1.RuleReferenceSpec{
 				{
 					Name:      "no-such-rule",
