@@ -659,7 +659,7 @@ push-e2e-content: e2e-content-images  ## Build and push the e2e-content-images
 
 .PHONY: must-gather-image
 must-gather-image:  ## Build the must-gather image
-	$(RUNTIME) build -t $(MUST_GATHER_IMAGE_PATH):$(MUST_GATHER_IMAGE_TAG) -f images/must-gather/Dockerfile .
+	$(RUNTIME) build -t $(MUST_GATHER_IMAGE_PATH):$(MUST_GATHER_IMAGE_TAG) -f images/must-gather/Dockerfile.ocp .
 
 .PHONY: must-gather
 must-gather: must-gather-image must-gather-push  ## Build and push the must-gather image

@@ -1,0 +1,5 @@
+FROM registry.ci.openshift.org/ocp/4.17:cli
+
+COPY utils/must-gather/* /usr/bin/
+
+ENTRYPOINT /usr/bin/gather
