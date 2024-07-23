@@ -19,6 +19,24 @@ do
   done
 done
 
+NAMESPACE="openshift-compliance"
+SCANS=$(${BIN} get scans -n ${NAMESPACE} -o jsonpath="{.items[*].metadata.name}")
+RAW_RESULTS_DIR=${LOGS_DIR}/${NAMESPACE}/raw-results/
+EXTRACT_PODS_DIR=${RAW_RESULTS_DIR}/extract-pods/
+mkdir -p ${EXTRACT_PODS_DIR}
+for SCAN in ${SCANS[@]}
+do
+    mkdir ${RAW_RESULTS_DIR}/${SCAN}
+    CLAIMNAME=$(${BIN} get pvc -n ${NAMESPACE} ${SCAN} -ojsonpath='{.metadata.name}')
+    # The EXTRACT_POD_NAME needs to match the pod name in fetch-raw-results-pod-template.yaml
+    EXTRACT_POD_NAME="extract-raw-results-${CLAIMNAME}"
+    sed s/%CLAIMNAME%/${CLAIMNAME}/g /usr/share/fetch-raw-results-pod-template.yaml > ${EXTRACT_PODS_DIR}/${EXTRACT_POD_NAME}-pod.yaml
+
+    ${BIN} create -n ${NAMESPACE} -f ${EXTRACT_PODS_DIR}/${EXTRACT_POD_NAME}-pod.yaml
+    ${BIN} wait -n ${NAMESPACE} --for=condition=Ready pod/${EXTRACT_POD_NAME}
+    ${BIN} cp -n ${NAMESPACE} ${EXTRACT_POD_NAME}:/scan-results ${RAW_RESULTS_DIR}/${SCAN}
+    ${BIN} delete pod -n ${NAMESPACE} ${EXTRACT_POD_NAME}
+done
 
 # Pod logs, describes
 NAMESPACES=(openshift-compliance)
