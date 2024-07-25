@@ -132,6 +132,10 @@ func (r *ReconcileScanSettingBinding) Reconcile(ctx context.Context, request rec
 	}
 
 	suite := compliancev1alpha1.ComplianceSuite{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ComplianceSuite",
+			APIVersion: compliancev1alpha1.SchemeGroupVersion.String(),
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.Name,
 			Namespace: instance.Namespace,
