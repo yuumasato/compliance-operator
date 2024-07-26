@@ -29,7 +29,7 @@ do
     mkdir ${RAW_RESULTS_DIR}/${SCAN}
     CLAIMNAME=$(${BIN} get pvc -n ${NAMESPACE} ${SCAN} -ojsonpath='{.metadata.name}')
     # The EXTRACT_POD_NAME needs to match the pod name in fetch-raw-results-pod-template.yaml
-    EXTRACT_POD_NAME="extract-raw-results-${CLAIMNAME}"
+    EXTRACT_POD_NAME="must-gather-raw-results-${CLAIMNAME}"
     sed s/%CLAIMNAME%/${CLAIMNAME}/g /usr/share/fetch-raw-results-pod-template.yaml > ${EXTRACT_PODS_DIR}/${EXTRACT_POD_NAME}-pod.yaml
 
     ${BIN} create -n ${NAMESPACE} -f ${EXTRACT_PODS_DIR}/${EXTRACT_POD_NAME}-pod.yaml
