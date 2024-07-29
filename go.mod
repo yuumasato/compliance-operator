@@ -13,7 +13,7 @@ require (
 
 require (
 	github.com/ajeddeloh/go-json v0.0.0-20200220154158-5ae607161559 // indirect
-	github.com/antchfx/xmlquery v1.3.18
+	github.com/antchfx/xmlquery v1.4.1
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0
 	github.com/cenkalti/backoff/v4 v4.2.1
@@ -89,7 +89,7 @@ require (
 )
 
 require (
-	github.com/antchfx/xpath v1.2.4 // indirect
+	github.com/antchfx/xpath v1.3.1 // indirect
 	github.com/aws/aws-sdk-go v1.50.25 // indirect
 	github.com/ccojocar/zxcvbn-go v1.0.2 // indirect
 	github.com/coreos/fcct v0.5.0 // indirect
