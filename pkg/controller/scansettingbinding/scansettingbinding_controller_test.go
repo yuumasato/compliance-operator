@@ -56,15 +56,27 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 		objs := []runtime.Object{}
 
 		// test instance
-		ssb = &compv1alpha1.ScanSettingBinding{}
-		suite = &compv1alpha1.ComplianceSuite{}
+		bindingTypeMeta := v1.TypeMeta{}
+		bindingTypeMeta.SetGroupVersionKind(compv1alpha1.SchemeGroupVersion.WithKind("ScanSettingBinding"))
+		ssb = &compv1alpha1.ScanSettingBinding{
+			TypeMeta: bindingTypeMeta,
+		}
+
+		suiteTypeMeta := v1.TypeMeta{}
+		suiteTypeMeta.SetGroupVersionKind(compv1alpha1.SchemeGroupVersion.WithKind("ComplianceSuite"))
+		suite = &compv1alpha1.ComplianceSuite{
+			TypeMeta: suiteTypeMeta,
+		}
 
 		platformProfileAnnotations := map[string]string{
 			compv1alpha1.ProductTypeAnnotation: string(compv1alpha1.ScanTypeNode),
 			compv1alpha1.ProductAnnotation:     "rhcos4",
 		}
 
+		profileBundleTypeMeta := v1.TypeMeta{}
+		profileBundleTypeMeta.SetGroupVersionKind(compv1alpha1.SchemeGroupVersion.WithKind("ProfileBundle"))
 		pBundleRhcos = &compv1alpha1.ProfileBundle{
+			TypeMeta: profileBundleTypeMeta,
 			ObjectMeta: v1.ObjectMeta{
 				Name:      "rhcos4",
 				Namespace: common.GetComplianceOperatorNamespace(),
@@ -78,7 +90,10 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 			},
 		}
 
+		profileTypeMeta := v1.TypeMeta{}
+		profileTypeMeta.SetGroupVersionKind(compv1alpha1.SchemeGroupVersion.WithKind("Profile"))
 		profRhcosE8 = &compv1alpha1.Profile{
+			TypeMeta: profileTypeMeta,
 			ObjectMeta: v1.ObjectMeta{
 				Name:        "rhcos4-e8",
 				Namespace:   common.GetComplianceOperatorNamespace(),
@@ -91,7 +106,10 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 			},
 		}
 
+		tailoredProfileTypeMeta := v1.TypeMeta{}
+		tailoredProfileTypeMeta.SetGroupVersionKind(compv1alpha1.SchemeGroupVersion.WithKind("TailoredProfile"))
 		tpRhcosE8 = &compv1alpha1.TailoredProfile{
+			TypeMeta: tailoredProfileTypeMeta,
 			ObjectMeta: v1.ObjectMeta{
 				Name:      "emptypass-rhcos4-e8",
 				Namespace: common.GetComplianceOperatorNamespace(),
@@ -120,10 +138,7 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 		}
 
 		scratchTP = &compv1alpha1.TailoredProfile{
-			TypeMeta: v1.TypeMeta{
-				Kind:       "TailoredProfile",
-				APIVersion: compv1alpha1.SchemeGroupVersion.String(),
-			},
+			TypeMeta: tailoredProfileTypeMeta,
 			ObjectMeta: v1.ObjectMeta{
 				Name:        "scratch-tp",
 				Namespace:   common.GetComplianceOperatorNamespace(),
@@ -150,7 +165,10 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 			},
 		}
 
+		settingsTypeMeta := v1.TypeMeta{}
+		settingsTypeMeta.SetGroupVersionKind(compv1alpha1.SchemeGroupVersion.WithKind("ScanSetting"))
 		setting = &compv1alpha1.ScanSetting{
+			TypeMeta: settingsTypeMeta,
 			ObjectMeta: v1.ObjectMeta{
 				Name:      "scan-setting",
 				Namespace: common.GetComplianceOperatorNamespace(),
@@ -255,7 +273,10 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 
 	Context("Creates a simple suite from a Profile", func() {
 		JustBeforeEach(func() {
+			bindingTypeMeta := v1.TypeMeta{}
+			bindingTypeMeta.SetGroupVersionKind(compv1alpha1.SchemeGroupVersion.WithKind("ScanSettingBinding"))
 			ssb = &compv1alpha1.ScanSettingBinding{
+				TypeMeta: bindingTypeMeta,
 				ObjectMeta: v1.ObjectMeta{
 					Name:      "simple-compliance-requirements",
 					Namespace: common.GetComplianceOperatorNamespace(),
@@ -348,7 +369,10 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 
 	Context("Creates a simple suite from a TailoredProfile", func() {
 		JustBeforeEach(func() {
+			bindingTypeMeta := v1.TypeMeta{}
+			bindingTypeMeta.SetGroupVersionKind(compv1alpha1.SchemeGroupVersion.WithKind("ScanSettingBinding"))
 			ssb = &compv1alpha1.ScanSettingBinding{
+				TypeMeta: bindingTypeMeta,
 				ObjectMeta: v1.ObjectMeta{
 					Name:      "simple-compliance-requirements-tp",
 					Namespace: common.GetComplianceOperatorNamespace(),
@@ -447,7 +471,10 @@ var _ = Describe("Testing scansettingbinding controller", func() {
 
 	Context("Creates a suite from a TailoredProfile created from scratch", func() {
 		JustBeforeEach(func() {
+			bindingTypeMeta := v1.TypeMeta{}
+			bindingTypeMeta.SetGroupVersionKind(compv1alpha1.SchemeGroupVersion.WithKind("ScanSettingBinding"))
 			ssb = &compv1alpha1.ScanSettingBinding{
+				TypeMeta: bindingTypeMeta,
 				ObjectMeta: v1.ObjectMeta{
 					Name:      "scratch-tp",
 					Namespace: common.GetComplianceOperatorNamespace(),

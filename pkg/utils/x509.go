@@ -22,7 +22,7 @@ func NewServerCert(caCert, caKey []byte, certname string, expire int) ([]byte, [
 	if err != nil {
 		return nil, nil, err
 	}
-	config, err := ca.MakeServerCert(sets.NewString(certname), expire)
+	config, err := ca.MakeServerCert(sets.New(certname), expire)
 	if err != nil {
 		return nil, nil, err
 	}
