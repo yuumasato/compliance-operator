@@ -1,0 +1,25 @@
+apiVersion: "v1"
+kind: Pod
+metadata:
+  name: must-gather-raw-results-%CLAIMNAME%
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  restartPolicy: Never
+  containers:
+    - name: must-gather-raw-results
+      image: registry.access.redhat.com/ubi9/ubi
+      command: ["sleep", "300"]
+      volumeMounts:
+      - mountPath: "/scan-results"
+        name: results-vol
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+  volumes:
+    - name: results-vol
+      persistentVolumeClaim:
+        claimName: %CLAIMNAME%

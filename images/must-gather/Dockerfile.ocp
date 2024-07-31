@@ -1,5 +1,6 @@
 FROM registry.ci.openshift.org/ocp/4.17:cli
 
-COPY utils/must-gather/* /usr/bin/
+COPY utils/must-gather/gather* /usr/bin/
+COPY utils/must-gather/fetch-raw-results-pod-template.yaml /usr/share/
 
 ENTRYPOINT /usr/bin/gather
