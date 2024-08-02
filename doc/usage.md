@@ -493,7 +493,7 @@ The compliance-operator exposes the following metrics to Prometheus when cluster
     # TYPE compliance_operator_compliance_state gauge
     compliance_operator_compliance_state{name="some-compliance-suite"} 1
 
-After logging into the console, navigating to Monitoring -> Metrics, the
+After logging into the console, navigating to Observe -> Metrics, the
 compliance_operator* metrics can be queried using the metrics dashboard. The
 `{__name__=~"compliance.*"}` query can be used to view the full set of metrics.
 
