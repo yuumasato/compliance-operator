@@ -166,3 +166,11 @@ rules:
       - get
       - list
       - watch
+  - apiGroups:
+      - operator.openshift.io
+    resources:
+      - ingresscontrollers # Necessary for Compliance Operator to apply remediations that update TLS ciphers.
+    verbs:
+      - get
+      - list
+      - patch
