@@ -501,8 +501,7 @@ Testing for the metrics from the cli can also be done directly with a pod that
 curls the metrics service. This is useful for troubleshooting.
 
 ```
-oc run --rm -i --restart=Never --image=registry.fedoraproject.org/fedora-minimal:latest -n openshift-compliance metrics-test -- bash -c 'curl -ks -H "Authorization: Bea
-rer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" https://metrics.openshift-compliance.svc:8585/metrics-co' | grep compliance
+oc run --rm -i --restart=Never --image=registry.fedoraproject.org/fedora-minimal:latest -n openshift-compliance metrics-test -- bash -c 'curl -ks -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" https://metrics.openshift-compliance.svc:8585/metrics-co' | grep compliance
 ```
 
 ## To use PriorityClass for scans
