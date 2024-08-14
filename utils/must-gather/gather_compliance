@@ -47,7 +47,7 @@ wait
 
 # Pod logs, describes
 NAMESPACES=(openshift-compliance)
-APIRESOURCES=(configmaps pods routes roles rolebindings serviceaccounts services leases)
+APIRESOURCES=(configmaps pods routes roles rolebindings serviceaccounts services leases events pvc pv)
 
 for NAMESPACE in ${NAMESPACES[@]}
 do
