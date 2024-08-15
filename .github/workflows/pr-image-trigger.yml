@@ -4,9 +4,9 @@ name: PR Image Trigger
 on:
   pull_request:
     types:
-    - opened
-    - reopened
-    - synchronize
+      - opened
+      - reopened
+      - synchronize
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.run_id }}
@@ -20,9 +20,11 @@ jobs:
       - name: Save PR number
         env:
           PR_NUMBER: ${{ github.event.number }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           mkdir -p ./pr
           echo $PR_NUMBER > ./pr/pr_number
+          echo $COMMIT_SHA > ./pr/commit_sha
       - uses: actions/upload-artifact@v4
         with:
           name: pr_number

@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       pr-number: ${{ steps.pr_number.outputs.pr_number }}
+      commit_sha: ${{ steps.commit_sha.outputs.commit_sha }}
+      platforms: ${{ steps.arch.outputs.platforms }}
     steps:
       - name: "Download artifacts"
         uses: actions/github-script@v7
@@ -39,6 +41,26 @@ jobs:
         id: pr_number
         run: |
           echo "pr_number=$(cat pr_number)" >> "$GITHUB_OUTPUT"
+      - name: "Read commit SHA"
+        id: commit_sha
+        run: |
+          echo "commit_sha=$(cat commit_sha)" >> "$GITHUB_OUTPUT"
+      - name: "Get all labels"
+        id: labels
+        uses: snnaplab/get-labels-action@v1.0.1
+        with:
+          number: ${{ steps.pr_number.outputs.pr_number }}
+      - name: "Check arch to build from labels"
+        id: arch
+        run: |
+          platforms="linux/amd64" # append other platforms as needed to platforms variable
+          if [[ $(echo "${{ steps.labels.outputs.labels }}" | grep -c "arch/ppc64le") -gt 0 ]]; then
+            platforms="$platforms,linux/ppc64le"
+          fi
+          if [[ $(echo "${{ steps.labels.outputs.labels }}" | grep -c "arch/s390x") -gt 0 ]]; then
+            platforms="$platforms,linux/s390x"
+          fi
+          echo "platforms=$platforms" >> "$GITHUB_OUTPUT"
 
   operator-container-push-pr:
     needs: get-pr-number
@@ -50,11 +72,11 @@ jobs:
     with:
       name: compliance-operator
       registry_org: complianceascode
-      tag: ${{ needs.get-pr-number.outputs.pr-number }}
+      tag: ${{ needs.get-pr-number.outputs.pr-number }}-${{ needs.get-pr-number.outputs.commit_sha }}
       dockerfile_path: build/Dockerfile
       vendor: "Compliance Operator Authors"
       checkout_ref: refs/pull/${{ needs.get-pr-number.outputs.pr-number }}/head
-      platforms: "linux/amd64,linux/ppc64le,linux/s390x"
+      platforms: ${{ needs.get-pr-number.outputs.platforms }}
 
   bundle-container-push-pr:
     needs: get-pr-number
@@ -66,11 +88,13 @@ jobs:
     with:
       name: compliance-operator-bundle
       registry_org: complianceascode
-      tag: ${{ needs.get-pr-number.outputs.pr-number }}
+      tag: ${{ needs.get-pr-number.outputs.pr-number }}-${{ needs.get-pr-number.outputs.commit_sha }}
       dockerfile_path: bundle.Dockerfile
       vendor: "Compliance Operator Authors"
       checkout_ref: refs/pull/${{ needs.get-pr-number.outputs.pr-number }}/head
-      platforms: "linux/amd64,linux/ppc64le,linux/s390x"
+      prepare_command: |
+        make bundle OPERATOR_IMAGE=ghcr.io/complianceascode/compliance-operator:${{ needs.get-pr-number.outputs.pr-number }}-${{ needs.get-pr-number.outputs.commit_sha }} OPENSCAP_IMAGE=ghcr.io/complianceascode/openscap-ocp:${{ needs.get-pr-number.outputs.pr-number }}-${{ needs.get-pr-number.outputs.commit_sha }} BUNDLE_IMGS=ghcr.io/complianceascode/compliance-operator-bundle:${{ needs.get-pr-number.outputs.pr-number }}-${{ needs.get-pr-number.outputs.commit_sha }}
+      platforms: ${{ needs.get-pr-number.outputs.platforms }}
 
   openscap-container-push-pr:
     needs: get-pr-number
@@ -82,11 +106,11 @@ jobs:
     with:
       name: openscap-ocp
       registry_org: complianceascode
-      tag: ${{ needs.get-pr-number.outputs.pr-number }}
+      tag: ${{ needs.get-pr-number.outputs.pr-number }}-${{ needs.get-pr-number.outputs.commit_sha }}
       dockerfile_path: images/openscap/Dockerfile
       vendor: "Compliance Operator Authors"
       checkout_ref: refs/pull/${{ needs.get-pr-number.outputs.pr-number }}/head
-      platforms: "linux/amd64,linux/ppc64le,linux/s390x"
+      platforms: ${{ needs.get-pr-number.outputs.platforms }}
 
   catalog-container-push-pr:
     needs:
@@ -101,13 +125,13 @@ jobs:
     with:
       name: compliance-operator-catalog
       registry_org: complianceascode
-      tag: ${{ needs.get-pr-number.outputs.pr-number }}
+      tag: ${{ needs.get-pr-number.outputs.pr-number }}-${{ needs.get-pr-number.outputs.commit_sha }}
       dockerfile_path: catalog.Dockerfile
       vendor: "Compliance Operator Authors"
       checkout_ref: refs/pull/${{ needs.get-pr-number.outputs.pr-number }}/head
       prepare_command: |
-        make catalog-docker BUNDLE_IMGS=ghcr.io/complianceascode/compliance-operator-bundle:${{ needs.get-pr-number.outputs.pr-number }}
-      platforms: "linux/amd64,linux/ppc64le,linux/s390x"
+        make catalog-docker BUNDLE_IMGS=ghcr.io/complianceascode/compliance-operator-bundle:${{ needs.get-pr-number.outputs.pr-number }}-${{ needs.get-pr-number.outputs.commit_sha }}
+      platforms: ${{ needs.get-pr-number.outputs.platforms }}
 
   comment-pr:
     needs:
@@ -128,6 +152,6 @@ jobs:
           message: |
             :robot: To deploy this PR, run the following command:
             ```
-            make catalog-deploy CATALOG_IMG=ghcr.io/complianceascode/compliance-operator-catalog:${{ needs.get-pr-number.outputs.pr-number }}
+            make catalog-deploy CATALOG_IMG=ghcr.io/complianceascode/compliance-operator-catalog:${{ needs.get-pr-number.outputs.pr-number }}-${{ needs.get-pr-number.outputs.commit_sha }}
             ```
           pr_number: ${{ needs.get-pr-number.outputs.pr-number }}
