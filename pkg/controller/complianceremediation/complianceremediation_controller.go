@@ -48,6 +48,7 @@ func (r *ReconcileComplianceRemediation) SetupWithManager(mgr ctrl.Manager) erro
 
 // Add creates a new ComplianceRemediation Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
+// Change something to trigger operator image build
 func Add(mgr manager.Manager, met *metrics.Metrics, _ utils.CtlplaneSchedulingInfo, _ *kubernetes.Clientset) error {
 	return add(mgr, newReconciler(mgr, met))
 }
