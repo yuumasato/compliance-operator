@@ -11,8 +11,8 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "test-release-1.8"
   creationTimestamp:
   labels:
-    appstudio.openshift.io/application: compliance-operator-1-8
-    appstudio.openshift.io/component: compliance-operator-1-8
+    appstudio.openshift.io/application: compliance-operator-release-1-8
+    appstudio.openshift.io/component: compliance-operator-release-1-8
     pipelines.appstudio.openshift.io/type: build
   name: compliance-operator-1-8-on-pull-request
   namespace: wsato-tenant

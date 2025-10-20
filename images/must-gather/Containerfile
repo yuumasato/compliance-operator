@@ -1,5 +1,6 @@
 FROM registry.redhat.io/ubi9/ubi-minimal:latest
 
+# Test
 LABEL \
         io.k8s.display-name="must-gather cli for compliance-operator" \
         io.k8s.description="An must-gather cli for the compliance-operator." \

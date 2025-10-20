@@ -1,5 +1,6 @@
 FROM registry.redhat.io/ubi9/ubi-minimal:latest
 
+# Test
 LABEL \
         io.k8s.display-name="OpenSCAP scanner for compliance-operator" \
         io.k8s.description="An OpenSCAP operand for the compliance-operator." \
