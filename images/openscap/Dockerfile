@@ -1,5 +1,6 @@
 FROM registry.access.redhat.com/ubi8/ubi-minimal
 
+# test
 LABEL \
     name="openscap-ocp" \
     run="podman run --privileged -v /:/host  -eHOSTROOT=/host -ePROFILE=xccdf_org.ssgproject.content_profile_coreos-fedramp -eCONTENT=ssg-rhcos4-ds.xml -eREPORT_DIR=/reports -eRULE=xccdf_org.ssgproject.content_rule_selinux_state" \
